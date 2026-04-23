@@ -19,11 +19,20 @@ export function SmartQuoteForm() {
 
   const unit = serviceTypes.find(([id]) => id === service)?.[3] ?? 0.26;
   const estimate = words > 0 ? Math.ceil(words * unit) : 0;
-
   const estimateText = useMemo(() => (estimate ? `¥${estimate.toLocaleString()}` : "待计算"), [estimate]);
+  const isLocked = status === "submitting" || status === "success";
+
+  function resetForNewQuote() {
+    setStatus("idle");
+    setMessage("");
+    setWords(0);
+    setService("standard");
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isLocked) return;
+
     setStatus("submitting");
     setMessage("");
 
@@ -56,11 +65,16 @@ export function SmartQuoteForm() {
 
   return (
     <form className="space-y-7" onSubmit={handleSubmit}>
-      <fieldset disabled={status === "submitting"}>
+      <fieldset disabled={isLocked}>
         <legend className="font-bold text-brand-900">选择服务级别</legend>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           {serviceTypes.map(([id, label, desc]) => (
-            <label key={id} className={`cursor-pointer border p-5 ${service === id ? "border-brand-600 bg-brand-100" : "border-slate-200"}`}>
+            <label
+              key={id}
+              className={`cursor-pointer border p-5 ${service === id ? "border-brand-600 bg-brand-100" : "border-slate-200"} ${
+                isLocked ? "cursor-not-allowed opacity-70" : ""
+              }`}
+            >
               <input className="sr-only" type="radio" name="service_type" value={id} checked={service === id} onChange={() => setService(id)} />
               <span className="block font-semibold text-brand-900">{label}</span>
               <span className="mt-2 block text-sm leading-6 text-slate-600">{desc}</span>
@@ -72,7 +86,7 @@ export function SmartQuoteForm() {
       <div className="grid gap-5 md:grid-cols-2">
         <label className="block">
           <span className="text-sm font-semibold text-brand-900">翻译方向</span>
-          <select name="language_pair" className="mt-2 w-full border border-slate-300 px-4 py-3">
+          <select name="language_pair" disabled={isLocked} className="mt-2 w-full border border-slate-300 px-4 py-3 disabled:bg-slate-50">
             <option>中 → 英</option>
             <option>英 → 中</option>
             <option>中 → 日</option>
@@ -82,7 +96,7 @@ export function SmartQuoteForm() {
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-brand-900">文件格式</span>
-          <select name="file_format" className="mt-2 w-full border border-slate-300 px-4 py-3">
+          <select name="file_format" disabled={isLocked} className="mt-2 w-full border border-slate-300 px-4 py-3 disabled:bg-slate-50">
             <option>Word / PDF / PPT / Excel</option>
             <option>SDLXLIFF / XLIFF</option>
             <option>IDML / XML / HTML</option>
@@ -100,7 +114,8 @@ export function SmartQuoteForm() {
             min={0}
             value={words || ""}
             onChange={(event) => setWords(Number(event.target.value))}
-            className="w-full border border-slate-300 px-4 py-3"
+            disabled={isLocked}
+            className="w-full border border-slate-300 px-4 py-3 disabled:bg-slate-50"
           />
           <div className="min-w-40 bg-slate-50 px-5 py-3 text-center">
             <span className="block text-xs text-slate-500">预估费用</span>
@@ -110,10 +125,22 @@ export function SmartQuoteForm() {
       </label>
 
       <div className="grid gap-5 md:grid-cols-2">
-        <input name="name" required placeholder="您的姓名" className="border border-slate-300 px-4 py-3" />
-        <input name="contact" required placeholder="手机 / 邮箱 / 微信" className="border border-slate-300 px-4 py-3" />
+        <input name="name" required disabled={isLocked} placeholder="您的姓名" className="border border-slate-300 px-4 py-3 disabled:bg-slate-50" />
+        <input
+          name="contact"
+          required
+          disabled={isLocked}
+          placeholder="手机 / 邮箱 / 微信"
+          className="border border-slate-300 px-4 py-3 disabled:bg-slate-50"
+        />
       </div>
-      <textarea name="notes" rows={4} placeholder="请说明用途、截止时间、是否需要盖章或格式还原" className="w-full border border-slate-300 px-4 py-3" />
+      <textarea
+        name="notes"
+        rows={4}
+        disabled={isLocked}
+        placeholder="请说明用途、截止时间、是否需要盖章或格式还原"
+        className="w-full border border-slate-300 px-4 py-3 disabled:bg-slate-50"
+      />
 
       {message && (
         <p className={`rounded px-4 py-3 text-sm ${status === "success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
@@ -121,9 +148,18 @@ export function SmartQuoteForm() {
         </p>
       )}
 
-      <button disabled={status === "submitting"} className="w-full rounded bg-brand-600 px-6 py-4 font-semibold text-white hover:bg-brand-500 disabled:cursor-wait disabled:bg-slate-400">
-        {status === "submitting" ? "正在提交..." : "提交询价，30 分钟内响应"}
+      <button
+        disabled={isLocked}
+        className="w-full rounded bg-brand-600 px-6 py-4 font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-400"
+      >
+        {status === "submitting" ? "正在提交..." : status === "success" ? "已提交，请等待客服联系" : "提交询价，30 分钟内响应"}
       </button>
+
+      {status === "success" && (
+        <button type="button" onClick={resetForNewQuote} className="w-full border border-brand-600 px-6 py-3 font-semibold text-brand-600 hover:bg-brand-100">
+          继续提交新需求
+        </button>
+      )}
     </form>
   );
 }
