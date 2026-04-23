@@ -1,19 +1,19 @@
 import type { ReactNode } from "react";
 import "./globals.css";
 
+export const metadata = {
+  metadataBase: new URL("https://qqbytop.com"),
+  title: {
+    default: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
+    template: "%s | QQBY 全球博译",
+  },
+  description:
+    "北京全球博译翻译服务有限公司提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
+};
+
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="zh-CN">
-      <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="stylesheet" href="/skin/css/common.css" />
-        <link rel="stylesheet" href="/skin/css/addstyle.css" />
-        <link rel="stylesheet" href="/skin/css/swiper.min.css" />
-        <link
-          rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
-        />
-      </head>
       <body>{children}</body>
     </html>
   );
