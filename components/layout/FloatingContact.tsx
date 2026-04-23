@@ -7,7 +7,7 @@ import { contact, getQqHref, getWhatsappHref } from "@/lib/contact";
 import type { Locale } from "@/lib/site-data";
 
 export function FloatingContact({ locale }: { locale: Locale }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const whatsappHref = getWhatsappHref(locale);
   const qqHref = getQqHref();
@@ -28,7 +28,7 @@ export function FloatingContact({ locale }: { locale: Locale }) {
         <div className="w-72 overflow-hidden rounded border border-slate-200 bg-white text-sm shadow-2xl">
           <div className="bg-brand-900 px-4 py-3 text-white">
             <p className="font-semibold">立即咨询 QQBY</p>
-            <p className="mt-1 text-xs text-slate-300">扫码、电话或提交需求，项目经理会尽快响应。</p>
+            <p className="mt-1 text-xs text-slate-300">扫码或提交需求，项目经理会尽快响应。</p>
           </div>
 
           <div className="space-y-3 p-4">
@@ -37,17 +37,12 @@ export function FloatingContact({ locale }: { locale: Locale }) {
               <p className="mt-2 text-xs leading-5 text-slate-600">{contact.wechatHint}</p>
             </div>
 
-            <div className="rounded bg-trust-600 px-4 py-3 text-center text-white">
-              <p className="text-xs opacity-90">电话咨询</p>
-              <p className="mt-1 text-lg font-bold tracking-wide">{contact.phone}</p>
-            </div>
-
             <button
               type="button"
               onClick={copyPhone}
               className="w-full rounded border border-slate-200 px-3 py-2 text-center font-semibold text-brand-900 hover:bg-slate-50"
             >
-              {copied ? "电话已复制" : "复制电话"}
+              {copied ? "电话已复制" : `复制电话 ${contact.phone}`}
             </button>
 
             <div className="grid grid-cols-2 gap-2">
