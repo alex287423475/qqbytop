@@ -8,8 +8,19 @@ import type { Locale } from "@/lib/site-data";
 
 export function FloatingContact({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(true);
+  const [copied, setCopied] = useState(false);
   const whatsappHref = getWhatsappHref(locale);
   const qqHref = getQqHref();
+
+  async function copyPhone() {
+    try {
+      await navigator.clipboard.writeText(contact.phone);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
 
   return (
     <aside className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2">
@@ -26,9 +37,18 @@ export function FloatingContact({ locale }: { locale: Locale }) {
               <p className="mt-2 text-xs leading-5 text-slate-600">{contact.wechatHint}</p>
             </div>
 
-            <a className="block rounded bg-trust-600 px-4 py-3 text-center font-semibold text-white hover:bg-trust-600/90" href={contact.phoneHref}>
-              电话咨询：{contact.phone}
-            </a>
+            <div className="rounded bg-trust-600 px-4 py-3 text-center text-white">
+              <p className="text-xs opacity-90">电话咨询</p>
+              <p className="mt-1 text-lg font-bold tracking-wide">{contact.phone}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={copyPhone}
+              className="w-full rounded border border-slate-200 px-3 py-2 text-center font-semibold text-brand-900 hover:bg-slate-50"
+            >
+              {copied ? "电话已复制" : "复制电话"}
+            </button>
 
             <div className="grid grid-cols-2 gap-2">
               <Link className="rounded bg-brand-600 px-3 py-2 text-center font-semibold text-white hover:bg-brand-500" href={`/${locale}/quote`}>
