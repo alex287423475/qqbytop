@@ -78,6 +78,24 @@ QUOTE_WEBHOOK_URL=https://example.com/webhook/quote
 
 未配置飞书或通用 webhook 时，提交内容会进入 Vercel Function 日志，适合临时验收，不适合作为长期线索存储方案。
 
+## 即时咨询入口
+
+微信二维码已内置在浮动联系按钮、页脚和关于页，图片路径：
+
+```text
+public/skin/picture/wx.jpg
+```
+
+可选即时通讯和在线客服通过环境变量开启：
+
+```text
+NEXT_PUBLIC_WHATSAPP_NUMBER=8613800000000
+NEXT_PUBLIC_QQ_NUMBER=123456789
+NEXT_PUBLIC_CRISP_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+`NEXT_PUBLIC_WHATSAPP_NUMBER` 需要使用可接收 WhatsApp 的真实号码，包含国家区号，不要带 `+`、空格或横线。
+
 ## 本地运行
 
 ```powershell
@@ -109,5 +127,6 @@ npx vercel deploy --prod
 ## 后续可增强项
 
 - 接入邮件或 CRM 通知。
+- 配置真实 WhatsApp、QQ 和 Crisp ID 后开启更多即时咨询入口。
 - 为每个语言版本补充更完整的人工本地化文案。
 - 按真实业务案例补充更多文章和行业方案。
