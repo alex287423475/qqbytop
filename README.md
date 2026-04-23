@@ -61,13 +61,22 @@ middleware.ts
 POST /api/quote
 ```
 
-生产环境可配置以下变量，把询价同步到飞书、n8n、CRM 或自建接口：
+生产环境可配置以下变量，把询价同步到飞书群机器人：
+
+```text
+QUOTE_FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/...
+QUOTE_FEISHU_SECRET=飞书机器人签名密钥
+```
+
+`QUOTE_FEISHU_SECRET` 只有在飞书机器人开启“签名校验”时才需要填写。
+
+也可以配置通用 webhook，把原始 JSON 同步到 n8n、CRM 或自建接口：
 
 ```text
 QUOTE_WEBHOOK_URL=https://example.com/webhook/quote
 ```
 
-未配置 webhook 时，提交内容会进入 Vercel Function 日志，适合临时验收，不适合作为长期线索存储方案。
+未配置飞书或通用 webhook 时，提交内容会进入 Vercel Function 日志，适合临时验收，不适合作为长期线索存储方案。
 
 ## 本地运行
 
@@ -99,7 +108,6 @@ npx vercel deploy --prod
 
 ## 后续可增强项
 
-- 将 `/quote` 的 `mailto:` 询价表单升级为 Vercel Serverless API。
-- 接入邮件、飞书或 CRM 通知。
+- 接入邮件或 CRM 通知。
 - 为每个语言版本补充更完整的人工本地化文案。
 - 按真实业务案例补充更多文章和行业方案。
