@@ -6,7 +6,7 @@ export const contact = {
   email: "info@qqbytop.com",
   emailHref: "mailto:info@qqbytop.com",
   address: "北京市昌平区回龙观东大街336号院1号楼5层511",
-  wechatQr: "/skin/picture/wx.jpg",
+  wechatQr: "/contact/wechat-qr.jpg",
   wechatHint: "扫码添加客服，发送文件或项目需求",
   whatsappNumber: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "",
   qqNumber: process.env.NEXT_PUBLIC_QQ_NUMBER || "",
