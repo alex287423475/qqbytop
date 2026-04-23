@@ -80,6 +80,13 @@ async function sendFeishuNotification(submission: QuoteSubmission) {
     return false;
   }
 
+  const result = (await response.json().catch(() => null)) as { code?: number; StatusCode?: number; msg?: string; StatusMessage?: string } | null;
+  const statusCode = result?.code ?? result?.StatusCode;
+  if (typeof statusCode === "number" && statusCode !== 0) {
+    console.error("quote_feishu_failed", statusCode, result?.msg || result?.StatusMessage || "unknown error");
+    return false;
+  }
+
   return true;
 }
 
