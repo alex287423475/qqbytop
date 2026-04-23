@@ -17,7 +17,7 @@ const legacyRedirects: Record<string, string> = {
   "learning/": "/zh/blog",
 };
 
-export function proxy(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.includes(".")) {

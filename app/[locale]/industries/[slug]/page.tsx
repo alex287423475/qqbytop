@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CTA } from "@/components/shared/CTA";
 import { SectionHeader } from "@/components/shared/SectionHeader";
@@ -10,6 +11,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const industry = getIndustry(slug);
+
   return {
     title: industry?.title ?? "行业翻译方案",
     description: industry?.summary,
@@ -77,16 +79,31 @@ export default async function IndustryDetailPage({ params }: { params: Promise<{
         <div className="mx-auto max-w-7xl px-5">
           <SectionHeader title="常用关联服务" />
           <div className="mt-10 grid gap-6 md:grid-cols-2">
-            {industry.relatedServices.map((slug) => {
-              const service = getService(slug);
+            {industry.relatedServices.map((serviceSlug) => {
+              const service = getService(serviceSlug);
               if (!service) return null;
+
               return (
-                <a key={slug} href={`/${locale}/services/${slug}`} className="bg-white p-6 hover:shadow-lg">
+                <Link key={serviceSlug} href={`/${locale}/services/${serviceSlug}`} className="bg-white p-6 hover:shadow-lg">
                   <h3 className="font-bold text-brand-900">{service.title}</h3>
                   <p className="mt-3 text-sm leading-7 text-slate-600">{service.summary}</p>
-                </a>
+                </Link>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16">
+        <div className="mx-auto max-w-4xl px-5">
+          <SectionHeader title="常见问题" />
+          <div className="mt-10 divide-y divide-slate-200 border-y border-slate-200">
+            {industry.faq.map((item) => (
+              <details key={item.q} className="group py-5">
+                <summary className="cursor-pointer list-none font-semibold text-brand-900">{item.q}</summary>
+                <p className="mt-3 leading-7 text-slate-600">{item.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>

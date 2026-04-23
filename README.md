@@ -42,8 +42,32 @@ components/
 旧站 URL 兼容跳转逻辑位于：
 
 ```text
-proxy.ts
+middleware.ts
 ```
+
+## 多语言收录策略
+
+当前 `/en` 和 `/ja` 路由用于保留未来本地化入口，但内容仍以中文为主。为避免搜索引擎收录重复中文内容：
+
+- `sitemap.xml` 只输出 `/zh` 页面。
+- `/en` 和 `/ja` 页面通过 metadata 设置为 `noindex, follow`。
+- 等英文、日文文案人工本地化完成后，再开放收录并恢复到 sitemap。
+
+## 询价表单
+
+`/[locale]/quote` 使用站内 API 提交，不依赖访客本机邮件客户端：
+
+```text
+POST /api/quote
+```
+
+生产环境可配置以下变量，把询价同步到飞书、n8n、CRM 或自建接口：
+
+```text
+QUOTE_WEBHOOK_URL=https://example.com/webhook/quote
+```
+
+未配置 webhook 时，提交内容会进入 Vercel Function 日志，适合临时验收，不适合作为长期线索存储方案。
 
 ## 本地运行
 

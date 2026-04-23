@@ -1,7 +1,8 @@
 import type { MetadataRoute } from "next";
-import { industries, locales, posts, services } from "@/lib/site-data";
+import { industries, posts, services } from "@/lib/site-data";
 
 const baseUrl = "https://qqbytop.com";
+const indexedLocales = ["zh"] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages = ["", "/services", "/industries", "/about", "/pricing", "/quote", "/blog"];
@@ -10,7 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const blogPages = posts.map((post) => `/blog/${post.slug}`);
 
   return [...staticPages, ...servicePages, ...industryPages, ...blogPages].flatMap((path) =>
-    locales.map((locale) => ({
+    indexedLocales.map((locale) => ({
       url: `${baseUrl}/${locale}${path}`,
       lastModified: new Date(),
       changeFrequency: path === "" ? "weekly" : "monthly",

@@ -1,22 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 
 const serviceTypes = [
-  ["standard", "标准翻译", "普通商务/内部阅读材料", 0.26],
-  ["professional", "专业翻译 + 审校", "法律/技术/金融/医学材料", 0.32],
-  ["premium", "高级翻译 + 母语润色", "营销/出版/官网内容", 0.4],
+  ["standard", "标准翻译", "普通商务、内部阅读材料", 0.26],
+  ["professional", "专业翻译 + 审校", "法律、技术、金融、医学材料", 0.32],
+  ["premium", "高级翻译 + 母语润色", "营销、出版、官网内容", 0.4],
 ] as const;
 
+type ServiceType = (typeof serviceTypes)[number][0];
+type SubmitState = "idle" | "submitting" | "success" | "error";
+
 export function SmartQuoteForm() {
-  const [service, setService] = useState("standard");
+  const [service, setService] = useState<ServiceType>("standard");
   const [words, setWords] = useState(0);
+  const [status, setStatus] = useState<SubmitState>("idle");
+  const [message, setMessage] = useState("");
+
   const unit = serviceTypes.find(([id]) => id === service)?.[3] ?? 0.26;
   const estimate = words > 0 ? Math.ceil(words * unit) : 0;
 
+  const estimateText = useMemo(() => (estimate ? `¥${estimate.toLocaleString()}` : "待计算"), [estimate]);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("submitting");
+    setMessage("");
+
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      const response = await fetch("/api/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, estimated_fee: estimate, service_type: service }),
+      });
+      const data = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(data.message || "提交失败，请稍后再试。");
+      }
+
+      setStatus("success");
+      setMessage(data.message || "需求已提交，我们会尽快联系您。");
+      form.reset();
+      setWords(0);
+      setService("standard");
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "提交失败，请稍后再试。");
+    }
+  }
+
   return (
-    <form className="space-y-7" action={`mailto:info@qqbytop.com`} method="post" encType="text/plain">
-      <fieldset>
+    <form className="space-y-7" onSubmit={handleSubmit}>
+      <fieldset disabled={status === "submitting"}>
         <legend className="font-bold text-brand-900">选择服务级别</legend>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           {serviceTypes.map(([id, label, desc]) => (
@@ -54,10 +94,17 @@ export function SmartQuoteForm() {
       <label className="block">
         <span className="text-sm font-semibold text-brand-900">预估字数</span>
         <div className="mt-2 flex flex-col gap-4 sm:flex-row">
-          <input type="number" name="word_count" min={0} value={words || ""} onChange={(event) => setWords(Number(event.target.value))} className="w-full border border-slate-300 px-4 py-3" />
+          <input
+            type="number"
+            name="word_count"
+            min={0}
+            value={words || ""}
+            onChange={(event) => setWords(Number(event.target.value))}
+            className="w-full border border-slate-300 px-4 py-3"
+          />
           <div className="min-w-40 bg-slate-50 px-5 py-3 text-center">
             <span className="block text-xs text-slate-500">预估费用</span>
-            <strong className="text-2xl text-brand-600">{estimate ? `¥${estimate.toLocaleString()}` : "待计算"}</strong>
+            <strong className="text-2xl text-brand-600">{estimateText}</strong>
           </div>
         </div>
       </label>
@@ -67,7 +114,16 @@ export function SmartQuoteForm() {
         <input name="contact" required placeholder="手机 / 邮箱 / 微信" className="border border-slate-300 px-4 py-3" />
       </div>
       <textarea name="notes" rows={4} placeholder="请说明用途、截止时间、是否需要盖章或格式还原" className="w-full border border-slate-300 px-4 py-3" />
-      <button className="w-full rounded bg-brand-600 px-6 py-4 font-semibold text-white hover:bg-brand-500">提交询价，30 分钟内响应</button>
+
+      {message && (
+        <p className={`rounded px-4 py-3 text-sm ${status === "success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+          {message}
+        </p>
+      )}
+
+      <button disabled={status === "submitting"} className="w-full rounded bg-brand-600 px-6 py-4 font-semibold text-white hover:bg-brand-500 disabled:cursor-wait disabled:bg-slate-400">
+        {status === "submitting" ? "正在提交..." : "提交询价，30 分钟内响应"}
+      </button>
     </form>
   );
 }
