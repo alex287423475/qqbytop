@@ -6,8 +6,10 @@ import {
   buildBlogCollectionSchema,
   buildBlogCollectionSummary,
   buildBlogCurrentRange,
+  buildBlogFeature,
   buildBlogHref,
   buildBlogPageMetadata,
+  buildBlogPageOverview,
 } from "../lib/blog-page.ts";
 
 test("buildBlogHref includes category and page query parameters only when needed", () => {
@@ -23,6 +25,49 @@ test("buildBlogCollectionSummary and current range are localized", () => {
   assert.equal(buildBlogCollectionSummary("ja", 1, 6, 12), "12 件中 1-6 件を表示");
   assert.equal(buildBlogCurrentRange("zh", 7, 12, 12), "当前显示 7-12 / 12");
   assert.equal(buildBlogCurrentRange("en", 7, 12, 12), "Currently showing 7-12 / 12");
+});
+
+test("buildBlogPageOverview returns category-specific zh copy", () => {
+  const overview = buildBlogPageOverview({
+    locale: "zh",
+    activeCategory: "法律合规",
+    totalArticles: 12,
+    totalCategories: 6,
+    categoryArticles: 2,
+    currentPage: 1,
+    latestDate: "2026-04-25",
+  });
+
+  assert.equal(overview.eyebrow, "分类导读");
+  assert.equal(overview.title, "法律合规相关文章");
+  assert.equal(overview.stats[0].label, "本分类文章");
+  assert.equal(overview.stats[0].value, "2");
+  assert.equal(overview.stats[2].value, "2026-04-25");
+});
+
+test("buildBlogFeature flags fact-source articles", () => {
+  const feature = buildBlogFeature({
+    locale: "zh",
+    article: {
+      title: "涉外合同翻译最常见的五个风险",
+      slug: "contract-translation-risks",
+      description: "",
+      category: "法律合规",
+      categories: ["法律合规"],
+      contentMode: "fact-source",
+      date: "2026-04-16",
+      locale: "zh",
+      keywords: [],
+      readTime: "6 分钟",
+      faq: [],
+      images: [],
+      coverImage: null,
+      coverAlt: "",
+    },
+  });
+
+  assert.equal(feature?.badge, "核心事实源");
+  assert.equal(feature?.cta, "进入文章");
 });
 
 test("buildBlogPageMetadata includes canonical and category-aware title", () => {
@@ -52,6 +97,7 @@ test("buildBlogCollectionSchema creates a collection page item list", () => {
         description: "",
         category: "法律合规",
         categories: ["法律合规"],
+        contentMode: "fact-source",
         date: "2026-04-16",
         locale: "zh",
         keywords: [],

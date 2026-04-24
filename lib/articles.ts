@@ -22,6 +22,7 @@ export type ArticleMeta = {
   description: string;
   category: string;
   categories: string[];
+  contentMode: string;
   date: string;
   locale: string;
   keywords: string[];
@@ -106,6 +107,7 @@ function parseArticleFile(filePath: string, locale: string) {
     description: typeof data.description === "string" ? data.description.trim() : "",
     category: categories[0] || "",
     categories,
+    contentMode: typeof data.contentMode === "string" ? data.contentMode.trim() : "",
     date: typeof data.date === "string" ? data.date.trim() : "",
     locale,
     keywords,
