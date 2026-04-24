@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { BlogCategoryChips } from "@/components/shared/BlogCategoryChips";
 import { buildArticleListing } from "@/lib/article-listing";
 import { getAllArticles } from "@/lib/articles";
-import { BlogCategoryChips } from "@/components/shared/BlogCategoryChips";
 import { locales, type Locale } from "@/lib/site-data";
 
 const blogCopy: Record<Locale, { eyebrow: string; title: string; description: string; empty: string }> = {
@@ -91,10 +91,10 @@ export default async function BlogPage({
             <>
               <div id="blog-results" className="mb-8 scroll-mt-28 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-brand-600">
-                    {listing.activeCategory === "all" ? "全部文章" : listing.activeCategory}
+                  <p className="text-sm font-semibold text-brand-600">{listing.activeCategory === "all" ? "全部文章" : listing.activeCategory}</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    显示第 {listing.pagination.startItem}-{listing.pagination.endItem} 篇，共 {listing.pagination.totalItems} 篇
                   </p>
-                  <p className="mt-2 text-sm text-slate-500">共 {listing.pagination.totalItems} 篇文章</p>
                 </div>
                 <p className="text-sm text-slate-500">
                   第 {listing.pagination.page} / {listing.pagination.totalPages} 页
@@ -144,11 +144,14 @@ export default async function BlogPage({
               )}
 
               {listing.pagination.totalPages > 1 && (
-                <nav className="mt-10 flex flex-wrap items-center justify-center gap-2" aria-label="Blog pagination">
+                <nav
+                  className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row sm:flex-wrap"
+                  aria-label="Blog pagination"
+                >
                   <Link
-                    href={buildBlogHref(normalized, listing.activeCategory, Math.max(1, listing.pagination.page - 1))}
+                    href={`${buildBlogHref(normalized, listing.activeCategory, Math.max(1, listing.pagination.page - 1))}#blog-results`}
                     aria-disabled={listing.pagination.page === 1}
-                    className={`inline-flex min-w-11 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
+                    className={`inline-flex min-w-24 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
                       listing.pagination.page === 1
                         ? "pointer-events-none border-slate-200 text-slate-300"
                         : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
@@ -156,30 +159,32 @@ export default async function BlogPage({
                   >
                     上一页
                   </Link>
-                  {Array.from({ length: listing.pagination.totalPages }, (_, index) => index + 1).map((pageNumber) => {
-                    const active = pageNumber === listing.pagination.page;
-                    return (
-                      <Link
-                        key={pageNumber}
-                        href={buildBlogHref(normalized, listing.activeCategory, pageNumber)}
-                        className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border text-sm font-semibold ${
-                          active
-                            ? "border-brand-600 bg-brand-600 text-white"
-                            : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
-                        }`}
-                      >
-                        {pageNumber}
-                      </Link>
-                    );
-                  })}
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    {Array.from({ length: listing.pagination.totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                      const active = pageNumber === listing.pagination.page;
+                      return (
+                        <Link
+                          key={pageNumber}
+                          href={`${buildBlogHref(normalized, listing.activeCategory, pageNumber)}#blog-results`}
+                          className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border text-sm font-semibold ${
+                            active
+                              ? "border-brand-600 bg-brand-600 text-white"
+                              : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
+                          }`}
+                        >
+                          {pageNumber}
+                        </Link>
+                      );
+                    })}
+                  </div>
                   <Link
-                    href={buildBlogHref(
+                    href={`${buildBlogHref(
                       normalized,
                       listing.activeCategory,
                       Math.min(listing.pagination.totalPages, listing.pagination.page + 1),
-                    )}
+                    )}#blog-results`}
                     aria-disabled={listing.pagination.page === listing.pagination.totalPages}
-                    className={`inline-flex min-w-11 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
+                    className={`inline-flex min-w-24 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
                       listing.pagination.page === listing.pagination.totalPages
                         ? "pointer-events-none border-slate-200 text-slate-300"
                         : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
@@ -187,6 +192,9 @@ export default async function BlogPage({
                   >
                     下一页
                   </Link>
+                  <p className="text-sm text-slate-500">
+                    当前显示 {listing.pagination.startItem}-{listing.pagination.endItem} / {listing.pagination.totalItems}
+                  </p>
                 </nav>
               )}
             </>

@@ -94,16 +94,21 @@ export function buildArticleListing<T extends ArticleListingItem>(
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const page = Math.min(toPositiveInt(options.page, 1), totalPages);
   const start = (page - 1) * pageSize;
+  const pageArticles = filteredArticles.slice(start, start + pageSize);
+  const startItem = totalItems === 0 ? 0 : start + 1;
+  const endItem = totalItems === 0 ? 0 : start + pageArticles.length;
 
   return {
     facets,
     activeCategory,
-    articles: filteredArticles.slice(start, start + pageSize),
+    articles: pageArticles,
     pagination: {
       page,
       pageSize,
       totalItems,
       totalPages,
+      startItem,
+      endItem,
     },
   };
 }

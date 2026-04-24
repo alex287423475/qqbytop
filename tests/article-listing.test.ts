@@ -26,6 +26,8 @@ test("buildArticleListing paginates all articles by 6 per page", () => {
   assert.equal(listing.pagination.page, 2);
   assert.equal(listing.pagination.totalPages, 2);
   assert.equal(listing.pagination.totalItems, 8);
+  assert.equal(listing.pagination.startItem, 7);
+  assert.equal(listing.pagination.endItem, 8);
   assert.deepEqual(
     listing.articles.map((article) => article.slug),
     ["g", "h"],
@@ -38,6 +40,8 @@ test("buildArticleListing filters by category and clamps invalid pages", () => {
   assert.equal(listing.activeCategory, "法律翻译");
   assert.equal(listing.pagination.page, 1);
   assert.equal(listing.pagination.totalPages, 1);
+  assert.equal(listing.pagination.startItem, 1);
+  assert.equal(listing.pagination.endItem, 2);
   assert.deepEqual(
     listing.articles.map((article) => article.slug),
     ["c", "f"],

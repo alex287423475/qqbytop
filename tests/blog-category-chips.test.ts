@@ -6,6 +6,7 @@ import {
   buildCategoryChipId,
   getCategoryChipClassName,
   getCategoryScrollerClassName,
+  getCategoryScrollerEdgeState,
   getCategoryScrollerShellClassName,
 } from "../components/shared/blog-category-chips.helpers.ts";
 
@@ -17,6 +18,28 @@ test("buildCategoryChipId normalizes category values for stable DOM ids", () => 
 test("buildCategoryChipHref anchors navigation back to the results area", () => {
   assert.equal(buildCategoryChipHref("/zh/blog"), "/zh/blog#blog-results");
   assert.equal(buildCategoryChipHref("/zh/blog?category=跨境合规"), "/zh/blog?category=跨境合规#blog-results");
+});
+
+test("getCategoryScrollerEdgeState hides fades when no horizontal overflow exists", () => {
+  assert.deepEqual(getCategoryScrollerEdgeState(0, 320, 320), {
+    showLeftFade: false,
+    showRightFade: false,
+  });
+});
+
+test("getCategoryScrollerEdgeState reflects left and right edge visibility while scrolling", () => {
+  assert.deepEqual(getCategoryScrollerEdgeState(0, 320, 900), {
+    showLeftFade: false,
+    showRightFade: true,
+  });
+  assert.deepEqual(getCategoryScrollerEdgeState(120, 320, 900), {
+    showLeftFade: true,
+    showRightFade: true,
+  });
+  assert.deepEqual(getCategoryScrollerEdgeState(580, 320, 900), {
+    showLeftFade: true,
+    showRightFade: false,
+  });
 });
 
 test("getCategoryScrollerClassName enables horizontal scroll on mobile", () => {

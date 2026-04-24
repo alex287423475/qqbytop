@@ -6,6 +6,17 @@ export function buildCategoryChipHref(baseHref: string) {
   return `${baseHref}#blog-results`;
 }
 
+export function getCategoryScrollerEdgeState(scrollLeft: number, clientWidth: number, scrollWidth: number, tolerance = 4) {
+  if (scrollWidth <= clientWidth + tolerance) {
+    return { showLeftFade: false, showRightFade: false };
+  }
+
+  return {
+    showLeftFade: scrollLeft > tolerance,
+    showRightFade: scrollLeft + clientWidth < scrollWidth - tolerance,
+  };
+}
+
 export function getCategoryScrollerShellClassName() {
   return "relative -mx-5 md:mx-0";
 }
