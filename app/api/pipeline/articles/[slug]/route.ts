@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import matter from "gray-matter";
 import { NextRequest, NextResponse } from "next/server";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
 
@@ -41,6 +42,48 @@ function getLocale(slug: string) {
   return readKeywordRows().find((row) => row.slug === slug)?.locale || "zh";
 }
 
+function extractVisualAssets(markdown: string, locale: string, slug: string) {
+  const parsed = matter(markdown);
+  const fromFrontmatter = Array.isArray(parsed.data.visuals) ? parsed.data.visuals : [];
+  const fromMarkdown = Array.from(markdown.matchAll(/!\[([^\]]*)]\((\/article-assets\/[^)]+\.svg)\)/g)).map((match) => ({
+    alt: match[1],
+    src: match[2],
+  }));
+
+  const unique = new Map<string, { type: string; title: string; alt: string; src: string; exists: boolean }>();
+  for (const asset of [...fromFrontmatter, ...fromMarkdown]) {
+    const src = typeof asset.src === "string" ? asset.src : "";
+    if (!src.startsWith("/article-assets/")) continue;
+
+    const filePath = path.join(process.cwd(), "public", src.replace(/^\//, ""));
+    unique.set(src, {
+      type: typeof asset.type === "string" ? asset.type : path.basename(src, ".svg"),
+      title: typeof asset.title === "string" ? asset.title : "",
+      alt: typeof asset.alt === "string" ? asset.alt : "",
+      src,
+      exists: fs.existsSync(filePath),
+    });
+  }
+
+  const assetDir = path.join(process.cwd(), "public", "article-assets", locale, slug);
+  if (fs.existsSync(assetDir)) {
+    for (const file of fs.readdirSync(assetDir).filter((item) => item.endsWith(".svg"))) {
+      const src = `/article-assets/${locale}/${slug}/${file}`;
+      if (!unique.has(src)) {
+        unique.set(src, {
+          type: path.basename(file, ".svg"),
+          title: "",
+          alt: `${slug} ${path.basename(file, ".svg")}`,
+          src,
+          exists: true,
+        });
+      }
+    }
+  }
+
+  return Array.from(unique.values());
+}
+
 export async function GET(request: NextRequest, context: RouteContext) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
@@ -67,13 +110,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
   const article = findArticleFile(locale, slug);
   if (!article) return NextResponse.json({ message: `没有找到文章文件：${slug}` }, { status: 404 });
 
+  const markdown = fs.readFileSync(article.filePath, "utf-8");
+
   return NextResponse.json({
     slug,
     locale,
     stage: article.stage,
     editable: editableStages.includes(article.stage as (typeof editableStages)[number]),
     filePath: article.filePath,
-    markdown: fs.readFileSync(article.filePath, "utf-8"),
+    markdown,
+    visualAssets: extractVisualAssets(markdown, locale, slug),
     articleUrl: article.stage === "published" ? `/${locale}/blog/${slug}` : null,
   });
 }
@@ -116,6 +162,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     stage: "draft",
     filePath: draftPath,
     markdown,
+    visualAssets: extractVisualAssets(markdown, locale, slug),
     message: "已保存为草稿，请重新执行校验草稿。",
   });
 }

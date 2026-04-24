@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 
 const scriptMap: Record<string, string> = {
   generate: "generate-article.mjs",
+  visuals: "generate-visual-assets.mjs",
   review: "review-article-agent.mjs",
   rewrite: "rewrite-article-agent.mjs",
   validate: "validate-article.mjs",
@@ -16,6 +17,7 @@ const scriptMap: Record<string, string> = {
 
 const roleMap: Record<string, "modelA" | "modelB"> = {
   generate: "modelA",
+  visuals: "modelA",
   review: "modelB",
   rewrite: "modelB",
   validate: "modelA",

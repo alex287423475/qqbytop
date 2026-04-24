@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">跨境电商chargeback申诉流程</title>
+  <desc id="desc">跨境翻译: evidence chain for reviewable translation decisions</desc>
+  <rect width="1200" height="680" fill="#f8fafc"/>
+  <rect x="40" y="40" width="1120" height="600" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="80" y="105" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="34" font-weight="700" fill="#0f172a">跨境电商chargeback申诉流程</text>
+  <text x="80" y="145" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" fill="#475569">跨境翻译: evidence chain for reviewable translation decisions</text>
+  
+  <rect x="90" y="245" width="220" height="210" rx="16" fill="#eff6ff" stroke="#60a5fa" stroke-width="2"/>
+  <circle cx="132" cy="293" r="24" fill="#2563eb"/>
+  <text x="132" y="301" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">1</text>
+  <text x="118" y="345" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="22" font-weight="700" fill="#0f172a">Source material</text>
+  <foreignObject x="118" y="370" width="165" height="70">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,'Microsoft YaHei',sans-serif;font-size:15px;line-height:1.45;color:#475569">File, screenshot, record, or policy text</div>
+  </foreignObject>
+  <path d="M 310 350 L 350 350" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/><path d="M 342 338 L 356 350 L 342 362" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="360" y="245" width="220" height="210" rx="16" fill="#eff6ff" stroke="#60a5fa" stroke-width="2"/>
+  <circle cx="402" cy="293" r="24" fill="#2563eb"/>
+  <text x="402" y="301" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">2</text>
+  <text x="388" y="345" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="22" font-weight="700" fill="#0f172a">Context check</text>
+  <foreignObject x="388" y="370" width="165" height="70">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,'Microsoft YaHei',sans-serif;font-size:15px;line-height:1.45;color:#475569">Purpose, receiver, deadline, and required format</div>
+  </foreignObject>
+  <path d="M 580 350 L 620 350" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/><path d="M 612 338 L 626 350 L 612 362" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="630" y="245" width="220" height="210" rx="16" fill="#eff6ff" stroke="#60a5fa" stroke-width="2"/>
+  <circle cx="672" cy="293" r="24" fill="#2563eb"/>
+  <text x="672" y="301" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">3</text>
+  <text x="658" y="345" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="22" font-weight="700" fill="#0f172a">Term control</text>
+  <foreignObject x="658" y="370" width="165" height="70">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,'Microsoft YaHei',sans-serif;font-size:15px;line-height:1.45;color:#475569">Names, dates, product terms, legal terms</div>
+  </foreignObject>
+  <path d="M 850 350 L 890 350" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/><path d="M 882 338 L 896 350 L 882 362" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="900" y="245" width="220" height="210" rx="16" fill="#eff6ff" stroke="#60a5fa" stroke-width="2"/>
+  <circle cx="942" cy="293" r="24" fill="#2563eb"/>
+  <text x="942" y="301" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">4</text>
+  <text x="928" y="345" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="22" font-weight="700" fill="#0f172a">Delivery proof</text>
+  <foreignObject x="928" y="370" width="165" height="70">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Arial,'Microsoft YaHei',sans-serif;font-size:15px;line-height:1.45;color:#475569">Bilingual output, notes, and revision trail</div>
+  </foreignObject>
+  
+</svg>

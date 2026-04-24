@@ -65,6 +65,15 @@ type KeywordPreview = {
   editable?: boolean;
   filePath: string | null;
   markdown: string | null;
+  visualAssets?: VisualAsset[];
+};
+
+type VisualAsset = {
+  type: string;
+  title: string;
+  alt: string;
+  src: string;
+  exists: boolean;
 };
 
 type AiConfig = {
@@ -660,6 +669,7 @@ export function WorkflowDashboard({
         editable: payload.editable,
         filePath: payload.filePath || null,
         markdown: payload.markdown || null,
+        visualAssets: payload.visualAssets || [],
       });
       setEditorMarkdown(payload.markdown || "");
     } catch (nextError) {
@@ -694,6 +704,7 @@ export function WorkflowDashboard({
         editable: false,
         filePath: payload.filePath || null,
         markdown: payload.markdown || null,
+        visualAssets: [],
       });
       setEditorMarkdown(payload.markdown || "");
     } catch (nextError) {
@@ -725,6 +736,7 @@ export function WorkflowDashboard({
         stage: payload.stage || (preview.sourceType === "fact-source" ? "fact-source-pack" : "draft"),
         filePath: payload.filePath || preview.filePath,
         markdown: payload.markdown || editorMarkdown,
+        visualAssets: payload.visualAssets || preview.visualAssets || [],
         editable: true,
       });
       setEditorMarkdown(payload.markdown || editorMarkdown);
@@ -1443,6 +1455,29 @@ function PreviewDialog({
               <MetaRow label="内容模式" value={preview.row.contentMode === "fact-source" ? "核心事实源" : "普通文章"} />
               <MetaRow label="文件" value={preview.filePath || "暂无生成文件"} />
             </dl>
+            {preview.visualAssets && preview.visualAssets.length > 0 && (
+              <div className="mt-5 border-t border-slate-800 pt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">文章配图</p>
+                <div className="mt-3 grid gap-3">
+                  {preview.visualAssets.map((asset) => (
+                    <a
+                      key={asset.src}
+                      href={asset.src}
+                      target="_blank"
+                      className="group rounded border border-slate-800 bg-slate-950/70 p-2 transition hover:border-brand-500"
+                    >
+                      <div className="overflow-hidden rounded bg-white">
+                        <img src={asset.src} alt={asset.alt || asset.title || asset.type} className="aspect-[16/9] w-full object-contain" />
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <span className="truncate">{asset.title || asset.alt || asset.type}</span>
+                        <span className={asset.exists ? "text-emerald-300" : "text-rose-300"}>{asset.exists ? "已生成" : "缺失"}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             {preview.articleUrl && (
               <a className="mt-5 inline-flex rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500" href={preview.articleUrl} target="_blank">
                 打开已发布文章
