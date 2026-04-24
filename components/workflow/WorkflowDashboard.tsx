@@ -755,7 +755,7 @@ export function WorkflowDashboard({
     { key: "models", label: "AI模型配置", description: "配置模型A和模型B" },
     { key: "prompts", label: "Prompt提示词", description: "编辑生成、质检、重写提示词" },
     { key: "keywords", label: "关键词文件", description: "新增、删除和预览关键词" },
-    { key: "workflow", label: "流程操作", description: "执行生成、校验、审核、发布" },
+    { key: "workflow", label: "流程操作", description: "执行生成、质检、重写、校验、审核、发布" },
     { key: "logs", label: "最近日志", description: "查看脚本运行事件" },
   ];
 
@@ -876,7 +876,9 @@ export function WorkflowDashboard({
               <section className="pipeline-panel p-5">
                 <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
                   <h2 className="text-lg font-bold text-white">流程操作</h2>
-                  <p className="text-sm text-slate-400">按流程阶段执行任务，运行时会自动刷新状态与日志。当前提供商：{provider}</p>
+                  <p className="text-sm text-slate-400">
+                    主流程是生成文章、AI质检、AI重写、校验、审核、发布。生成文章会自动生成封面和正文配图；“刷新配图”只用于旧文章补图或手动编辑后重建图片。当前提供商：{provider}
+                  </p>
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

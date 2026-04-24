@@ -15,7 +15,7 @@ const stages = [
 
 const actions = [
   { key: "generate", label: "生成文章" },
-  { key: "visuals", label: "生成配图" },
+  { key: "visuals", label: "刷新配图" },
   { key: "review", label: "AI质检" },
   { key: "rewrite", label: "AI重写" },
   { key: "validate", label: "校验草稿" },
