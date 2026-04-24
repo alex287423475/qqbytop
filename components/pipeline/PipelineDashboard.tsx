@@ -15,7 +15,7 @@ const actions = [
   { key: "generate", label: "生成文章" },
   { key: "validate", label: "校验草稿" },
   { key: "approve", label: "审核通过" },
-  { key: "publish", label: "发布内容" },
+  { key: "publish", label: "发布网站" },
 ];
 
 const providerOptions = [
@@ -40,7 +40,7 @@ export function PipelineDashboard({ initialStatus }: { initialStatus?: WorkflowS
     <WorkflowDashboard
       title="SEO 文章生产线控制台"
       eyebrow="Local Brain"
-      description="这个页面仅用于本地开发环境。它读取 local-brain 状态文件，并按生成、校验、审核、发布四个步骤控制内容流水线。"
+      description="这个页面仅用于本地开发环境。它读取 local-brain 状态文件，并按生成、校验、审核、发布网站四个步骤控制内容流水线。发布网站会先写入本地内容库，线上仍需 Git 推送触发 Vercel 部署。"
       apiBase="/api/pipeline"
       initialStatus={initialStatus}
       stages={stages}
