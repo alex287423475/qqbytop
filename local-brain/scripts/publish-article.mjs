@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { execFileSync } from "child_process";
 import matter from "gray-matter";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
 
@@ -11,6 +12,38 @@ function parseArgs() {
   return {
     slug: slugIndex >= 0 ? process.argv[slugIndex + 1] : null,
   };
+}
+
+function runGit(args) {
+  return execFileSync("git", args, {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "pipe"],
+  }).trim();
+}
+
+function hasStagedChanges() {
+  const output = runGit(["diff", "--cached", "--name-only", "--", "content/articles"]);
+  return output.length > 0;
+}
+
+function publishToWebsite(slugs) {
+  appendLog("publish", "开始推送到 GitHub，等待 Vercel 自动部署");
+
+  runGit(["add", "--", "content/articles"]);
+
+  if (!hasStagedChanges()) {
+    appendLog("publish", "内容库没有新的可提交变更，跳过 Git 推送");
+    return;
+  }
+
+  const commitSubject = slugs.length === 1 ? `content: publish ${slugs[0]}` : `content: publish ${slugs.length} SEO articles`;
+  runGit(["commit", "-m", commitSubject]);
+  appendLog("publish", `已创建提交：${commitSubject}`);
+
+  const branch = runGit(["branch", "--show-current"]) || "main";
+  runGit(["push", "origin", branch]);
+  appendLog("publish", `已推送到 origin/${branch}，Vercel 将自动部署`);
 }
 
 async function main() {
@@ -31,7 +64,9 @@ async function main() {
   }
 
   setRunning("publish");
-  appendLog("publish", `开始发布 ${files.length} 篇文章`);
+  appendLog("publish", `开始发布网站：${files.length} 篇文章`);
+
+  const publishedSlugs = [];
 
   try {
     for (const file of files) {
@@ -45,24 +80,26 @@ async function main() {
       fs.mkdirSync(targetDir, { recursive: true });
       fs.copyFileSync(sourcePath, path.join(targetDir, "index.md"));
       fs.unlinkSync(sourcePath);
+      publishedSlugs.push(slugValue);
 
       updateArticleStage(slugValue, "published", {
         publishedAt: new Date().toISOString(),
         locale,
         errors: [],
       });
-      appendLog("publish", `已发布：${locale}/${slugValue}`, slugValue);
+      appendLog("publish", `已写入网站内容库：${locale}/${slugValue}`, slugValue);
     }
+
+    publishToWebsite(publishedSlugs);
   } finally {
     setIdle();
-    appendLog("publish", "发布步骤完成");
+    appendLog("publish", "发布网站步骤完成");
   }
 }
 
 main().catch((error) => {
-  appendLog("publish", `发布失败：${error.message}`);
+  appendLog("publish", `发布网站失败：${error.message}`);
   setIdle();
   console.error(error);
   process.exitCode = 1;
 });
-
