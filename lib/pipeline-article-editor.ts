@@ -6,6 +6,10 @@ export function canEditArticleStage(stage: string): stage is EditableArticleStag
   return editableStages.includes(stage as EditableArticleStage);
 }
 
+export function canCreateRevisionDraft(stage: string) {
+  return stage === "published";
+}
+
 export function shouldDeleteOriginalAfterSave(stage: string, originalPath: string, draftPath: string) {
   if (stage === "published") return false;
   return originalPath !== draftPath;

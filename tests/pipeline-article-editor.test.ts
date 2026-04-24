@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   canEditArticleStage,
+  canCreateRevisionDraft,
   getArticleEditMessages,
   shouldDeleteOriginalAfterSave,
 } from "../lib/pipeline-article-editor.ts";
@@ -31,4 +32,10 @@ test("non-published editable stages still replace their previous working file", 
     responseMessage: "已保存为草稿，请重新执行校验草稿。",
     logMessage: "已手动编辑并退回草稿：example",
   });
+});
+
+test("only published articles expose direct revision-draft creation", () => {
+  assert.equal(canCreateRevisionDraft("published"), true);
+  assert.equal(canCreateRevisionDraft("draft"), false);
+  assert.equal(canCreateRevisionDraft("validated"), false);
 });

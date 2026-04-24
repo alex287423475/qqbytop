@@ -679,6 +679,45 @@ export function WorkflowDashboard({
     }
   }
 
+  async function createRevisionDraft(item: WorkflowItem) {
+    const itemId = getItemId(item);
+    setKeywordBusy(`revision:${itemId}`);
+
+    try {
+      const response = await fetch(`${apiBase}/articles/${encodeURIComponent(itemId)}`, {
+        method: "POST",
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "生成修订草稿失败。");
+
+      setPreview({
+        row: {
+          keyword: item.keyword || item.name || item.slug || itemId,
+          slug: itemId,
+          locale: String(item.locale || payload.locale || "zh"),
+          category: String(item.category || ""),
+          intent: String(item.intent || ""),
+          priority: String(item.priority || ""),
+          contentMode: String(item.contentMode || "standard"),
+        },
+        articleUrl: null,
+        stage: payload.stage,
+        sourceType: "article",
+        editable: true,
+        filePath: payload.filePath || null,
+        markdown: payload.markdown || null,
+        visualAssets: payload.visualAssets || [],
+      });
+      setEditorMarkdown(payload.markdown || "");
+      await fetchStatus();
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "生成修订草稿失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
   async function openReviewReport(item: WorkflowItem) {
     const itemId = getItemId(item);
     setKeywordBusy(`review:${itemId}`);
@@ -931,6 +970,13 @@ export function WorkflowDashboard({
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
+                            {item.stage === "published" && (
+                              <MiniButton
+                                label="生成修订稿"
+                                onClick={() => createRevisionDraft(item)}
+                                disabled={isBusy || keywordBusy === `revision:${itemId}`}
+                              />
+                            )}
                             {item.contentMode === "fact-source" && (
                               <MiniButton label="事实源资料包" onClick={() => openFactSourcePack(item)} disabled={isBusy || keywordBusy === `fact-source:${itemId}`} />
                             )}

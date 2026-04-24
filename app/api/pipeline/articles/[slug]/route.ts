@@ -2,7 +2,12 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { NextRequest, NextResponse } from "next/server";
-import { canEditArticleStage, getArticleEditMessages, shouldDeleteOriginalAfterSave } from "@/lib/pipeline-article-editor";
+import {
+  canCreateRevisionDraft,
+  canEditArticleStage,
+  getArticleEditMessages,
+  shouldDeleteOriginalAfterSave,
+} from "@/lib/pipeline-article-editor";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
@@ -142,7 +147,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   const article = findArticleFile(locale, slug);
   if (!article) return NextResponse.json({ message: `没有找到文章文件：${slug}` }, { status: 404 });
   if (!canEditArticleStage(article.stage)) {
-    return NextResponse.json({ message: "已发布文章不能在本地面板直接编辑，请新建修订稿后重新发布。" }, { status: 400 });
+    return NextResponse.json({ message: "当前阶段暂不支持直接编辑。" }, { status: 400 });
   }
 
   const draftPath = path.join(process.cwd(), "local-brain", "drafts", `${slug}.md`);
@@ -152,6 +157,40 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   if (shouldDeleteOriginalAfterSave(article.stage, article.filePath, draftPath) && fs.existsSync(article.filePath)) {
     fs.unlinkSync(article.filePath);
   }
+
+  const messages = getArticleEditMessages(article.stage, slug);
+  updateRuntimeStatus(slug, locale, messages.logMessage);
+
+  return NextResponse.json({
+    success: true,
+    slug,
+    locale,
+    stage: "draft",
+    filePath: draftPath,
+    markdown,
+    visualAssets: extractVisualAssets(markdown, locale, slug),
+    message: messages.responseMessage,
+  });
+}
+
+export async function POST(_request: NextRequest, context: RouteContext) {
+  const blocked = assertDevOnly();
+  if (blocked) return blocked;
+
+  const { slug } = await context.params;
+  if (!/^[a-z0-9-]+$/.test(slug)) return NextResponse.json({ message: "Invalid slug." }, { status: 400 });
+
+  const locale = getLocale(slug);
+  const article = findArticleFile(locale, slug);
+  if (!article) return NextResponse.json({ message: `没有找到文章文件：${slug}` }, { status: 404 });
+  if (!canCreateRevisionDraft(article.stage)) {
+    return NextResponse.json({ message: "只有已发布文章支持直接生成修订稿。" }, { status: 400 });
+  }
+
+  const markdown = fs.readFileSync(article.filePath, "utf-8");
+  const draftPath = path.join(process.cwd(), "local-brain", "drafts", `${slug}.md`);
+  fs.mkdirSync(path.dirname(draftPath), { recursive: true });
+  fs.writeFileSync(draftPath, markdown, "utf-8");
 
   const messages = getArticleEditMessages(article.stage, slug);
   updateRuntimeStatus(slug, locale, messages.logMessage);
