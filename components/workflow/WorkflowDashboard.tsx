@@ -96,6 +96,15 @@ type AiTestResult = {
   latencyMs?: number;
 };
 
+type PromptFile = {
+  key: string;
+  label: string;
+  description: string;
+  fileName: string;
+  filePath: string;
+  content: string;
+};
+
 type KeywordManagerConfig = {
   enabled: true;
   apiBase: string;
@@ -197,6 +206,10 @@ export function WorkflowDashboard({
   const [aiBusy, setAiBusy] = useState<"modelA" | "modelB" | null>(null);
   const [aiTestBusy, setAiTestBusy] = useState<"modelA" | "modelB" | null>(null);
   const [aiTestResult, setAiTestResult] = useState<Record<"modelA" | "modelB", AiTestResult | null>>({ modelA: null, modelB: null });
+  const [promptFiles, setPromptFiles] = useState<PromptFile[]>([]);
+  const [activePromptKey, setActivePromptKey] = useState("generate-system");
+  const [promptDraft, setPromptDraft] = useState("");
+  const [promptBusy, setPromptBusy] = useState(false);
 
   async function fetchStatus() {
     const response = await fetch(`${apiBase}/status`, { cache: "no-store" });
@@ -229,12 +242,27 @@ export function WorkflowDashboard({
     });
   }
 
+  async function fetchPromptFiles(preferredKey = activePromptKey) {
+    const response = await fetch(`${apiBase}/prompts`, { cache: "no-store" });
+    if (!response.ok) return;
+
+    const payload = (await response.json()) as { prompts: PromptFile[] };
+    const prompts = payload.prompts || [];
+    const selected = prompts.find((prompt) => prompt.key === preferredKey) || prompts[0];
+
+    setPromptFiles(prompts);
+    if (selected) {
+      setActivePromptKey(selected.key);
+      setPromptDraft(selected.content);
+    }
+  }
+
   useEffect(() => {
     let disposed = false;
 
     async function load() {
       try {
-        await Promise.all([fetchStatus(), fetchKeywords(), fetchAiConfig()]);
+        await Promise.all([fetchStatus(), fetchKeywords(), fetchAiConfig(), fetchPromptFiles()]);
       } catch (nextError) {
         if (!disposed) setError(nextError instanceof Error ? nextError.message : "状态读取失败。");
       } finally {
@@ -322,6 +350,35 @@ export function WorkflowDashboard({
       setError(message);
     } finally {
       setAiTestBusy(null);
+    }
+  }
+
+  function selectPrompt(key: string) {
+    const prompt = promptFiles.find((item) => item.key === key);
+    setActivePromptKey(key);
+    setPromptDraft(prompt?.content || "");
+  }
+
+  async function savePrompt() {
+    setPromptBusy(true);
+
+    try {
+      const response = await fetch(`${apiBase}/prompts`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: activePromptKey, content: promptDraft }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "保存提示词失败。");
+
+      const saved = payload.prompt as PromptFile;
+      setPromptFiles((current) => current.map((item) => (item.key === saved.key ? saved : item)));
+      setPromptDraft(saved.content);
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "保存提示词失败。");
+    } finally {
+      setPromptBusy(false);
     }
   }
 
@@ -538,20 +595,31 @@ export function WorkflowDashboard({
         </div>
 
         {providerOptions && (
-          <AiConfigPanel
-            forms={aiForms}
-            providerOptions={providerOptions}
-            busy={aiBusy}
-            testBusy={aiTestBusy}
-            testResult={aiTestResult}
-            onChange={(role, nextForm) => {
-              setAiForms((current) => ({ ...current, [role]: nextForm }));
-              if (role === "modelA") setProvider(nextForm.provider);
-              setAiTestResult((current) => ({ ...current, [role]: null }));
-            }}
-            onSave={saveAiConfig}
-            onTest={testAiConfig}
-          />
+          <>
+            <AiConfigPanel
+              forms={aiForms}
+              providerOptions={providerOptions}
+              busy={aiBusy}
+              testBusy={aiTestBusy}
+              testResult={aiTestResult}
+              onChange={(role, nextForm) => {
+                setAiForms((current) => ({ ...current, [role]: nextForm }));
+                if (role === "modelA") setProvider(nextForm.provider);
+                setAiTestResult((current) => ({ ...current, [role]: null }));
+              }}
+              onSave={saveAiConfig}
+              onTest={testAiConfig}
+            />
+            <PromptManager
+              prompts={promptFiles}
+              activeKey={activePromptKey}
+              draft={promptDraft}
+              busy={promptBusy}
+              onSelect={selectPrompt}
+              onDraftChange={setPromptDraft}
+              onSave={savePrompt}
+            />
+          </>
         )}
 
         {keywordManager && (
@@ -833,6 +901,80 @@ function AiConfigPanel({
           </div>
         )}
       </div>
+    </section>
+  );
+}
+
+function PromptManager({
+  prompts,
+  activeKey,
+  draft,
+  busy,
+  onSelect,
+  onDraftChange,
+  onSave,
+}: {
+  prompts: PromptFile[];
+  activeKey: string;
+  draft: string;
+  busy: boolean;
+  onSelect: (key: string) => void;
+  onDraftChange: (value: string) => void;
+  onSave: () => void;
+}) {
+  const activePrompt = prompts.find((prompt) => prompt.key === activeKey) || prompts[0];
+  const isDirty = Boolean(activePrompt && draft !== activePrompt.content);
+
+  return (
+    <section className="pipeline-panel mt-8 p-5">
+      <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
+        <h2 className="text-lg font-bold text-white">Prompt 提示词</h2>
+        <p className="text-sm text-slate-400">查看、修改并保存生成文章、AI质检和AI重写的提示词。保存后下一次运行对应 Agent 会立即使用新版提示词。</p>
+      </div>
+
+      {prompts.length === 0 ? (
+        <EmptyState text="正在读取提示词文件..." />
+      ) : (
+        <div className="mt-5 grid gap-5 lg:grid-cols-[0.38fr_1fr]">
+          <div className="space-y-2">
+            {prompts.map((prompt) => (
+              <button
+                key={prompt.key}
+                onClick={() => onSelect(prompt.key)}
+                className={`w-full rounded border px-4 py-3 text-left transition ${
+                  prompt.key === activeKey ? "border-brand-500 bg-brand-500/10 text-white" : "border-slate-700 bg-slate-900/50 text-slate-300 hover:border-brand-500"
+                }`}
+              >
+                <span className="block text-sm font-semibold">{prompt.label}</span>
+                <span className="mt-1 block text-xs text-slate-500">{prompt.fileName}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="rounded border border-slate-700 bg-slate-950/40">
+            <div className="flex flex-col gap-3 border-b border-slate-700 p-4 xl:flex-row xl:items-start xl:justify-between">
+              <div>
+                <h3 className="font-semibold text-white">{activePrompt?.label || "提示词"}</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-400">{activePrompt?.description || ""}</p>
+                {activePrompt?.filePath && <p className="mt-2 break-all text-xs text-slate-500">{activePrompt.filePath}</p>}
+              </div>
+              <button
+                onClick={onSave}
+                disabled={busy || !activePrompt || !draft.trim()}
+                className="rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+              >
+                {busy ? "保存中..." : isDirty ? "保存提示词" : "已保存"}
+              </button>
+            </div>
+            <textarea
+              className="min-h-[420px] w-full resize-y bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-200 outline-none focus:ring-2 focus:ring-inset focus:ring-brand-500"
+              value={draft}
+              onChange={(event) => onDraftChange(event.target.value)}
+              spellCheck={false}
+            />
+          </div>
+        </div>
+      )}
     </section>
   );
 }
