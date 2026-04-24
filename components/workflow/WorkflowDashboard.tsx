@@ -137,6 +137,28 @@ const emptyKeywordForm: KeywordRow = {
   contentMode: "standard",
 };
 
+const defaultCategoryOptions = [
+  "证件翻译",
+  "翻译价格",
+  "法律翻译",
+  "跨境电商",
+  "专利翻译",
+  "专业翻译",
+  "翻译服务",
+  "本地化",
+  "商务翻译",
+  "技术翻译",
+  "医学翻译",
+  "游戏本地化",
+  "合规翻译",
+];
+
+const defaultIntentOptions = ["信息", "询价", "比较", "风险", "办理", "指南", "案例", "合规", "转化"];
+
+function mergeSelectOptions(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
 function createDefaultStatus(stages: WorkflowStage[]): WorkflowStatus {
   return {
     updatedAt: null,
@@ -1098,6 +1120,9 @@ function KeywordManager({
   onPreview: (slug: string) => void;
   onFactSource: (row: KeywordRow) => void;
 }) {
+  const categoryOptions = mergeSelectOptions([...defaultCategoryOptions, ...rows.map((row) => row.category), form.category]);
+  const intentOptions = mergeSelectOptions([...defaultIntentOptions, ...rows.map((row) => row.intent), form.intent]);
+
   return (
     <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
@@ -1109,8 +1134,20 @@ function KeywordManager({
         <TextInput label="关键词" value={form.keyword} onChange={(keyword) => onFormChange({ ...form, keyword })} />
         <TextInput label="slug" value={form.slug} onChange={(slug) => onFormChange({ ...form, slug })} placeholder="beijing-translation-price" />
         <SelectInput label="语言" value={form.locale} options={["zh", "en", "ja"]} onChange={(locale) => onFormChange({ ...form, locale })} />
-        <TextInput label="分类" value={form.category} onChange={(category) => onFormChange({ ...form, category })} />
-        <TextInput label="意图" value={form.intent} onChange={(intent) => onFormChange({ ...form, intent })} />
+        <SelectInput
+          label="分类"
+          value={form.category}
+          options={categoryOptions}
+          placeholder="选择分类"
+          onChange={(category) => onFormChange({ ...form, category })}
+        />
+        <SelectInput
+          label="意图"
+          value={form.intent}
+          options={intentOptions}
+          placeholder="选择意图"
+          onChange={(intent) => onFormChange({ ...form, intent })}
+        />
         <SelectInput label="优先级" value={form.priority} options={["P0", "P1", "P2", "P3"]} onChange={(priority) => onFormChange({ ...form, priority })} />
         <SelectInput
           label="内容模式"
@@ -1356,7 +1393,19 @@ function TextInput({
   );
 }
 
-function SelectInput({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+function SelectInput({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="flex flex-col gap-2 text-sm text-slate-300">
       {label}
@@ -1365,6 +1414,7 @@ function SelectInput({ label, value, options, onChange }: { label: string; value
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
+        {placeholder && <option value="">{placeholder}</option>}
         {options.map((option) => (
           <option key={option} value={option}>
             {option}
