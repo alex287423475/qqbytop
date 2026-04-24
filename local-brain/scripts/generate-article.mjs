@@ -180,6 +180,7 @@ async function main() {
   const { slug } = parseArgs();
   const keywords = readCsv(path.join(inputsDir, "keywords.csv"));
   const redLines = readCsv(path.join(inputsDir, "red-lines.csv")).map((item) => item.word);
+  const provider = process.env.AI_PROVIDER || "mock";
   const systemPrompt = readPromptFile("article-system.md");
   const standardUserPromptTemplate = readPromptFile("article-user.md");
   const factSourceUserPromptTemplate = readPromptFile("article-fact-source-user.md", standardUserPromptTemplate);
@@ -220,14 +221,35 @@ async function main() {
         ? `\n\n事实源资料包（必须优先使用，但不要编造资料包没有提供的数据）：\n${factSourcePack.content}`
         : "";
       const userPrompt = `${userPromptTemplate}\n\n关键词：${row.keyword}\nslug：${row.slug}\n分类：${row.category}\n意图：${row.intent}\n内容模式：${contentMode === "fact-source" ? "核心事实源" : "普通文章"}\n红线词：${redLines.join("、")}${factSourceContext}`;
-      let markdown = await callLLM(systemPrompt, userPrompt, {
-        temperature: contentMode === "fact-source" ? 0.45 : 0.6,
-        maxTokens: contentMode === "fact-source" ? 8000 : 5000,
-        fallback,
-      });
+      let markdown;
+      try {
+        markdown = await callLLM(systemPrompt, userPrompt, {
+          temperature: contentMode === "fact-source" ? 0.45 : 0.6,
+          maxTokens: contentMode === "fact-source" ? 8000 : 5000,
+          fallback,
+        });
+      } catch (error) {
+        updateArticleStage(row.slug, "generate-failed", {
+          keyword: row.keyword,
+          locale: row.locale,
+          category: row.category,
+          contentMode,
+          errors: [error.message],
+        });
+        appendLog("generate", `生成失败，未写入模板文章：${row.slug} / ${error.message}`, row.slug);
+        continue;
+      }
 
       if (!validateGeneratedMarkdown(markdown)) {
-        markdown = fallback();
+        updateArticleStage(row.slug, "generate-failed", {
+          keyword: row.keyword,
+          locale: row.locale,
+          category: row.category,
+          contentMode,
+          errors: ["模型返回内容未通过基础 Markdown 结构检查，未写入模板文章。"],
+        });
+        appendLog("generate", `生成失败，模型返回结构不合格：${row.slug}`, row.slug);
+        continue;
       }
 
       fs.writeFileSync(path.join(draftsDir, `${row.slug}.md`), markdown, "utf-8");
@@ -240,7 +262,8 @@ async function main() {
             locale: row.locale,
             contentMode,
             factSourcePath: factSourcePack.filePath,
-            provider: process.env.AI_PROVIDER || "mock",
+            provider,
+            source: provider === "mock" ? "mock-fallback" : "model",
             generatedAt: new Date().toISOString(),
           },
           null,

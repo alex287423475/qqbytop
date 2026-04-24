@@ -187,7 +187,7 @@ export async function callLLM(systemPrompt, userPrompt, options = {}) {
     if (!content) throw new Error(`${provider} returned empty content`);
     return content;
   } catch (error) {
-    if (typeof options.fallback === "function") {
+    if (provider === "mock" && typeof options.fallback === "function") {
       return options.fallback(error);
     }
 
