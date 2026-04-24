@@ -1,9 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { BlogCategoryChips } from "@/components/shared/BlogCategoryChips";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { buildArticleListing } from "@/lib/article-listing";
 import { getAllArticles } from "@/lib/articles";
-import { buildBlogCollectionSummary, buildBlogHref, buildBlogPageMetadata, getBlogCopy } from "@/lib/blog-page";
+import {
+  buildBlogBreadcrumbSchema,
+  buildBlogCollectionSchema,
+  buildBlogCollectionSummary,
+  buildBlogCurrentRange,
+  buildBlogHref,
+  buildBlogPageMetadata,
+  getBlogCopy,
+} from "@/lib/blog-page";
 import { locales, type Locale } from "@/lib/site-data";
 
 export async function generateMetadata({
@@ -47,9 +56,25 @@ export default async function BlogPage({
     page: filters.page,
     pageSize: 6,
   });
+  const collectionSchema = buildBlogCollectionSchema({
+    locale: normalized,
+    category: listing.activeCategory,
+    page: listing.pagination.page,
+    articles: listing.articles,
+    startItem: listing.pagination.startItem,
+    totalItems: listing.pagination.totalItems,
+  });
+  const breadcrumbSchema = buildBlogBreadcrumbSchema({
+    locale: normalized,
+    category: listing.activeCategory,
+    page: listing.pagination.page,
+  });
 
   return (
     <>
+      <JsonLd data={collectionSchema} />
+      <JsonLd data={breadcrumbSchema} />
+
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">
           <p className="text-sm font-semibold text-brand-600">{copy.eyebrow}</p>
@@ -79,7 +104,19 @@ export default async function BlogPage({
             <>
               <div id="blog-results" className="mb-8 scroll-mt-28 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-semibold text-brand-600">{listing.activeCategory === "all" ? "全部文章" : listing.activeCategory}</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <p className="text-sm font-semibold text-brand-600">
+                      {listing.activeCategory === "all" ? copy.allArticlesLabel : listing.activeCategory}
+                    </p>
+                    {listing.activeCategory !== "all" && (
+                      <Link
+                        href={`${buildBlogHref(normalized, "all", 1)}#blog-results`}
+                        className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-brand-300 hover:text-brand-700"
+                      >
+                        {copy.clearFilter}
+                      </Link>
+                    )}
+                  </div>
                   <p className="mt-2 text-sm text-slate-500">
                     {buildBlogCollectionSummary(
                       normalized,
@@ -89,14 +126,12 @@ export default async function BlogPage({
                     )}
                   </p>
                 </div>
-                <p className="text-sm text-slate-500">
-                  第 {listing.pagination.page} / {listing.pagination.totalPages} 页
-                </p>
+                <p className="text-sm text-slate-500">{copy.pageLabel(listing.pagination.page, listing.pagination.totalPages)}</p>
               </div>
 
               {listing.articles.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-slate-500">
-                  当前分类下还没有文章。
+                  {copy.categoryEmpty}
                 </div>
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -153,7 +188,7 @@ export default async function BlogPage({
                         : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
                     }`}
                   >
-                    上一页
+                    {copy.prevPage}
                   </Link>
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {Array.from({ length: listing.pagination.totalPages }, (_, index) => index + 1).map((pageNumber) => {
@@ -186,10 +221,15 @@ export default async function BlogPage({
                         : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
                     }`}
                   >
-                    下一页
+                    {copy.nextPage}
                   </Link>
                   <p className="text-sm text-slate-500">
-                    当前显示 {listing.pagination.startItem}-{listing.pagination.endItem} / {listing.pagination.totalItems}
+                    {buildBlogCurrentRange(
+                      normalized,
+                      listing.pagination.startItem,
+                      listing.pagination.endItem,
+                      listing.pagination.totalItems,
+                    )}
                   </p>
                 </nav>
               )}
