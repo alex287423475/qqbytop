@@ -796,12 +796,16 @@ function PreviewDialog({
 }) {
   const [width, setWidth] = useState(82);
   const [height, setHeight] = useState(72);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const bodyHeight = isFullscreen ? "calc(100vh - 82px)" : `${height}vh`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
+    <div className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 ${isFullscreen ? "px-0" : "px-4"}`}>
       <div
-        className="max-h-[96vh] w-full overflow-hidden rounded border border-slate-700 bg-slate-900 shadow-2xl"
-        style={{ maxWidth: `${width}vw` }}
+        className={`w-full overflow-hidden bg-slate-900 shadow-2xl ${
+          isFullscreen ? "h-screen max-h-screen border-0" : "max-h-[96vh] rounded border border-slate-700"
+        }`}
+        style={{ maxWidth: isFullscreen ? "100vw" : `${width}vw` }}
       >
         <div className="flex items-start justify-between gap-4 border-b border-slate-700 px-5 py-4">
           <div>
@@ -837,12 +841,18 @@ function PreviewDialog({
             >
               最大
             </button>
+            <button
+              onClick={() => setIsFullscreen((current) => !current)}
+              className={`rounded border px-3 py-1.5 text-sm ${isFullscreen ? "border-brand-500 text-white" : "border-slate-700 text-slate-300 hover:border-brand-500"}`}
+            >
+              {isFullscreen ? "退出全屏" : "全屏"}
+            </button>
             <button onClick={onClose} className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:border-brand-500">
               关闭
             </button>
           </div>
         </div>
-        <div className="grid gap-0 overflow-y-auto lg:grid-cols-[0.85fr_1.15fr]" style={{ maxHeight: `${height}vh` }}>
+        <div className="grid gap-0 overflow-y-auto lg:grid-cols-[0.85fr_1.15fr]" style={{ maxHeight: bodyHeight }}>
           <div className="border-b border-slate-800 p-5 lg:border-b-0 lg:border-r">
             <dl className="space-y-3 text-sm">
               <MetaRow label="语言" value={preview.row.locale} />
@@ -896,7 +906,7 @@ function PreviewDialog({
           {preview.editable ? (
             <textarea
               className="w-full resize-y bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-200 outline-none"
-              style={{ minHeight: `${height}vh` }}
+              style={{ minHeight: bodyHeight }}
               value={markdown}
               onChange={(event) => onMarkdownChange(event.target.value)}
             />
