@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
+import { getArticleAssetPaths } from "./lib/visual-assets.mjs";
 
 const draftsDir = path.resolve("local-brain/drafts");
 const validatedDir = path.resolve("local-brain/validated");
@@ -55,6 +56,8 @@ function validateFile(filePath, redLines, existingSlugs) {
   const textOnly = content.replace(/[#>*`\-\[\]\(\)|]/g, "").replace(/\s+/g, "");
   const keyword = Array.isArray(data.keywords) && data.keywords.length > 0 ? data.keywords[0] : "";
   const keywordCount = keyword ? content.split(keyword).length - 1 : 0;
+  const contentMode = String(data.contentMode || "").trim();
+  const imageLinks = [...content.matchAll(/!\[[^\]]+\]\((\/article-assets\/[^)]+)\)/g)].map((match) => match[1]);
 
   if (!data.title) errors.push("Missing frontmatter: title");
   if (!data.slug) errors.push("Missing frontmatter: slug");
@@ -94,6 +97,17 @@ function validateFile(filePath, redLines, existingSlugs) {
   }
   if (keyword && keywordCount > 25) {
     errors.push(`Primary keyword appears too many times: ${keywordCount}`);
+  }
+
+  if (contentMode === "fact-source") {
+    if (imageLinks.length < 3) {
+      errors.push("Fact-source articles need at least 3 explanatory image links");
+    }
+
+    const assetPaths = getArticleAssetPaths(data.locale || "zh", slug);
+    if (assetPaths.length < 3) {
+      errors.push("Fact-source article image assets are missing from public/article-assets");
+    }
   }
 
   const redHits = redLines.filter((word) => content.includes(word));

@@ -3,6 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 
 const articlesDir = path.resolve("content/articles");
+const publicDir = path.resolve("public");
 
 function validateArticle(filePath) {
   const raw = fs.readFileSync(filePath, "utf-8");
@@ -10,6 +11,7 @@ function validateArticle(filePath) {
   const errors = [];
   const faqCount = Array.isArray(data.faq) ? data.faq.length : 0;
   const textOnly = content.replace(/[#>*`\-\[\]\(\)|]/g, "").replace(/\s+/g, "");
+  const imageLinks = [...content.matchAll(/!\[[^\]]+\]\((\/article-assets\/[^)]+)\)/g)].map((match) => match[1]);
 
   if (!data.title) errors.push("title 为空");
   if (!data.slug) errors.push("slug 为空");
@@ -27,6 +29,14 @@ function validateArticle(filePath) {
   }
   if (data.locale === "zh" && textOnly.length < 1200) errors.push(`中文正文不足 1200 字（当前约 ${textOnly.length}）`);
   if (data.locale === "en" && content.split(/\s+/).filter(Boolean).length < 1000) errors.push("英文正文不足 1000 words");
+
+  if (data.contentMode === "fact-source") {
+    if (imageLinks.length < 3) errors.push("fact-source article needs at least 3 image links");
+    for (const imageLink of imageLinks) {
+      const assetPath = path.join(publicDir, imageLink.replace(/^\//u, ""));
+      if (!fs.existsSync(assetPath)) errors.push(`missing image asset: ${imageLink}`);
+    }
+  }
 
   return errors;
 }
@@ -70,4 +80,3 @@ function main() {
 }
 
 main();
-

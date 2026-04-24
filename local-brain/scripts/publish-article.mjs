@@ -23,14 +23,14 @@ function runGit(args) {
 }
 
 function hasStagedChanges() {
-  const output = runGit(["diff", "--cached", "--name-only", "--", "content/articles"]);
+  const output = runGit(["diff", "--cached", "--name-only", "--", "content/articles", "public/article-assets"]);
   return output.length > 0;
 }
 
 function publishToWebsite(slugs) {
   appendLog("publish", "开始推送到 GitHub，等待 Vercel 自动部署");
 
-  runGit(["add", "--", "content/articles"]);
+  runGit(["add", "--", "content/articles", "public/article-assets"]);
 
   if (!hasStagedChanges()) {
     appendLog("publish", "内容库没有新的可提交变更，跳过 Git 推送");

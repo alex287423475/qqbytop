@@ -15,6 +15,7 @@ function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof g
     datePublished: article.date,
     inLanguage: locale,
     keywords: article.keywords.join(", "),
+    image: article.images.map((image) => `https://qqbytop.com${image}`),
     mainEntityOfPage: `https://qqbytop.com/${locale}/blog/${article.slug}`,
     author: {
       "@type": "Organization",
@@ -62,6 +63,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title: article.title,
     description: article.description,
+    openGraph: {
+      title: article.title,
+      description: article.description,
+      images: article.images,
+    },
   };
 }
 

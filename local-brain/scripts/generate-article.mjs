@@ -3,6 +3,7 @@ import path from "path";
 import { parse } from "csv-parse/sync";
 import { callLLM, getProviderLabel } from "./ai-provider.mjs";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
+import { ensureArticleVisualAssets } from "./lib/visual-assets.mjs";
 
 const draftsDir = path.resolve("local-brain/drafts");
 const reportsDir = path.resolve("local-brain/reports");
@@ -252,6 +253,7 @@ async function main() {
         continue;
       }
 
+      markdown = ensureArticleVisualAssets(markdown, { ...row, contentMode });
       fs.writeFileSync(path.join(draftsDir, `${row.slug}.md`), markdown, "utf-8");
       fs.writeFileSync(
         path.join(reportsDir, `${row.slug}-generate.json`),
@@ -262,6 +264,7 @@ async function main() {
             locale: row.locale,
             contentMode,
             factSourcePath: factSourcePack.filePath,
+            visuals: contentMode === "fact-source" ? "public/article-assets" : null,
             provider,
             source: provider === "mock" ? "mock-fallback" : "model",
             generatedAt: new Date().toISOString(),

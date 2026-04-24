@@ -3,6 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 import { callLLM, getProviderLabel } from "./ai-provider.mjs";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
+import { ensureArticleVisualAssets } from "./lib/visual-assets.mjs";
 
 const draftsDir = path.resolve("local-brain/drafts");
 const rewrittenDir = path.resolve("local-brain/rewritten");
@@ -113,6 +114,14 @@ async function main() {
       }
 
       rewritten = normalizeSlug(rewritten, file.slug);
+      const visualData = matter(rewritten).data;
+      rewritten = ensureArticleVisualAssets(rewritten, {
+        slug: file.slug,
+        locale: visualData.locale || "zh",
+        keyword: Array.isArray(visualData.keywords) ? visualData.keywords[0] : visualData.title,
+        category: visualData.category,
+        contentMode: visualData.contentMode,
+      });
       fs.writeFileSync(path.join(rewrittenDir, `${file.slug}.md`), rewritten, "utf-8");
       fs.writeFileSync(path.join(draftsDir, `${file.slug}.md`), rewritten, "utf-8");
       fs.writeFileSync(

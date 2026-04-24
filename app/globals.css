@@ -149,7 +149,11 @@ body {
 
 .prose-content img {
   margin-top: 1.5rem;
+  width: 100%;
+  height: auto;
   border-radius: 0.75rem;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
 }
 
 .prose-content details {

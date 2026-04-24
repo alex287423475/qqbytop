@@ -25,6 +25,7 @@ export type ArticleMeta = {
   keywords: string[];
   readTime: string;
   faq: ArticleFaq[];
+  images: string[];
 };
 
 export type Article = ArticleMeta & {
@@ -80,6 +81,12 @@ function normalizeFaq(value: unknown): ArticleFaq[] {
     .filter((item) => item.q && item.a);
 }
 
+function extractImageUrls(content: string) {
+  return [...content.matchAll(/!\[[^\]]*]\(([^)]+)\)/g)]
+    .map((match) => match[1]?.trim())
+    .filter((src): src is string => Boolean(src && src.startsWith("/")));
+}
+
 function parseArticleFile(filePath: string, locale: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const { data, content } = matter(raw);
@@ -98,6 +105,7 @@ function parseArticleFile(filePath: string, locale: string) {
     keywords,
     readTime: estimateReadTime(content, locale),
     faq: normalizeFaq(data.faq),
+    images: extractImageUrls(content),
   };
 
   return { meta, content };
