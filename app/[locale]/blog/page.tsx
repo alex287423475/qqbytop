@@ -67,7 +67,13 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
           ) : (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {articles.map((article) => (
-                <article key={article.slug} className="rounded-2xl border border-slate-200 p-6 transition hover:border-brand-600 hover:shadow-lg">
+                <article key={article.slug} className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg">
+                  {article.coverImage && (
+                    <Link href={`/${normalized}/blog/${article.slug}`} className="block border-b border-slate-100 bg-slate-50">
+                      <img src={article.coverImage} alt={article.coverAlt || article.title} className="aspect-[1200/630] w-full object-cover" />
+                    </Link>
+                  )}
+                  <div className="p-6">
                   <p className="text-sm font-semibold text-brand-600">{article.category}</p>
                   <h2 className="mt-3 text-xl font-bold text-brand-900">
                     <Link href={`/${normalized}/blog/${article.slug}`}>{article.title}</Link>
@@ -83,6 +89,7 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
                   <p className="mt-5 text-xs text-slate-500">
                     {article.date} · {article.readTime}
                   </p>
+                  </div>
                 </article>
               ))}
             </div>

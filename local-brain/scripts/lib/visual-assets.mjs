@@ -49,6 +49,18 @@ function assetDefinitions(keyword, category) {
   ];
 }
 
+function coverDefinition(keyword, category) {
+  const cleanKeyword = keyword || "SEO article";
+  const cleanCategory = category || "Translation";
+
+  return {
+    fileName: "cover.svg",
+    title: `${cleanKeyword} - cover`,
+    alt: `${cleanKeyword} core fact source cover`,
+    svg: buildCoverSvg(cleanKeyword, cleanCategory),
+  };
+}
+
 function svgFrame(title, subtitle, body) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
@@ -59,6 +71,56 @@ function svgFrame(title, subtitle, body) {
   <text x="80" y="105" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="34" font-weight="700" fill="#0f172a">${escapeXml(title)}</text>
   <text x="80" y="145" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" fill="#475569">${escapeXml(subtitle)}</text>
   ${body}
+</svg>
+`;
+}
+
+function wrapText(value, max = 16) {
+  const text = String(value || "").trim();
+  if (!text) return [];
+  const chars = Array.from(text);
+  const lines = [];
+  for (let index = 0; index < chars.length; index += max) {
+    lines.push(chars.slice(index, index + max).join(""));
+  }
+  return lines.slice(0, 3);
+}
+
+function buildCoverSvg(keyword, category) {
+  const titleLines = wrapText(keyword, 15);
+  const titleSvg = titleLines
+    .map(
+      (line, index) =>
+        `<text x="90" y="${210 + index * 72}" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="58" font-weight="800" fill="#ffffff">${escapeXml(line)}</text>`,
+    )
+    .join("\n");
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">${escapeXml(keyword)}</title>
+  <desc id="desc">${escapeXml(category)} core fact source cover image</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="58%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <pattern id="grid" width="44" height="44" patternUnits="userSpaceOnUse">
+      <path d="M 44 0 L 0 0 0 44" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+  <rect x="70" y="70" width="1060" height="490" rx="30" fill="#0f172a" fill-opacity="0.58" stroke="#93c5fd" stroke-opacity="0.45"/>
+  <text x="90" y="135" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="24" font-weight="700" fill="#93c5fd">北京全球博译翻译公司 · 核心事实源</text>
+  ${titleSvg}
+  <text x="90" y="470" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="25" fill="#dbeafe">${escapeXml(category)} · 判断标准 · 证据链 · 交付边界</text>
+  <g transform="translate(790 150)">
+    <rect x="0" y="0" width="270" height="270" rx="28" fill="#ffffff" fill-opacity="0.1" stroke="#bfdbfe" stroke-opacity="0.65"/>
+    <path d="M58 78h154M58 128h154M58 178h98" stroke="#ffffff" stroke-width="16" stroke-linecap="round"/>
+    <circle cx="213" cy="181" r="36" fill="#22c55e"/>
+    <path d="M197 181l12 12 26-34" fill="none" stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
 `;
 }
@@ -181,6 +243,16 @@ export function ensureArticleVisualAssets(markdown, row) {
   const assetDir = path.join(publicRoot, "article-assets", locale, slug);
   fs.mkdirSync(assetDir, { recursive: true });
 
+  const cover = coverDefinition(keyword, category);
+  const coverPath = path.join(assetDir, cover.fileName);
+  fs.writeFileSync(coverPath, cover.svg, "utf-8");
+  const coverAsset = {
+    type: "cover",
+    title: cover.title,
+    alt: cover.alt,
+    src: `/article-assets/${locale}/${slug}/${cover.fileName}`,
+  };
+
   const assets = assetDefinitions(keyword, category).map((asset) => {
     const filePath = path.join(assetDir, asset.fileName);
     fs.writeFileSync(filePath, asset.svg, "utf-8");
@@ -193,6 +265,8 @@ export function ensureArticleVisualAssets(markdown, row) {
   });
 
   parsed.data.contentMode = contentMode;
+  parsed.data.coverImage = coverAsset.src;
+  parsed.data.coverAlt = coverAsset.alt;
   parsed.data.visuals = assets.map(({ type, title, alt, src }) => ({ type, title, alt, src }));
   parsed.content = insertVisualSection(parsed.content, assets);
 

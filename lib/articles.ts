@@ -26,6 +26,8 @@ export type ArticleMeta = {
   readTime: string;
   faq: ArticleFaq[];
   images: string[];
+  coverImage: string | null;
+  coverAlt: string;
 };
 
 export type Article = ArticleMeta & {
@@ -105,7 +107,14 @@ function parseArticleFile(filePath: string, locale: string) {
     keywords,
     readTime: estimateReadTime(content, locale),
     faq: normalizeFaq(data.faq),
-    images: extractImageUrls(content),
+    coverImage: typeof data.coverImage === "string" && data.coverImage.startsWith("/") ? data.coverImage : null,
+    coverAlt: typeof data.coverAlt === "string" ? data.coverAlt : "",
+    images: Array.from(
+      new Set([
+        ...(typeof data.coverImage === "string" && data.coverImage.startsWith("/") ? [data.coverImage] : []),
+        ...extractImageUrls(content),
+      ]),
+    ),
   };
 
   return { meta, content };

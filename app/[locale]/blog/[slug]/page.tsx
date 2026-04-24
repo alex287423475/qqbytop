@@ -99,6 +99,11 @@ export default async function BlogPostPage({ params }: { params: Promise<{ local
         <p className="mt-4 text-sm text-slate-500">
           {article.date} · {article.readTime}
         </p>
+        {article.coverImage && (
+          <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <img src={article.coverImage} alt={article.coverAlt || article.title} className="aspect-[1200/630] w-full object-cover" />
+          </div>
+        )}
         {article.keywords.length > 0 && (
           <div className="mt-4 flex flex-wrap gap-2">
             {article.keywords.map((keyword) => (

@@ -16,13 +16,14 @@ const stagePaths = [
 function extractVisualAssets(markdown: string, locale: string, slug: string) {
   const parsed = matter(markdown);
   const fromFrontmatter = Array.isArray(parsed.data.visuals) ? parsed.data.visuals : [];
+  const coverImage = typeof parsed.data.coverImage === "string" ? [{ type: "cover", title: "Cover image", alt: parsed.data.coverAlt || "", src: parsed.data.coverImage }] : [];
   const fromMarkdown = Array.from(markdown.matchAll(/!\[([^\]]*)]\((\/article-assets\/[^)]+\.svg)\)/g)).map((match) => ({
     alt: match[1],
     src: match[2],
   }));
 
   const unique = new Map<string, { type: string; title: string; alt: string; src: string; exists: boolean }>();
-  for (const asset of [...fromFrontmatter, ...fromMarkdown]) {
+  for (const asset of [...coverImage, ...fromFrontmatter, ...fromMarkdown]) {
     const src = typeof asset.src === "string" ? asset.src : "";
     if (!src.startsWith("/article-assets/")) continue;
     unique.set(src, {
