@@ -49,6 +49,7 @@ type KeywordRow = {
   category: string;
   intent: string;
   priority: string;
+  contentMode?: string;
 };
 
 type KeywordPreview = {
@@ -132,6 +133,7 @@ const emptyKeywordForm: KeywordRow = {
   category: "",
   intent: "信息",
   priority: "P1",
+  contentMode: "standard",
 };
 
 function createDefaultStatus(stages: WorkflowStage[]): WorkflowStatus {
@@ -488,6 +490,7 @@ export function WorkflowDashboard({
           category: String(item.category || ""),
           intent: String(item.intent || ""),
           priority: String(item.priority || ""),
+          contentMode: String(item.contentMode || "standard"),
         },
         articleUrl: payload.articleUrl || null,
         stage: payload.stage,
@@ -520,6 +523,7 @@ export function WorkflowDashboard({
           category: String(item.category || ""),
           intent: String(item.intent || ""),
           priority: String(item.priority || ""),
+          contentMode: String(item.contentMode || "standard"),
         },
         articleUrl: null,
         stage: payload.stage,
@@ -1054,13 +1058,19 @@ function KeywordManager({
         <p className="text-sm text-slate-400">直接管理 local-brain/inputs/keywords.csv，新增后即可进入生成流程。</p>
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[1.3fr_1fr_0.8fr_0.8fr_0.7fr_0.6fr_auto]">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_1fr_0.65fr_0.75fr_0.7fr_0.6fr_0.9fr_auto]">
         <TextInput label="关键词" value={form.keyword} onChange={(keyword) => onFormChange({ ...form, keyword })} />
         <TextInput label="slug" value={form.slug} onChange={(slug) => onFormChange({ ...form, slug })} placeholder="beijing-translation-price" />
         <SelectInput label="语言" value={form.locale} options={["zh", "en", "ja"]} onChange={(locale) => onFormChange({ ...form, locale })} />
         <TextInput label="分类" value={form.category} onChange={(category) => onFormChange({ ...form, category })} />
         <TextInput label="意图" value={form.intent} onChange={(intent) => onFormChange({ ...form, intent })} />
         <SelectInput label="优先级" value={form.priority} options={["P0", "P1", "P2", "P3"]} onChange={(priority) => onFormChange({ ...form, priority })} />
+        <SelectInput
+          label="内容模式"
+          value={form.contentMode || "standard"}
+          options={["standard", "fact-source"]}
+          onChange={(contentMode) => onFormChange({ ...form, contentMode })}
+        />
         <button
           onClick={onAdd}
           disabled={busy === "add"}
@@ -1080,6 +1090,7 @@ function KeywordManager({
               <th className="px-3 py-3">分类</th>
               <th className="px-3 py-3">意图</th>
               <th className="px-3 py-3">优先级</th>
+              <th className="px-3 py-3">内容模式</th>
               <th className="px-3 py-3">操作</th>
             </tr>
           </thead>
@@ -1092,6 +1103,7 @@ function KeywordManager({
                 <td className="px-3 py-3 text-slate-400">{row.category}</td>
                 <td className="px-3 py-3 text-slate-400">{row.intent}</td>
                 <td className="px-3 py-3 text-slate-400">{row.priority}</td>
+                <td className="px-3 py-3 text-slate-400">{row.contentMode === "fact-source" ? "核心事实源" : "普通文章"}</td>
                 <td className="px-3 py-3">
                   <div className="flex gap-2">
                     <MiniButton label="预览" onClick={() => onPreview(row.slug)} disabled={busy === `preview:${row.slug}`} />
@@ -1102,7 +1114,7 @@ function KeywordManager({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
                   关键词文件为空。
                 </td>
               </tr>
@@ -1194,6 +1206,7 @@ function PreviewDialog({
               <MetaRow label="分类" value={preview.row.category} />
               <MetaRow label="意图" value={preview.row.intent} />
               <MetaRow label="优先级" value={preview.row.priority} />
+              <MetaRow label="内容模式" value={preview.row.contentMode === "fact-source" ? "核心事实源" : "普通文章"} />
               <MetaRow label="文件" value={preview.filePath || "暂无生成文件"} />
             </dl>
             {preview.articleUrl && (

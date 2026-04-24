@@ -19,6 +19,12 @@ const promptRegistry = {
     description: "控制生成文章时必须包含的结构、SEO 要求和输出格式。",
     fileName: "article-user.md",
   },
+  "fact-source-user": {
+    key: "fact-source-user",
+    label: "核心事实源 User",
+    description: "控制核心事实源模式的研究深度、证据结构、事实源页面和白皮书写法。",
+    fileName: "article-fact-source-user.md",
+  },
   review: {
     key: "review",
     label: "AI质检",

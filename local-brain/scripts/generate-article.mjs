@@ -40,6 +40,17 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeContentMode(row) {
+  const mode = String(row.contentMode || row.mode || "standard").trim();
+  return mode === "fact-source" ? "fact-source" : "standard";
+}
+
+function readPromptFile(fileName, fallback = "") {
+  const filePath = path.join(promptsDir, fileName);
+  if (!fs.existsSync(filePath)) return fallback;
+  return fs.readFileSync(filePath, "utf-8");
+}
+
 function buildFaq(keyword, category) {
   return [
     {
@@ -157,8 +168,9 @@ async function main() {
   const { slug } = parseArgs();
   const keywords = readCsv(path.join(inputsDir, "keywords.csv"));
   const redLines = readCsv(path.join(inputsDir, "red-lines.csv")).map((item) => item.word);
-  const systemPrompt = fs.readFileSync(path.join(promptsDir, "article-system.md"), "utf-8");
-  const userPromptTemplate = fs.readFileSync(path.join(promptsDir, "article-user.md"), "utf-8");
+  const systemPrompt = readPromptFile("article-system.md");
+  const standardUserPromptTemplate = readPromptFile("article-user.md");
+  const factSourceUserPromptTemplate = readPromptFile("article-fact-source-user.md", standardUserPromptTemplate);
   const rows = slug ? keywords.filter((item) => item.slug === slug) : keywords.filter((item) => !hasGeneratedArtifact(item));
 
   if (rows.length === 0) {
@@ -175,19 +187,22 @@ async function main() {
 
   try {
     for (const row of rows) {
+      const contentMode = normalizeContentMode(row);
       updateArticleStage(row.slug, "generating", {
         keyword: row.keyword,
         locale: row.locale,
         category: row.category,
+        contentMode,
         errors: [],
       });
       appendLog("generate", `开始生成：${row.keyword}`, row.slug);
 
       const fallback = () => buildFallbackMarkdown(row, redLines);
-      const userPrompt = `${userPromptTemplate}\n\n关键词：${row.keyword}\nslug：${row.slug}\n分类：${row.category}\n意图：${row.intent}\n红线词：${redLines.join("、")}`;
+      const userPromptTemplate = contentMode === "fact-source" ? factSourceUserPromptTemplate : standardUserPromptTemplate;
+      const userPrompt = `${userPromptTemplate}\n\n关键词：${row.keyword}\nslug：${row.slug}\n分类：${row.category}\n意图：${row.intent}\n内容模式：${contentMode === "fact-source" ? "核心事实源" : "普通文章"}\n红线词：${redLines.join("、")}`;
       let markdown = await callLLM(systemPrompt, userPrompt, {
-        temperature: 0.6,
-        maxTokens: 5000,
+        temperature: contentMode === "fact-source" ? 0.45 : 0.6,
+        maxTokens: contentMode === "fact-source" ? 8000 : 5000,
         fallback,
       });
 
@@ -203,6 +218,7 @@ async function main() {
             slug: row.slug,
             keyword: row.keyword,
             locale: row.locale,
+            contentMode,
             provider: process.env.AI_PROVIDER || "mock",
             generatedAt: new Date().toISOString(),
           },
@@ -213,6 +229,7 @@ async function main() {
 
       updateArticleStage(row.slug, "draft", {
         generatedAt: new Date().toISOString(),
+        contentMode,
         errors: [],
       });
       appendLog("generate", `草稿已生成：${row.slug}.md`, row.slug);

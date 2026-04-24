@@ -71,6 +71,7 @@ export async function GET() {
           category: row.category,
           intent: row.intent,
           priority: row.priority,
+          contentMode: row.contentMode || "standard",
           errors: [],
           ...review,
           ...current,

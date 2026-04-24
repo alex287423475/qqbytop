@@ -9,9 +9,10 @@ export type KeywordRow = {
   category: string;
   intent: string;
   priority: string;
+  contentMode?: string;
 };
 
-const headers: Array<keyof KeywordRow> = ["keyword", "slug", "locale", "category", "intent", "priority"];
+const headers: Array<keyof KeywordRow> = ["keyword", "slug", "locale", "category", "intent", "priority", "contentMode"];
 
 export const keywordsPath = path.join(process.cwd(), "local-brain", "inputs", "keywords.csv");
 
@@ -39,6 +40,7 @@ export function normalizeKeywordRow(input: Partial<KeywordRow>): KeywordRow {
     category: String(input.category || "").trim(),
     intent: String(input.intent || "信息").trim(),
     priority: String(input.priority || "P1").trim(),
+    contentMode: String(input.contentMode || "standard").trim(),
   };
 
   if (!row.keyword) throw new Error("关键词不能为空。");
@@ -47,6 +49,7 @@ export function normalizeKeywordRow(input: Partial<KeywordRow>): KeywordRow {
   if (!["zh", "en", "ja"].includes(row.locale)) throw new Error("locale 必须是 zh、en 或 ja。");
   if (!row.category) throw new Error("分类不能为空。");
   if (!row.priority) throw new Error("优先级不能为空。");
+  if (!["standard", "fact-source"].includes(row.contentMode)) throw new Error("contentMode 必须是 standard 或 fact-source。");
 
   return row;
 }
