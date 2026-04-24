@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkRehype from "remark-rehype";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import rehypeStringify from "rehype-stringify";
+import { normalizeArticleCategories } from "@/lib/article-listing";
 
 export const articleLocales = ["zh", "en", "ja"] as const;
 export type ArticleLocale = (typeof articleLocales)[number];
@@ -20,6 +21,7 @@ export type ArticleMeta = {
   slug: string;
   description: string;
   category: string;
+  categories: string[];
   date: string;
   locale: string;
   keywords: string[];
@@ -93,6 +95,7 @@ function parseArticleFile(filePath: string, locale: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const { data, content } = matter(raw);
   const fallbackSlug = path.basename(path.dirname(filePath));
+  const categories = normalizeArticleCategories(data.category);
   const keywords = Array.isArray(data.keywords)
     ? data.keywords.filter((keyword): keyword is string => typeof keyword === "string" && keyword.trim().length > 0)
     : [];
@@ -101,7 +104,8 @@ function parseArticleFile(filePath: string, locale: string) {
     title: typeof data.title === "string" ? data.title.trim() : "",
     slug: typeof data.slug === "string" ? data.slug.trim() : fallbackSlug,
     description: typeof data.description === "string" ? data.description.trim() : "",
-    category: typeof data.category === "string" ? data.category.trim() : "",
+    category: categories[0] || "",
+    categories,
     date: typeof data.date === "string" ? data.date.trim() : "",
     locale,
     keywords,

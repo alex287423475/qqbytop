@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { buildArticleListing } from "@/lib/article-listing";
 import { getAllArticles } from "@/lib/articles";
 import { locales, type Locale } from "@/lib/site-data";
 
@@ -23,6 +24,14 @@ const blogCopy: Record<Locale, { eyebrow: string; title: string; description: st
   },
 };
 
+function buildBlogHref(locale: string, category: string, page: number) {
+  const params = new URLSearchParams();
+  if (category && category !== "all") params.set("category", category);
+  if (page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return `/${locale}/blog${query ? `?${query}` : ""}`;
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
@@ -33,11 +42,22 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   };
 }
 
-export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function BlogPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ category?: string; page?: string }>;
+}) {
   const { locale } = await params;
+  const filters = await searchParams;
   const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
   const articles = getAllArticles(normalized);
-  const categories = Array.from(new Set(articles.map((article) => article.category).filter(Boolean)));
+  const listing = buildArticleListing(articles, {
+    category: filters.category,
+    page: filters.page,
+    pageSize: 6,
+  });
 
   return (
     <>
@@ -46,13 +66,24 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
           <p className="text-sm font-semibold text-brand-600">{blogCopy[normalized].eyebrow}</p>
           <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">{blogCopy[normalized].title}</h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">{blogCopy[normalized].description}</p>
-          {categories.length > 0 && (
-            <div className="mt-6 flex flex-wrap gap-2">
-              {categories.map((category) => (
-                <span key={category} className="rounded-full bg-white px-3 py-1 text-sm text-slate-600 shadow-sm">
-                  {category}
-                </span>
-              ))}
+          {listing.facets.length > 1 && (
+            <div className="mt-8 flex flex-wrap gap-3">
+              {listing.facets.map((facet) => {
+                const active = facet.value === listing.activeCategory;
+                return (
+                  <Link
+                    key={facet.value}
+                    href={buildBlogHref(normalized, facet.value, 1)}
+                    className={`inline-flex items-center rounded-full border px-5 py-3 text-base font-medium transition ${
+                      active
+                        ? "border-brand-600 bg-brand-600 text-white shadow-lg shadow-brand-100"
+                        : "border-slate-200 bg-white text-slate-700 shadow-sm hover:border-brand-300 hover:text-brand-700"
+                    }`}
+                  >
+                    {facet.label}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
@@ -65,34 +96,97 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
               {blogCopy[normalized].empty}
             </div>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {articles.map((article) => (
-                <article key={article.slug} className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg">
-                  {article.coverImage && (
-                    <Link href={`/${normalized}/blog/${article.slug}`} className="block border-b border-slate-100 bg-slate-50">
-                      <img src={article.coverImage} alt={article.coverAlt || article.title} className="aspect-[1200/630] w-full object-cover" />
-                    </Link>
-                  )}
-                  <div className="p-6">
-                  <p className="text-sm font-semibold text-brand-600">{article.category}</p>
-                  <h2 className="mt-3 text-xl font-bold text-brand-900">
-                    <Link href={`/${normalized}/blog/${article.slug}`}>{article.title}</Link>
-                  </h2>
-                  <p className="mt-4 leading-7 text-slate-600">{article.description}</p>
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {article.keywords.slice(0, 3).map((keyword) => (
-                      <span key={keyword} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
-                        {keyword}
-                      </span>
-                    ))}
-                  </div>
-                  <p className="mt-5 text-xs text-slate-500">
-                    {article.date} · {article.readTime}
+            <>
+              <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-brand-600">
+                    {listing.activeCategory === "all" ? "全部文章" : listing.activeCategory}
                   </p>
-                  </div>
-                </article>
-              ))}
-            </div>
+                  <p className="mt-2 text-sm text-slate-500">共 {listing.pagination.totalItems} 篇文章</p>
+                </div>
+                <p className="text-sm text-slate-500">
+                  第 {listing.pagination.page} / {listing.pagination.totalPages} 页
+                </p>
+              </div>
+
+              {listing.articles.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-slate-500">
+                  当前分类下还没有文章。
+                </div>
+              ) : (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {listing.articles.map((article) => (
+                    <article key={article.slug} className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg">
+                      {article.coverImage && (
+                        <Link href={`/${normalized}/blog/${article.slug}`} className="block border-b border-slate-100 bg-slate-50">
+                          <img src={article.coverImage} alt={article.coverAlt || article.title} className="aspect-[1200/630] w-full object-cover" />
+                        </Link>
+                      )}
+                      <div className="p-6">
+                        <p className="text-sm font-semibold text-brand-600">{article.category}</p>
+                        <h2 className="mt-3 text-xl font-bold text-brand-900">
+                          <Link href={`/${normalized}/blog/${article.slug}`}>{article.title}</Link>
+                        </h2>
+                        <p className="mt-4 leading-7 text-slate-600">{article.description}</p>
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          {article.keywords.slice(0, 3).map((keyword) => (
+                            <span key={keyword} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-5 text-xs text-slate-500">
+                          {article.date} · {article.readTime}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {listing.pagination.totalPages > 1 && (
+                <nav className="mt-10 flex flex-wrap items-center justify-center gap-2" aria-label="Blog pagination">
+                  <Link
+                    href={buildBlogHref(normalized, listing.activeCategory, Math.max(1, listing.pagination.page - 1))}
+                    aria-disabled={listing.pagination.page === 1}
+                    className={`inline-flex min-w-11 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
+                      listing.pagination.page === 1
+                        ? "pointer-events-none border-slate-200 text-slate-300"
+                        : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
+                    }`}
+                  >
+                    上一页
+                  </Link>
+                  {Array.from({ length: listing.pagination.totalPages }, (_, index) => index + 1).map((pageNumber) => {
+                    const active = pageNumber === listing.pagination.page;
+                    return (
+                      <Link
+                        key={pageNumber}
+                        href={buildBlogHref(normalized, listing.activeCategory, pageNumber)}
+                        className={`inline-flex h-11 w-11 items-center justify-center rounded-lg border text-sm font-semibold ${
+                          active
+                            ? "border-brand-600 bg-brand-600 text-white"
+                            : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
+                        }`}
+                      >
+                        {pageNumber}
+                      </Link>
+                    );
+                  })}
+                  <Link
+                    href={buildBlogHref(normalized, listing.activeCategory, Math.min(listing.pagination.totalPages, listing.pagination.page + 1))}
+                    aria-disabled={listing.pagination.page === listing.pagination.totalPages}
+                    className={`inline-flex min-w-11 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
+                      listing.pagination.page === listing.pagination.totalPages
+                        ? "pointer-events-none border-slate-200 text-slate-300"
+                        : "border-slate-300 text-slate-700 hover:border-brand-400 hover:text-brand-700"
+                    }`}
+                  >
+                    下一页
+                  </Link>
+                </nav>
+              )}
+            </>
           )}
         </div>
       </section>
