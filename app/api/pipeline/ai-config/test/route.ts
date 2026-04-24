@@ -214,17 +214,31 @@ async function readJsonOrText(response: Response) {
 }
 
 function extractModelText(data: any) {
-  if (data?.choices?.[0]?.message?.content) return data.choices[0].message.content;
+  const messageContent = data?.choices?.[0]?.message?.content;
+  if (typeof messageContent === "string") return messageContent;
+  if (Array.isArray(messageContent)) return extractTextParts(messageContent);
   if (data?.choices?.[0]?.text) return data.choices[0].text;
   if (data?.content?.[0]?.text) return data.content[0].text;
   if (typeof data?.output_text === "string") return data.output_text;
   if (Array.isArray(data?.output)) {
     return data.output
       .flatMap((item: any) => item?.content || [])
-      .map((part: any) => part?.text || "")
+      .map((part: any) => extractTextPart(part))
       .filter(Boolean)
       .join("\n");
   }
+  return "";
+}
+
+function extractTextParts(parts: any[]) {
+  return parts.map((part) => extractTextPart(part)).filter(Boolean).join("\n");
+}
+
+function extractTextPart(part: any) {
+  if (typeof part === "string") return part;
+  if (typeof part?.text === "string") return part.text;
+  if (typeof part?.content === "string") return part.content;
+  if (part?.type === "text" && typeof part?.value === "string") return part.value;
   return "";
 }
 
