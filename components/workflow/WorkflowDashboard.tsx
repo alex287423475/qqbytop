@@ -794,20 +794,55 @@ function PreviewDialog({
   onSave: () => void;
   onClose: () => void;
 }) {
+  const [width, setWidth] = useState(82);
+  const [height, setHeight] = useState(72);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
-      <div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded border border-slate-700 bg-slate-900 shadow-2xl">
+      <div
+        className="max-h-[96vh] w-full overflow-hidden rounded border border-slate-700 bg-slate-900 shadow-2xl"
+        style={{ maxWidth: `${width}vw` }}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-slate-700 px-5 py-4">
           <div>
             <p className="text-xs uppercase text-slate-500">{preview.stage}</p>
             <h2 className="mt-1 text-xl font-bold text-white">{preview.row.keyword}</h2>
             <p className="mt-1 text-sm text-slate-400">{preview.row.slug}</p>
           </div>
-          <button onClick={onClose} className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:border-brand-500">
-            关闭
-          </button>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={() => {
+                setWidth(64);
+                setHeight(64);
+              }}
+              className={`rounded border px-3 py-1.5 text-sm ${width === 64 ? "border-brand-500 text-white" : "border-slate-700 text-slate-300 hover:border-brand-500"}`}
+            >
+              标准
+            </button>
+            <button
+              onClick={() => {
+                setWidth(82);
+                setHeight(72);
+              }}
+              className={`rounded border px-3 py-1.5 text-sm ${width === 82 ? "border-brand-500 text-white" : "border-slate-700 text-slate-300 hover:border-brand-500"}`}
+            >
+              宽屏
+            </button>
+            <button
+              onClick={() => {
+                setWidth(98);
+                setHeight(88);
+              }}
+              className={`rounded border px-3 py-1.5 text-sm ${width === 98 ? "border-brand-500 text-white" : "border-slate-700 text-slate-300 hover:border-brand-500"}`}
+            >
+              最大
+            </button>
+            <button onClick={onClose} className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:border-brand-500">
+              关闭
+            </button>
+          </div>
         </div>
-        <div className="grid max-h-[70vh] gap-0 overflow-y-auto lg:grid-cols-[0.85fr_1.15fr]">
+        <div className="grid gap-0 overflow-y-auto lg:grid-cols-[0.85fr_1.15fr]" style={{ maxHeight: `${height}vh` }}>
           <div className="border-b border-slate-800 p-5 lg:border-b-0 lg:border-r">
             <dl className="space-y-3 text-sm">
               <MetaRow label="语言" value={preview.row.locale} />
@@ -830,11 +865,38 @@ function PreviewDialog({
                 {saving ? "保存中" : "保存修改"}
               </button>
             )}
+            {preview.editable && (
+              <label className="mt-5 flex flex-col gap-2 text-xs text-slate-400">
+                窗口宽度：{width}vw
+                <input
+                  type="range"
+                  min={56}
+                  max={98}
+                  value={width}
+                  onChange={(event) => setWidth(Number(event.target.value))}
+                  className="w-full accent-brand-500"
+                />
+              </label>
+            )}
+            {preview.editable && (
+              <label className="mt-4 flex flex-col gap-2 text-xs text-slate-400">
+                编辑区高度：{height}vh
+                <input
+                  type="range"
+                  min={52}
+                  max={88}
+                  value={height}
+                  onChange={(event) => setHeight(Number(event.target.value))}
+                  className="w-full accent-brand-500"
+                />
+              </label>
+            )}
             {preview.editable && <p className="mt-3 text-xs leading-5 text-slate-500">保存后会退回草稿阶段，请重新执行“校验草稿”。</p>}
           </div>
           {preview.editable ? (
             <textarea
-              className="min-h-[70vh] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-200 outline-none"
+              className="w-full resize-y bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-200 outline-none"
+              style={{ minHeight: `${height}vh` }}
               value={markdown}
               onChange={(event) => onMarkdownChange(event.target.value)}
             />
