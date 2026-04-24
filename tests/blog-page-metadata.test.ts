@@ -10,6 +10,8 @@ import {
   buildBlogHref,
   buildBlogPageMetadata,
   buildBlogPageOverview,
+  buildBlogQuotePanel,
+  buildFactSourceHub,
 } from "../lib/blog-page.ts";
 
 test("buildBlogHref includes category and page query parameters only when needed", () => {
@@ -68,6 +70,28 @@ test("buildBlogFeature flags fact-source articles", () => {
 
   assert.equal(feature?.badge, "核心事实源");
   assert.equal(feature?.cta, "进入文章");
+});
+
+test("buildBlogQuotePanel links category state to quote page", () => {
+  const quotePanel = buildBlogQuotePanel({
+    locale: "zh",
+    activeCategory: "法律合规",
+  });
+
+  assert.equal(quotePanel.eyebrow, "需求联动");
+  assert.equal(quotePanel.title, "法律合规需求可以直接提交询价");
+  assert.equal(quotePanel.href, "/zh/quote?source=blog&category=%E6%B3%95%E5%BE%8B%E5%90%88%E8%A7%84");
+});
+
+test("buildFactSourceHub returns section copy for the active category", () => {
+  const hub = buildFactSourceHub({
+    locale: "zh",
+    activeCategory: "法律合规",
+  });
+
+  assert.equal(hub.eyebrow, "核心事实源入口");
+  assert.equal(hub.title, "法律合规核心事实源");
+  assert.equal(hub.cta, "查看文章");
 });
 
 test("buildBlogPageMetadata includes canonical and category-aware title", () => {

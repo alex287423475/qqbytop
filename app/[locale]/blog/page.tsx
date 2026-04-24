@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { BlogCategoryChips } from "@/components/shared/BlogCategoryChips";
 import { JsonLd } from "@/components/shared/JsonLd";
-import { buildArticleListing } from "@/lib/article-listing";
+import { buildArticleListing, normalizeArticleCategories } from "@/lib/article-listing";
 import { getAllArticles } from "@/lib/articles";
 import {
   buildBlogBreadcrumbSchema,
@@ -11,12 +11,13 @@ import {
   buildBlogCurrentRange,
   buildBlogFeature,
   buildBlogHref,
-  buildBlogPageOverview,
   buildBlogPageMetadata,
+  buildBlogPageOverview,
+  buildBlogQuotePanel,
+  buildFactSourceHub,
   getBlogCopy,
 } from "@/lib/blog-page";
 import { locales, type Locale } from "@/lib/site-data";
-import { normalizeArticleCategories } from "@/lib/article-listing";
 
 export async function generateMetadata({
   params,
@@ -59,6 +60,7 @@ export default async function BlogPage({
     page: filters.page,
     pageSize: 6,
   });
+
   const filteredArticles =
     listing.activeCategory === "all"
       ? articles
@@ -67,6 +69,7 @@ export default async function BlogPage({
             listing.activeCategory,
           ),
         );
+
   const overview = buildBlogPageOverview({
     locale: normalized,
     activeCategory: listing.activeCategory,
@@ -76,12 +79,23 @@ export default async function BlogPage({
     currentPage: listing.pagination.page,
     latestDate: filteredArticles[0]?.date ?? articles[0]?.date ?? "",
   });
+
   const featuredArticle =
     filteredArticles.find((article) => article.contentMode === "fact-source") ?? filteredArticles[0] ?? null;
   const feature = buildBlogFeature({
     locale: normalized,
     article: featuredArticle,
   });
+  const quotePanel = buildBlogQuotePanel({
+    locale: normalized,
+    activeCategory: listing.activeCategory,
+  });
+  const factSourceHub = buildFactSourceHub({
+    locale: normalized,
+    activeCategory: listing.activeCategory,
+  });
+  const factSourceArticles = filteredArticles.filter((article) => article.contentMode === "fact-source").slice(0, 3);
+
   const collectionSchema = buildBlogCollectionSchema({
     locale: normalized,
     category: listing.activeCategory,
@@ -170,59 +184,111 @@ export default async function BlogPage({
                   </div>
                 </section>
 
-                {featuredArticle && feature && (
-                  <section className="overflow-hidden rounded-3xl border border-slate-700 bg-brand-900 text-white shadow-sm">
-                    {featuredArticle.coverImage && (
-                      <Link
-                        href={`/${normalized}/blog/${featuredArticle.slug}`}
-                        className="block border-b border-white/10 bg-brand-900/60"
-                      >
-                        <Image
-                          src={featuredArticle.coverImage}
-                          alt={featuredArticle.coverAlt || featuredArticle.title}
-                          width={1200}
-                          height={630}
-                          sizes="(max-width: 1024px) 100vw, 34vw"
-                          className="aspect-[1200/630] w-full object-cover"
-                        />
-                      </Link>
-                    )}
-                    <div className="p-6">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-100">{feature.eyebrow}</p>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-brand-100">
-                          {feature.badge}
-                        </span>
-                        <span className="text-xs text-brand-100/80">{featuredArticle.category}</span>
-                      </div>
-                      <h2 className="mt-4 text-2xl font-bold leading-tight text-white">{featuredArticle.title}</h2>
-                      <p className="mt-3 text-sm leading-7 text-white/90">{feature.description}</p>
-                      <p className="mt-4 text-sm leading-7 text-brand-100/80">{featuredArticle.description}</p>
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        {featuredArticle.keywords.slice(0, 3).map((keyword) => (
-                          <span
-                            key={keyword}
-                            className="rounded-full border border-white/12 bg-white/5 px-2.5 py-1 text-xs text-brand-100/85"
-                          >
-                            {keyword}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-6 flex items-center justify-between gap-3 border-t border-white/10 pt-5">
-                        <p className="text-xs text-brand-100/70">
-                          {featuredArticle.date} · {featuredArticle.readTime}
-                        </p>
-                        <Link
-                          href={`/${normalized}/blog/${featuredArticle.slug}`}
-                          className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-brand-900 transition hover:bg-slate-100"
-                        >
-                          {feature.cta}
-                        </Link>
-                      </div>
-                    </div>
-                  </section>
-                )}
+                <section className="flex h-full flex-col justify-between rounded-3xl border border-brand-200 bg-gradient-to-br from-brand-50 via-white to-slate-50 p-6 shadow-sm">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">{quotePanel.eyebrow}</p>
+                    <h2 className="mt-3 text-2xl font-bold text-brand-900">{quotePanel.title}</h2>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{quotePanel.description}</p>
+                  </div>
+                  <div className="mt-6 rounded-2xl border border-brand-100 bg-white/90 p-4">
+                    <p className="text-sm font-medium text-slate-500">{listing.activeCategory === "all" ? copy.allArticlesLabel : listing.activeCategory}</p>
+                    <p className="mt-2 text-sm leading-7 text-slate-600">
+                      {listing.activeCategory === "all"
+                        ? buildBlogCollectionSummary(
+                            normalized,
+                            listing.pagination.startItem,
+                            listing.pagination.endItem,
+                            listing.pagination.totalItems,
+                          )
+                        : overview.description}
+                    </p>
+                    <Link
+                      href={quotePanel.href}
+                      className="mt-5 inline-flex items-center rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-500"
+                    >
+                      {quotePanel.cta}
+                    </Link>
+                  </div>
+                </section>
               </div>
+
+              <section className="mb-10 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 bg-slate-50 px-6 py-5">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-500">{factSourceHub.eyebrow}</p>
+                      <h2 className="mt-2 text-2xl font-bold text-brand-900">{factSourceHub.title}</h2>
+                      <p className="mt-2 max-w-3xl text-sm leading-7 text-slate-600">{factSourceHub.description}</p>
+                    </div>
+                    <div className="rounded-2xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+                      {factSourceArticles.length} 篇
+                    </div>
+                  </div>
+                </div>
+
+                {factSourceArticles.length === 0 ? (
+                  <div className="px-6 py-12 text-center text-slate-500">{factSourceHub.empty}</div>
+                ) : (
+                  <div className="grid gap-6 px-6 py-6 md:grid-cols-2 xl:grid-cols-3">
+                    {factSourceArticles.map((article) => {
+                      const articleFeature = buildBlogFeature({
+                        locale: normalized,
+                        article,
+                      });
+
+                      return (
+                        <article
+                          key={article.slug}
+                          className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-400 hover:shadow-md"
+                        >
+                          {article.coverImage && (
+                            <Link href={`/${normalized}/blog/${article.slug}`} className="block overflow-hidden border-b border-slate-100 bg-slate-50">
+                              <Image
+                                src={article.coverImage}
+                                alt={article.coverAlt || article.title}
+                                width={1200}
+                                height={630}
+                                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                                className="aspect-[1200/630] w-full object-cover transition duration-500 hover:scale-[1.02]"
+                              />
+                            </Link>
+                          )}
+                          <div className="p-5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-700">
+                                {articleFeature?.badge || "核心事实源"}
+                              </span>
+                              <span className="text-xs font-medium text-slate-500">{article.category}</span>
+                            </div>
+                            <h3 className="mt-3 text-xl font-bold text-brand-900">
+                              <Link href={`/${normalized}/blog/${article.slug}`}>{article.title}</Link>
+                            </h3>
+                            <p className="mt-3 text-sm leading-7 text-slate-600">{article.description}</p>
+                            <div className="mt-5 flex flex-wrap gap-2">
+                              {article.keywords.slice(0, 3).map((keyword) => (
+                                <span key={keyword} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                                  {keyword}
+                                </span>
+                              ))}
+                            </div>
+                            <div className="mt-5 flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+                              <p className="text-xs text-slate-500">
+                                {article.date} · {article.readTime}
+                              </p>
+                              <Link
+                                href={`/${normalized}/blog/${article.slug}`}
+                                className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-brand-700 transition hover:border-brand-300 hover:bg-brand-50"
+                              >
+                                {factSourceHub.cta}
+                              </Link>
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
 
               {listing.articles.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-slate-500">

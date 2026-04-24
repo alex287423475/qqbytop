@@ -24,6 +24,22 @@ type BlogFeature = {
   cta: string;
 };
 
+type BlogQuotePanel = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  cta: string;
+  href: string;
+};
+
+type BlogFactSourceHub = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  empty: string;
+  cta: string;
+};
+
 const zhCategoryInsights: Record<string, string> = {
   "翻译价格": "集中梳理报价逻辑、计费变量和交付边界，适合询价前快速判断预算与工作量。",
   "证件翻译": "覆盖签证、学历、证明类材料的格式要求、盖章逻辑和常见退件原因。",
@@ -77,6 +93,23 @@ const blogCopy: Record<
       defaultBadge: string;
       cta: string;
     };
+    quote: {
+      eyebrow: string;
+      allTitle: string;
+      categoryTitle: (category: string) => string;
+      allDescription: string;
+      categoryDescription: (category: string) => string;
+      cta: string;
+    };
+    factSourceHub: {
+      eyebrow: string;
+      allTitle: string;
+      categoryTitle: (category: string) => string;
+      allDescription: string;
+      categoryDescription: (category: string) => string;
+      empty: string;
+      cta: string;
+    };
   }
 > = {
   zh: {
@@ -118,6 +151,25 @@ const blogCopy: Record<
       defaultBadge: "重点文章",
       cta: "进入文章",
     },
+    quote: {
+      eyebrow: "需求联动",
+      allTitle: "已经明确需求，可以直接进入询价",
+      categoryTitle: (category) => `${category}需求可以直接提交询价`,
+      allDescription: "如果你已经知道自己要翻什么、交付到什么程度，可以直接提交文件或说明场景，我们会按材料复杂度和交付要求评估。",
+      categoryDescription: (category) =>
+        `如果你当前主要关注${category}，可以直接提交文件、用途和目标语种，我们会按风险点、材料结构和交付边界来判断工作量。`,
+      cta: "提交询价",
+    },
+    factSourceHub: {
+      eyebrow: "核心事实源入口",
+      allTitle: "先读这些高密度文章，再决定具体方案",
+      categoryTitle: (category) => `${category}核心事实源`,
+      allDescription: "这些文章不是泛泛介绍，而是把判断标准、证据链、交付边界和常见错误拆开讲清楚，适合在咨询前先建立判断框架。",
+      categoryDescription: (category) =>
+        `下面这些文章优先覆盖 ${category} 里的高风险判断点，适合先快速建立标准，再决定是继续阅读还是直接提交需求。`,
+      empty: "当前分类下还没有标记为核心事实源的文章。",
+      cta: "查看文章",
+    },
   },
   en: {
     eyebrow: "Insights",
@@ -158,6 +210,25 @@ const blogCopy: Record<
       defaultBadge: "Featured",
       cta: "Read article",
     },
+    quote: {
+      eyebrow: "Need support",
+      allTitle: "If the scope is already clear, request a quote directly",
+      categoryTitle: (category) => `Send your ${category.toLowerCase()} request directly`,
+      allDescription: "Share the file set, target languages, and delivery goal. We will evaluate based on complexity, review depth, and formatting scope.",
+      categoryDescription: (category) =>
+        `If your current task is mainly about ${category.toLowerCase()}, send the material and intended use directly so we can scope the delivery more accurately.`,
+      cta: "Request quote",
+    },
+    factSourceHub: {
+      eyebrow: "Core fact sources",
+      allTitle: "Read these dense source articles before deciding next steps",
+      categoryTitle: (category) => `${category} core fact sources`,
+      allDescription: "These pieces focus on decision criteria, evidence chains, delivery boundaries, and failure patterns rather than broad overviews.",
+      categoryDescription: (category) =>
+        `These articles surface the highest-value facts inside ${category.toLowerCase()} so you can judge complexity before starting a project.`,
+      empty: "No core fact-source articles are available in this topic yet.",
+      cta: "Open article",
+    },
   },
   ja: {
     eyebrow: "インサイト",
@@ -197,6 +268,25 @@ const blogCopy: Record<
       factSourceBadge: "コア事実ソース",
       defaultBadge: "注目記事",
       cta: "記事を読む",
+    },
+    quote: {
+      eyebrow: "相談導線",
+      allTitle: "要件が固まっている場合はそのまま見積相談へ",
+      categoryTitle: (category) => `${category} の相談をそのまま送る`,
+      allDescription: "ファイル、用途、納品条件が分かっていれば、そのまま見積依頼に進めます。複雑度とレビュー範囲を見て判断します。",
+      categoryDescription: (category) =>
+        `${category} が中心なら、対象資料と用途を送っていただければ、作業量と納品条件を整理してご案内します。`,
+      cta: "見積を依頼",
+    },
+    factSourceHub: {
+      eyebrow: "コア事実ソース入口",
+      allTitle: "先に読むべき高密度記事",
+      categoryTitle: (category) => `${category} のコア事実ソース`,
+      allDescription: "一般論ではなく、判断基準、証拠構造、納品境界、よくある失敗を整理した記事を先に確認できます。",
+      categoryDescription: (category) =>
+        `${category} の重要な判断点を先に押さえられる記事をまとめています。`,
+      empty: "このカテゴリにはまだコア事実ソース記事がありません。",
+      cta: "記事を見る",
     },
   },
 };
@@ -278,6 +368,46 @@ export function buildBlogFeature({
     description: copy.feature.description,
     badge: article.contentMode === "fact-source" ? copy.feature.factSourceBadge : copy.feature.defaultBadge,
     cta: copy.feature.cta,
+  };
+}
+
+export function buildBlogQuotePanel({
+  locale,
+  activeCategory,
+}: {
+  locale: Locale;
+  activeCategory: string;
+}): BlogQuotePanel {
+  const copy = getBlogCopy(locale);
+  const isAll = activeCategory === "all";
+  const params = new URLSearchParams({ source: "blog" });
+  if (!isAll) params.set("category", activeCategory);
+
+  return {
+    eyebrow: copy.quote.eyebrow,
+    title: isAll ? copy.quote.allTitle : copy.quote.categoryTitle(activeCategory),
+    description: isAll ? copy.quote.allDescription : copy.quote.categoryDescription(activeCategory),
+    cta: copy.quote.cta,
+    href: `/${locale}/quote?${params.toString()}`,
+  };
+}
+
+export function buildFactSourceHub({
+  locale,
+  activeCategory,
+}: {
+  locale: Locale;
+  activeCategory: string;
+}): BlogFactSourceHub {
+  const copy = getBlogCopy(locale);
+  const isAll = activeCategory === "all";
+
+  return {
+    eyebrow: copy.factSourceHub.eyebrow,
+    title: isAll ? copy.factSourceHub.allTitle : copy.factSourceHub.categoryTitle(activeCategory),
+    description: isAll ? copy.factSourceHub.allDescription : copy.factSourceHub.categoryDescription(activeCategory),
+    empty: copy.factSourceHub.empty,
+    cta: copy.factSourceHub.cta,
   };
 }
 
