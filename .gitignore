@@ -17,3 +17,4 @@ local-brain/approved/
 local-brain/rejected/
 local-brain/reports/
 local-brain/status/pipeline.runtime.json
+local-brain/status/pipeline.runtime.corrupt-*.json

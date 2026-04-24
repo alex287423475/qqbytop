@@ -42,7 +42,14 @@ function validateMarkdown(markdown, slug) {
 function normalizeSlug(markdown, slug) {
   const parsed = matter(markdown);
   parsed.data.slug = slug;
-  return matter.stringify(parsed.content.trim(), parsed.data).trim() + "\n";
+  return matter.stringify(stripInternalRevisionNotes(parsed.content).trim(), parsed.data).trim() + "\n";
+}
+
+function stripInternalRevisionNotes(content) {
+  return content
+    .replace(/\n##\s*AI质检后修订说明[\s\S]*?(?=\n##\s+|\s*$)/gu, "")
+    .replace(/\n##\s*修订说明[\s\S]*?(?=\n##\s+|\s*$)/gu, "")
+    .replace(/\n##\s*Rewrite Notes[\s\S]*?(?=\n##\s+|\s*$)/giu, "");
 }
 
 function fallbackRewrite(markdown, report, slug) {
@@ -60,11 +67,7 @@ function fallbackRewrite(markdown, report, slug) {
     ? parsed.data.keywords.filter((item) => item !== "QQBY").concat(["北京全球博译翻译公司"]).slice(0, 5)
     : ["北京全球博译翻译公司", "翻译服务", "翻译报价"];
 
-  output = matter.stringify(parsed.content.trim(), parsed.data).trim() + "\n";
-  if (!output.includes("## AI质检后修订说明")) {
-    output += `\n## AI质检后修订说明\n\n根据质检报告，本版重点减少模板化表达，补充企业经办人和个人客户都能使用的判断标准，并将公司简称统一为“北京全球博译翻译公司”。\n`;
-  }
-  return output;
+  return matter.stringify(stripInternalRevisionNotes(parsed.content).trim(), parsed.data).trim() + "\n";
 }
 
 async function main() {

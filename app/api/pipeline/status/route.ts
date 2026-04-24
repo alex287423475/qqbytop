@@ -60,6 +60,7 @@ export async function GET() {
   const items = Object.fromEntries(
     keywordRows.map((row) => {
       const current = articles[row.slug];
+      const review = readReviewReport(row.slug);
 
       return [
         row.slug,
@@ -71,6 +72,7 @@ export async function GET() {
           intent: row.intent,
           priority: row.priority,
           errors: [],
+          ...review,
           ...current,
           stage: current?.stage || getKeywordArtifactStage(row.locale, row.slug),
         },
@@ -107,4 +109,17 @@ function getKeywordArtifactStage(locale: string, slug: string) {
   ];
 
   return candidates.find((candidate) => fs.existsSync(candidate.filePath))?.stage || "keyword-only";
+}
+
+function readReviewReport(slug: string) {
+  const reportPath = path.join(process.cwd(), "local-brain", "reports", "review-agent", `${slug}.json`);
+  const report = readJsonFile(reportPath);
+  if (!report) return {};
+
+  return {
+    reviewScore: report.overallScore,
+    reviewRecommendation: report.recommendation,
+    reviewSummary: report.summary,
+    reviewReportPath: path.join(process.cwd(), "local-brain", "reports", "review-agent", `${slug}.md`),
+  };
 }

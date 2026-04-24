@@ -32,11 +32,16 @@ function findArticleFile(locale: string, slug: string) {
   return getArticleCandidates(locale, slug).find((candidate) => fs.existsSync(candidate.filePath)) || null;
 }
 
+function findReviewReport(slug: string) {
+  const reportPath = path.join(process.cwd(), "local-brain", "reports", "review-agent", `${slug}.md`);
+  return fs.existsSync(reportPath) ? reportPath : null;
+}
+
 function getLocale(slug: string) {
   return readKeywordRows().find((row) => row.slug === slug)?.locale || "zh";
 }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
 
@@ -44,6 +49,21 @@ export async function GET(_request: NextRequest, context: RouteContext) {
   if (!/^[a-z0-9-]+$/.test(slug)) return NextResponse.json({ message: "Invalid slug." }, { status: 400 });
 
   const locale = getLocale(slug);
+  if (request.nextUrl.searchParams.get("view") === "review") {
+    const reportPath = findReviewReport(slug);
+    if (!reportPath) return NextResponse.json({ message: `没有找到质检报告：${slug}` }, { status: 404 });
+
+    return NextResponse.json({
+      slug,
+      locale,
+      stage: "review-report",
+      editable: false,
+      filePath: reportPath,
+      markdown: fs.readFileSync(reportPath, "utf-8"),
+      articleUrl: null,
+    });
+  }
+
   const article = findArticleFile(locale, slug);
   if (!article) return NextResponse.json({ message: `没有找到文章文件：${slug}` }, { status: 404 });
 

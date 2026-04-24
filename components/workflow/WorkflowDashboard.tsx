@@ -445,6 +445,38 @@ export function WorkflowDashboard({
     }
   }
 
+  async function openReviewReport(item: WorkflowItem) {
+    const itemId = getItemId(item);
+    setKeywordBusy(`review:${itemId}`);
+
+    try {
+      const response = await fetch(`${apiBase}/articles/${encodeURIComponent(itemId)}?view=review`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "读取质检报告失败。");
+
+      setPreview({
+        row: {
+          keyword: `${getItemTitle(item)} - AI质检报告`,
+          slug: itemId,
+          locale: String(payload.locale || item.locale || "zh"),
+          category: String(item.category || ""),
+          intent: String(item.intent || ""),
+          priority: String(item.priority || ""),
+        },
+        articleUrl: null,
+        stage: payload.stage,
+        editable: false,
+        filePath: payload.filePath || null,
+        markdown: payload.markdown || null,
+      });
+      setEditorMarkdown(payload.markdown || "");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "读取质检报告失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
   async function saveArticleEdit() {
     if (!preview) return;
     setEditorBusy(true);
@@ -591,6 +623,9 @@ export function WorkflowDashboard({
 
                       <div className="mt-4 flex flex-wrap gap-2">
                         <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
+                        {(typeof item.reviewScore === "number" || typeof item.reviewReportPath === "string") && (
+                          <MiniButton label="质检报告" onClick={() => openReviewReport(item)} disabled={isBusy || keywordBusy === `review:${itemId}`} />
+                        )}
                         {actions.map((action) => (
                           <MiniButton key={action.key} label={action.label} onClick={() => runStep(action.key, itemId)} disabled={isBusy} />
                         ))}
