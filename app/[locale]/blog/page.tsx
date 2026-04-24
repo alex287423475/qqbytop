@@ -1,49 +1,12 @@
+import Image from "next/image";
 import Link from "next/link";
 import { BlogCategoryChips } from "@/components/shared/BlogCategoryChips";
 import { buildArticleListing } from "@/lib/article-listing";
 import { getAllArticles } from "@/lib/articles";
+import { buildBlogCollectionSummary, buildBlogHref, buildBlogPageMetadata, getBlogCopy } from "@/lib/blog-page";
 import { locales, type Locale } from "@/lib/site-data";
 
-const blogCopy: Record<Locale, { eyebrow: string; title: string; description: string; empty: string }> = {
-  zh: {
-    eyebrow: "专业资讯",
-    title: "把翻译、合规和本地化讲清楚",
-    description: "QQBY 专业资讯：翻译报价、法律合规、技术本地化与跨境内容运营方法。",
-    empty: "当前语言下还没有发布文章，后续会持续补充。",
-  },
-  en: {
-    eyebrow: "Insights",
-    title: "Translation, compliance, and localization explained clearly",
-    description: "QQBY insights on pricing, compliance, localization workflows, and multilingual delivery.",
-    empty: "No articles are published in this language yet.",
-  },
-  ja: {
-    eyebrow: "インサイト",
-    title: "翻訳・コンプライアンス・ローカライズを整理して解説",
-    description: "QQBY による翻訳価格、法務対応、技術ローカライズの実務記事。",
-    empty: "この言語では、まだ記事が公開されていません。",
-  },
-};
-
-function buildBlogHref(locale: string, category: string, page: number) {
-  const params = new URLSearchParams();
-  if (category && category !== "all") params.set("category", category);
-  if (page > 1) params.set("page", String(page));
-  const query = params.toString();
-  return `/${locale}/blog${query ? `?${query}` : ""}`;
-}
-
-export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
-  const { locale } = await params;
-  const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
-
-  return {
-    title: blogCopy[normalized].eyebrow,
-    description: blogCopy[normalized].description,
-  };
-}
-
-export default async function BlogPage({
+export async function generateMetadata({
   params,
   searchParams,
 }: {
@@ -60,13 +23,38 @@ export default async function BlogPage({
     pageSize: 6,
   });
 
+  return buildBlogPageMetadata({
+    locale: normalized,
+    category: listing.activeCategory,
+    page: listing.pagination.page,
+  });
+}
+
+export default async function BlogPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<{ category?: string; page?: string }>;
+}) {
+  const { locale } = await params;
+  const filters = await searchParams;
+  const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
+  const copy = getBlogCopy(normalized);
+  const articles = getAllArticles(normalized);
+  const listing = buildArticleListing(articles, {
+    category: filters.category,
+    page: filters.page,
+    pageSize: 6,
+  });
+
   return (
     <>
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">
-          <p className="text-sm font-semibold text-brand-600">{blogCopy[normalized].eyebrow}</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">{blogCopy[normalized].title}</h1>
-          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">{blogCopy[normalized].description}</p>
+          <p className="text-sm font-semibold text-brand-600">{copy.eyebrow}</p>
+          <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">{copy.title}</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">{copy.description}</p>
           {listing.facets.length > 1 && (
             <div className="mt-8">
               <BlogCategoryChips
@@ -85,7 +73,7 @@ export default async function BlogPage({
         <div className="mx-auto max-w-7xl px-5">
           {articles.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-slate-500">
-              {blogCopy[normalized].empty}
+              {copy.empty}
             </div>
           ) : (
             <>
@@ -93,7 +81,12 @@ export default async function BlogPage({
                 <div>
                   <p className="text-sm font-semibold text-brand-600">{listing.activeCategory === "all" ? "全部文章" : listing.activeCategory}</p>
                   <p className="mt-2 text-sm text-slate-500">
-                    显示第 {listing.pagination.startItem}-{listing.pagination.endItem} 篇，共 {listing.pagination.totalItems} 篇
+                    {buildBlogCollectionSummary(
+                      normalized,
+                      listing.pagination.startItem,
+                      listing.pagination.endItem,
+                      listing.pagination.totalItems,
+                    )}
                   </p>
                 </div>
                 <p className="text-sm text-slate-500">
@@ -110,14 +103,17 @@ export default async function BlogPage({
                   {listing.articles.map((article) => (
                     <article
                       key={article.slug}
-                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg"
+                      className="group overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg"
                     >
                       {article.coverImage && (
-                        <Link href={`/${normalized}/blog/${article.slug}`} className="block border-b border-slate-100 bg-slate-50">
-                          <img
+                        <Link href={`/${normalized}/blog/${article.slug}`} className="block overflow-hidden border-b border-slate-100 bg-slate-50">
+                          <Image
                             src={article.coverImage}
                             alt={article.coverAlt || article.title}
-                            className="aspect-[1200/630] w-full object-cover"
+                            width={1200}
+                            height={630}
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                            className="aspect-[1200/630] w-full object-cover transition duration-500 group-hover:scale-[1.03]"
                           />
                         </Link>
                       )}
