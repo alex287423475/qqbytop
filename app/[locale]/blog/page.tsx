@@ -70,9 +70,11 @@ export default async function BlogPage({
           {listing.facets.length > 1 && (
             <div className="mt-8">
               <BlogCategoryChips
-                facets={listing.facets}
+                facets={listing.facets.map((facet) => ({
+                  ...facet,
+                  href: buildBlogHref(normalized, facet.value, 1),
+                }))}
                 activeCategory={listing.activeCategory}
-                hrefFor={(category) => buildBlogHref(normalized, category, 1)}
               />
             </div>
           )}
@@ -87,7 +89,7 @@ export default async function BlogPage({
             </div>
           ) : (
             <>
-              <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+              <div id="blog-results" className="mb-8 scroll-mt-28 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-brand-600">
                     {listing.activeCategory === "all" ? "全部文章" : listing.activeCategory}

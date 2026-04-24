@@ -2,8 +2,16 @@ export function buildCategoryChipId(value: string) {
   return `blog-category-chip-${encodeURIComponent(value || "all")}`;
 }
 
+export function buildCategoryChipHref(baseHref: string) {
+  return `${baseHref}#blog-results`;
+}
+
+export function getCategoryScrollerShellClassName() {
+  return "relative -mx-5 md:mx-0";
+}
+
 export function getCategoryScrollerClassName() {
-  return "category-chip-scroller -mx-5 flex gap-3 overflow-x-auto px-5 whitespace-nowrap scroll-smooth md:mx-0 md:flex-wrap md:px-0";
+  return "category-chip-scroller flex gap-3 overflow-x-auto px-5 whitespace-nowrap scroll-smooth snap-x snap-mandatory md:flex-wrap md:px-0";
 }
 
 export function getCategoryChipClassName(active: boolean) {
