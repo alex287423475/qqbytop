@@ -52,6 +52,11 @@ type KeywordRow = {
   contentMode?: string;
 };
 
+type KeywordOptions = {
+  category: string[];
+  intent: string[];
+};
+
 type KeywordPreview = {
   row: KeywordRow;
   articleUrl: string | null;
@@ -159,6 +164,13 @@ function mergeSelectOptions(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+function splitMultiValue(value: string) {
+  return value
+    .split(/[、,，;；|]/u)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function createDefaultStatus(stages: WorkflowStage[]): WorkflowStatus {
   return {
     updatedAt: null,
@@ -219,8 +231,10 @@ export function WorkflowDashboard({
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keywordRows, setKeywordRows] = useState<KeywordRow[]>([]);
+  const [keywordOptions, setKeywordOptions] = useState<KeywordOptions>({ category: defaultCategoryOptions, intent: defaultIntentOptions });
   const [keywordForm, setKeywordForm] = useState<KeywordRow>(emptyKeywordForm);
   const [keywordBusy, setKeywordBusy] = useState<string | null>(null);
+  const [keywordOptionBusy, setKeywordOptionBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<KeywordPreview | null>(null);
   const [editorMarkdown, setEditorMarkdown] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
@@ -257,6 +271,17 @@ export function WorkflowDashboard({
     setKeywordRows(payload.rows || []);
   }
 
+  async function fetchKeywordOptions() {
+    if (!keywordManager) return;
+    const response = await fetch(`${apiBase}/keyword-options`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = (await response.json()) as { options: KeywordOptions };
+    setKeywordOptions({
+      category: payload.options?.category || defaultCategoryOptions,
+      intent: payload.options?.intent || defaultIntentOptions,
+    });
+  }
+
   async function fetchAiConfig() {
     const response = await fetch(`${apiBase}/ai-config`, { cache: "no-store" });
     if (!response.ok) return;
@@ -288,7 +313,7 @@ export function WorkflowDashboard({
 
     async function load() {
       try {
-        await Promise.all([fetchStatus(), fetchKeywords(), fetchAiConfig(), fetchPromptFiles()]);
+        await Promise.all([fetchStatus(), fetchKeywords(), fetchKeywordOptions(), fetchAiConfig(), fetchPromptFiles()]);
       } catch (nextError) {
         if (!disposed) setError(nextError instanceof Error ? nextError.message : "状态读取失败。");
       } finally {
@@ -303,6 +328,7 @@ export function WorkflowDashboard({
         if (!disposed) setError(nextError instanceof Error ? nextError.message : "状态读取失败。");
       });
       fetchKeywords().catch(() => undefined);
+      fetchKeywordOptions().catch(() => undefined);
     }, 1200);
 
     return () => {
@@ -452,6 +478,51 @@ export function WorkflowDashboard({
       setError(nextError instanceof Error ? nextError.message : "添加关键词失败。");
     } finally {
       setKeywordBusy(null);
+    }
+  }
+
+  async function addKeywordOption(type: "category" | "intent", value: string) {
+    if (!keywordManager) return;
+    const clean = value.trim();
+    if (!clean) return;
+    setKeywordOptionBusy(`add:${type}`);
+
+    try {
+      const response = await fetch(`${apiBase}/keyword-options`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value: clean }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "添加选项失败。");
+      setKeywordOptions(payload.options || keywordOptions);
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "添加选项失败。");
+    } finally {
+      setKeywordOptionBusy(null);
+    }
+  }
+
+  async function deleteKeywordOption(type: "category" | "intent", value: string) {
+    if (!keywordManager) return;
+    if (!window.confirm(`确认删除选项：${value}？已在关键词文件中使用的值仍会继续显示。`)) return;
+    setKeywordOptionBusy(`delete:${type}:${value}`);
+
+    try {
+      const response = await fetch(`${apiBase}/keyword-options`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, value }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "删除选项失败。");
+      setKeywordOptions(payload.options || keywordOptions);
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "删除选项失败。");
+    } finally {
+      setKeywordOptionBusy(null);
     }
   }
 
@@ -737,10 +808,14 @@ export function WorkflowDashboard({
               (keywordManager ? (
                 <KeywordManager
                   rows={keywordRows}
+                  options={keywordOptions}
                   form={keywordForm}
                   busy={keywordBusy}
+                  optionBusy={keywordOptionBusy}
                   onFormChange={setKeywordForm}
                   onAdd={addKeyword}
+                  onAddOption={addKeywordOption}
+                  onDeleteOption={deleteKeywordOption}
                   onDelete={deleteKeyword}
                   onPreview={previewKeyword}
                   onFactSource={openFactSourcePack}
@@ -1103,25 +1178,33 @@ function PromptManager({
 
 function KeywordManager({
   rows,
+  options,
   form,
   busy,
+  optionBusy,
   onFormChange,
   onAdd,
+  onAddOption,
+  onDeleteOption,
   onDelete,
   onPreview,
   onFactSource,
 }: {
   rows: KeywordRow[];
+  options: KeywordOptions;
   form: KeywordRow;
   busy: string | null;
+  optionBusy: string | null;
   onFormChange: (form: KeywordRow) => void;
   onAdd: () => void;
+  onAddOption: (type: "category" | "intent", value: string) => void;
+  onDeleteOption: (type: "category" | "intent", value: string) => void;
   onDelete: (slug: string) => void;
   onPreview: (slug: string) => void;
   onFactSource: (row: KeywordRow) => void;
 }) {
-  const categoryOptions = mergeSelectOptions([...defaultCategoryOptions, ...rows.map((row) => row.category), form.category]);
-  const intentOptions = mergeSelectOptions([...defaultIntentOptions, ...rows.map((row) => row.intent), form.intent]);
+  const categoryOptions = mergeSelectOptions([...options.category, ...rows.flatMap((row) => splitMultiValue(row.category)), ...splitMultiValue(form.category)]);
+  const intentOptions = mergeSelectOptions([...options.intent, ...rows.flatMap((row) => splitMultiValue(row.intent)), ...splitMultiValue(form.intent)]);
 
   return (
     <section className="pipeline-panel p-5">
@@ -1134,19 +1217,25 @@ function KeywordManager({
         <TextInput label="关键词" value={form.keyword} onChange={(keyword) => onFormChange({ ...form, keyword })} />
         <TextInput label="slug" value={form.slug} onChange={(slug) => onFormChange({ ...form, slug })} placeholder="beijing-translation-price" />
         <SelectInput label="语言" value={form.locale} options={["zh", "en", "ja"]} onChange={(locale) => onFormChange({ ...form, locale })} />
-        <SelectInput
+        <MultiSelectInput
           label="分类"
           value={form.category}
           options={categoryOptions}
-          placeholder="选择分类"
+          type="category"
+          optionBusy={optionBusy}
           onChange={(category) => onFormChange({ ...form, category })}
+          onAddOption={onAddOption}
+          onDeleteOption={onDeleteOption}
         />
-        <SelectInput
+        <MultiSelectInput
           label="意图"
           value={form.intent}
           options={intentOptions}
-          placeholder="选择意图"
+          type="intent"
+          optionBusy={optionBusy}
           onChange={(intent) => onFormChange({ ...form, intent })}
+          onAddOption={onAddOption}
+          onDeleteOption={onDeleteOption}
         />
         <SelectInput label="优先级" value={form.priority} options={["P0", "P1", "P2", "P3"]} onChange={(priority) => onFormChange({ ...form, priority })} />
         <SelectInput
@@ -1390,6 +1479,99 @@ function TextInput({
         onChange={(event) => onChange(event.target.value)}
       />
     </label>
+  );
+}
+
+function MultiSelectInput({
+  label,
+  value,
+  options,
+  type,
+  optionBusy,
+  onChange,
+  onAddOption,
+  onDeleteOption,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  type: "category" | "intent";
+  optionBusy: string | null;
+  onChange: (value: string) => void;
+  onAddOption: (type: "category" | "intent", value: string) => void;
+  onDeleteOption: (type: "category" | "intent", value: string) => void;
+}) {
+  const [newOption, setNewOption] = useState("");
+  const selected = splitMultiValue(value);
+
+  function toggleOption(option: string) {
+    const next = selected.includes(option) ? selected.filter((item) => item !== option) : [...selected, option];
+    onChange(next.join("、"));
+  }
+
+  function addOption() {
+    const clean = newOption.trim();
+    if (!clean) return;
+    onAddOption(type, clean);
+    if (!selected.includes(clean)) onChange([...selected, clean].join("、"));
+    setNewOption("");
+  }
+
+  return (
+    <div className="flex flex-col gap-2 text-sm text-slate-300">
+      <span>{label}</span>
+      <div className="rounded border border-slate-700 bg-slate-900 p-2">
+        <div className="flex max-h-32 flex-col gap-1 overflow-y-auto pr-1">
+          {options.map((option) => (
+            <label key={option} className="flex items-center gap-2 rounded px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+              <input
+                type="checkbox"
+                checked={selected.includes(option)}
+                onChange={() => toggleOption(option)}
+                className="h-3.5 w-3.5 accent-brand-500"
+              />
+              <span className="min-w-0 flex-1 truncate">{option}</span>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onDeleteOption(type, option);
+                }}
+                disabled={optionBusy === `delete:${type}:${option}`}
+                className="rounded px-1.5 py-0.5 text-[11px] text-slate-500 hover:bg-rose-500/10 hover:text-rose-200 disabled:text-slate-700"
+                title={`删除${label}选项`}
+              >
+                删除
+              </button>
+            </label>
+          ))}
+        </div>
+        <div className="mt-2 flex gap-2 border-t border-slate-800 pt-2">
+          <input
+            value={newOption}
+            onChange={(event) => setNewOption(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addOption();
+              }
+            }}
+            placeholder={`新增${label}`}
+            className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-brand-500"
+          />
+          <button
+            type="button"
+            onClick={addOption}
+            disabled={!newOption.trim() || optionBusy === `add:${type}`}
+            className="rounded bg-slate-700 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-brand-600 disabled:bg-slate-800 disabled:text-slate-500"
+          >
+            添加
+          </button>
+        </div>
+        <p className="mt-2 truncate text-[11px] text-slate-500">{selected.length > 0 ? selected.join("、") : `未选择${label}`}</p>
+      </div>
+    </div>
   );
 }
 
