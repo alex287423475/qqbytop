@@ -19,6 +19,14 @@ function normalizeMode(value) {
   return String(value || "standard").trim() === "fact-source" ? "fact-source" : "standard";
 }
 
+function normalizeLocale(value) {
+  const locale = String(value || "zh").trim().toLowerCase();
+  if (locale.startsWith("zh")) return "zh";
+  if (locale.startsWith("en")) return "en";
+  if (locale.startsWith("ja")) return "ja";
+  return "zh";
+}
+
 function visualTitle() {
   return "\u53ef\u89c6\u5316\u5224\u65ad\u6846\u67b6";
 }
@@ -235,7 +243,7 @@ export function ensureArticleVisualAssets(markdown, row) {
   if (contentMode !== "fact-source") return markdown;
 
   const slug = row.slug || parsed.data.slug;
-  const locale = row.locale || parsed.data.locale || "zh";
+  const locale = normalizeLocale(row.locale || parsed.data.locale || "zh");
   const keyword = row.keyword || parsed.data.title || slug;
   const category = row.category || parsed.data.category || "Translation";
   if (!slug) return markdown;
@@ -274,7 +282,7 @@ export function ensureArticleVisualAssets(markdown, row) {
 }
 
 export function getArticleAssetPaths(locale, slug) {
-  const assetDir = path.join(publicRoot, "article-assets", locale || "zh", slug);
+  const assetDir = path.join(publicRoot, "article-assets", normalizeLocale(locale || "zh"), slug);
   if (!fs.existsSync(assetDir)) return [];
 
   return fs

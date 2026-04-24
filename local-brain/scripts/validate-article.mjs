@@ -11,6 +11,14 @@ const reportsDir = path.resolve("local-brain/reports");
 const inputsDir = path.resolve("local-brain/inputs");
 const articlesDir = path.resolve("content/articles");
 
+function normalizeLocale(value) {
+  const locale = String(value || "zh").trim().toLowerCase();
+  if (locale.startsWith("zh")) return "zh";
+  if (locale.startsWith("en")) return "en";
+  if (locale.startsWith("ja")) return "ja";
+  return "zh";
+}
+
 function parseArgs() {
   const slugIndex = process.argv.indexOf("--slug");
   return {
@@ -86,10 +94,10 @@ function validateFile(filePath, redLines, existingSlugs) {
     errors.push("Missing internal CTA or service links");
   }
 
-  if (data.locale === "zh" && textOnly.length < 1200) {
+  if (normalizeLocale(data.locale) === "zh" && textOnly.length < 1200) {
     errors.push(`Chinese body is too short: ${textOnly.length} chars`);
   }
-  if (data.locale === "en" && content.split(/\s+/).filter(Boolean).length < 1000) {
+  if (normalizeLocale(data.locale) === "en" && content.split(/\s+/).filter(Boolean).length < 1000) {
     errors.push("English body is too short: need at least 1000 words");
   }
   if (keyword && keywordCount < 2) {
@@ -104,7 +112,7 @@ function validateFile(filePath, redLines, existingSlugs) {
       errors.push("Fact-source articles need at least 3 explanatory image links");
     }
 
-    const assetPaths = getArticleAssetPaths(data.locale || "zh", slug);
+    const assetPaths = getArticleAssetPaths(normalizeLocale(data.locale || "zh"), slug);
     if (assetPaths.length < 3) {
       errors.push("Fact-source article image assets are missing from public/article-assets");
     }
