@@ -8,6 +8,7 @@ const draftsDir = path.resolve("local-brain/drafts");
 const reportsDir = path.resolve("local-brain/reports");
 const inputsDir = path.resolve("local-brain/inputs");
 const promptsDir = path.resolve("local-brain/prompts");
+const factSourcesDir = path.resolve("local-brain/inputs/fact-sources");
 
 function parseArgs() {
   const slugIndex = process.argv.indexOf("--slug");
@@ -49,6 +50,17 @@ function readPromptFile(fileName, fallback = "") {
   const filePath = path.join(promptsDir, fileName);
   if (!fs.existsSync(filePath)) return fallback;
   return fs.readFileSync(filePath, "utf-8");
+}
+
+function readFactSourcePack(slug) {
+  const candidates = [path.join(factSourcesDir, `${slug}.md`), path.join(factSourcesDir, `${slug}.txt`)];
+  const filePath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!filePath) return { filePath: null, content: "" };
+
+  return {
+    filePath,
+    content: fs.readFileSync(filePath, "utf-8").trim(),
+  };
 }
 
 function buildFaq(keyword, category) {
@@ -188,18 +200,26 @@ async function main() {
   try {
     for (const row of rows) {
       const contentMode = normalizeContentMode(row);
+      const factSourcePack = contentMode === "fact-source" ? readFactSourcePack(row.slug) : { filePath: null, content: "" };
       updateArticleStage(row.slug, "generating", {
         keyword: row.keyword,
         locale: row.locale,
         category: row.category,
         contentMode,
+        factSourcePath: factSourcePack.filePath,
         errors: [],
       });
       appendLog("generate", `开始生成：${row.keyword}`, row.slug);
+      if (contentMode === "fact-source" && !factSourcePack.content) {
+        appendLog("generate", `核心事实源缺少资料包，将只按深度模板生成：${row.slug}`, row.slug);
+      }
 
       const fallback = () => buildFallbackMarkdown(row, redLines);
       const userPromptTemplate = contentMode === "fact-source" ? factSourceUserPromptTemplate : standardUserPromptTemplate;
-      const userPrompt = `${userPromptTemplate}\n\n关键词：${row.keyword}\nslug：${row.slug}\n分类：${row.category}\n意图：${row.intent}\n内容模式：${contentMode === "fact-source" ? "核心事实源" : "普通文章"}\n红线词：${redLines.join("、")}`;
+      const factSourceContext = factSourcePack.content
+        ? `\n\n事实源资料包（必须优先使用，但不要编造资料包没有提供的数据）：\n${factSourcePack.content}`
+        : "";
+      const userPrompt = `${userPromptTemplate}\n\n关键词：${row.keyword}\nslug：${row.slug}\n分类：${row.category}\n意图：${row.intent}\n内容模式：${contentMode === "fact-source" ? "核心事实源" : "普通文章"}\n红线词：${redLines.join("、")}${factSourceContext}`;
       let markdown = await callLLM(systemPrompt, userPrompt, {
         temperature: contentMode === "fact-source" ? 0.45 : 0.6,
         maxTokens: contentMode === "fact-source" ? 8000 : 5000,
@@ -219,6 +239,7 @@ async function main() {
             keyword: row.keyword,
             locale: row.locale,
             contentMode,
+            factSourcePath: factSourcePack.filePath,
             provider: process.env.AI_PROVIDER || "mock",
             generatedAt: new Date().toISOString(),
           },
@@ -230,6 +251,7 @@ async function main() {
       updateArticleStage(row.slug, "draft", {
         generatedAt: new Date().toISOString(),
         contentMode,
+        factSourcePath: factSourcePack.filePath,
         errors: [],
       });
       appendLog("generate", `草稿已生成：${row.slug}.md`, row.slug);

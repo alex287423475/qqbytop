@@ -56,6 +56,7 @@ type KeywordPreview = {
   row: KeywordRow;
   articleUrl: string | null;
   stage: string;
+  sourceType?: "article" | "fact-source";
   editable?: boolean;
   filePath: string | null;
   markdown: string | null;
@@ -473,6 +474,40 @@ export function WorkflowDashboard({
     }
   }
 
+  async function openFactSourcePack(row: KeywordRow | WorkflowItem) {
+    const itemId = "slug" in row && row.slug ? String(row.slug) : getItemId(row as WorkflowItem);
+    setKeywordBusy(`fact-source:${itemId}`);
+
+    try {
+      const response = await fetch(`${apiBase}/fact-sources/${encodeURIComponent(itemId)}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "读取事实源资料包失败。");
+
+      setPreview({
+        row: {
+          keyword: "keyword" in row && row.keyword ? String(row.keyword) : getItemTitle(row as WorkflowItem),
+          slug: itemId,
+          locale: String(("locale" in row && row.locale) || payload.locale || "zh"),
+          category: String(("category" in row && row.category) || ""),
+          intent: String(("intent" in row && row.intent) || ""),
+          priority: String(("priority" in row && row.priority) || ""),
+          contentMode: "fact-source",
+        },
+        articleUrl: null,
+        stage: payload.stage,
+        sourceType: "fact-source",
+        editable: true,
+        filePath: payload.filePath || null,
+        markdown: payload.markdown || null,
+      });
+      setEditorMarkdown(payload.markdown || "");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "读取事实源资料包失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
   async function openArticleEditor(item: WorkflowItem) {
     const itemId = getItemId(item);
     setKeywordBusy(`edit:${itemId}`);
@@ -494,6 +529,7 @@ export function WorkflowDashboard({
         },
         articleUrl: payload.articleUrl || null,
         stage: payload.stage,
+        sourceType: "article",
         editable: payload.editable,
         filePath: payload.filePath || null,
         markdown: payload.markdown || null,
@@ -527,6 +563,7 @@ export function WorkflowDashboard({
         },
         articleUrl: null,
         stage: payload.stage,
+        sourceType: "article",
         editable: false,
         filePath: payload.filePath || null,
         markdown: payload.markdown || null,
@@ -544,7 +581,11 @@ export function WorkflowDashboard({
     setEditorBusy(true);
 
     try {
-      const response = await fetch(`${apiBase}/articles/${encodeURIComponent(preview.row.slug)}`, {
+      const endpoint =
+        preview.sourceType === "fact-source"
+          ? `${apiBase}/fact-sources/${encodeURIComponent(preview.row.slug)}`
+          : `${apiBase}/articles/${encodeURIComponent(preview.row.slug)}`;
+      const response = await fetch(endpoint, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ markdown: editorMarkdown }),
@@ -554,13 +595,13 @@ export function WorkflowDashboard({
 
       setPreview({
         ...preview,
-        stage: payload.stage || "draft",
+        stage: payload.stage || (preview.sourceType === "fact-source" ? "fact-source-pack" : "draft"),
         filePath: payload.filePath || preview.filePath,
         markdown: payload.markdown || editorMarkdown,
         editable: true,
       });
       setEditorMarkdown(payload.markdown || editorMarkdown);
-      await fetchStatus();
+      if (preview.sourceType !== "fact-source") await fetchStatus();
       setError(payload.message || null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "保存文章失败。");
@@ -680,6 +721,7 @@ export function WorkflowDashboard({
                   onAdd={addKeyword}
                   onDelete={deleteKeyword}
                   onPreview={previewKeyword}
+                  onFactSource={openFactSourcePack}
                 />
               ) : (
                 <EmptyState text="当前工作流没有关键词文件面板。" />
@@ -742,6 +784,9 @@ export function WorkflowDashboard({
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
+                            {item.contentMode === "fact-source" && (
+                              <MiniButton label="事实源资料包" onClick={() => openFactSourcePack(item)} disabled={isBusy || keywordBusy === `fact-source:${itemId}`} />
+                            )}
                             {(typeof item.reviewScore === "number" || typeof item.reviewReportPath === "string") && (
                               <MiniButton label="质检报告" onClick={() => openReviewReport(item)} disabled={isBusy || keywordBusy === `review:${itemId}`} />
                             )}
@@ -1042,6 +1087,7 @@ function KeywordManager({
   onAdd,
   onDelete,
   onPreview,
+  onFactSource,
 }: {
   rows: KeywordRow[];
   form: KeywordRow;
@@ -1050,6 +1096,7 @@ function KeywordManager({
   onAdd: () => void;
   onDelete: (slug: string) => void;
   onPreview: (slug: string) => void;
+  onFactSource: (row: KeywordRow) => void;
 }) {
   return (
     <section className="pipeline-panel p-5">
@@ -1107,6 +1154,9 @@ function KeywordManager({
                 <td className="px-3 py-3">
                   <div className="flex gap-2">
                     <MiniButton label="预览" onClick={() => onPreview(row.slug)} disabled={busy === `preview:${row.slug}`} />
+                    {row.contentMode === "fact-source" && (
+                      <MiniButton label="资料包" onClick={() => onFactSource(row)} disabled={busy === `fact-source:${row.slug}`} />
+                    )}
                     <MiniButton label="删除" onClick={() => onDelete(row.slug)} disabled={busy === `delete:${row.slug}`} />
                   </div>
                 </td>
@@ -1250,6 +1300,7 @@ function PreviewDialog({
               </label>
             )}
             {preview.editable && <p className="mt-3 text-xs leading-5 text-slate-500">保存后会退回草稿阶段，请重新执行“校验草稿”。</p>}
+            {preview.sourceType === "fact-source" && <p className="mt-3 text-xs leading-5 text-slate-500">资料包会在核心事实源模式生成时注入给模型。请只放脱敏材料和可公开使用的判断标准。</p>}
           </div>
           {preview.editable ? (
             <textarea
