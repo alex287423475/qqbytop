@@ -1,0 +1,149 @@
+import fs from "fs";
+import path from "path";
+
+export type AiProvider = "mock" | "openai" | "gemini" | "claude" | "deepseek";
+
+export type AiConfig = {
+  provider: AiProvider;
+  baseUrl: string;
+  model: string;
+  apiKeySet: boolean;
+  apiKeyMasked: string;
+};
+
+export type AiConfigInput = {
+  provider?: string;
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+};
+
+const envPath = path.join(process.cwd(), "local-brain", ".env");
+
+const providerModelKeys: Record<AiProvider, string> = {
+  mock: "LLM_MODEL",
+  openai: "OPENAI_MODEL",
+  gemini: "GEMINI_MODEL",
+  claude: "CLAUDE_MODEL",
+  deepseek: "DEEPSEEK_MODEL",
+};
+
+const defaultModels: Record<AiProvider, string> = {
+  mock: "mock",
+  openai: "gpt-4o-mini",
+  gemini: "gemini-2.5-pro",
+  claude: "claude-sonnet-4-20250514",
+  deepseek: "deepseek-chat",
+};
+
+export function readLocalEnv() {
+  if (!fs.existsSync(envPath)) return new Map<string, string>();
+
+  const values = new Map<string, string>();
+  const raw = fs.readFileSync(envPath, "utf-8");
+
+  for (const line of raw.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const index = line.indexOf("=");
+    if (index < 0) continue;
+    values.set(line.slice(0, index).trim(), unquoteEnv(line.slice(index + 1).trim()));
+  }
+
+  return values;
+}
+
+export function getAiConfig(): AiConfig {
+  const env = readLocalEnv();
+  const provider = normalizeProvider(env.get("AI_PROVIDER") || process.env.AI_PROVIDER || "mock");
+  const apiKey = env.get("LLM_API_KEY") || "";
+  const modelKey = providerModelKeys[provider];
+
+  return {
+    provider,
+    baseUrl: env.get("LLM_BASE_URL") || "",
+    model: env.get("LLM_MODEL") || env.get(modelKey) || defaultModels[provider],
+    apiKeySet: apiKey.length > 0,
+    apiKeyMasked: maskSecret(apiKey),
+  };
+}
+
+export function getAiEnvForChild(providerOverride?: string) {
+  const env = readLocalEnv();
+  const provider = normalizeProvider(providerOverride || env.get("AI_PROVIDER") || "mock");
+  const modelKey = providerModelKeys[provider];
+  const model = env.get("LLM_MODEL") || env.get(modelKey) || defaultModels[provider];
+  const apiKey = env.get("LLM_API_KEY") || "";
+
+  return {
+    AI_PROVIDER: provider,
+    LLM_BASE_URL: env.get("LLM_BASE_URL") || "",
+    LLM_API_KEY: apiKey,
+    LLM_MODEL: model,
+    [modelKey]: model,
+    OPENAI_API_KEY: provider === "openai" ? apiKey : env.get("OPENAI_API_KEY") || "",
+    GEMINI_API_KEY: provider === "gemini" ? apiKey : env.get("GEMINI_API_KEY") || "",
+    CLAUDE_API_KEY: provider === "claude" ? apiKey : env.get("CLAUDE_API_KEY") || "",
+    DEEPSEEK_API_KEY: provider === "deepseek" ? apiKey : env.get("DEEPSEEK_API_KEY") || "",
+  };
+}
+
+export function saveAiConfig(input: AiConfigInput): AiConfig {
+  const env = readLocalEnv();
+  const provider = normalizeProvider(input.provider || env.get("AI_PROVIDER") || "mock");
+  const modelKey = providerModelKeys[provider];
+  const model = String(input.model || "").trim() || defaultModels[provider];
+  const baseUrl = String(input.baseUrl || "").trim();
+  const apiKey = input.apiKey === undefined ? env.get("LLM_API_KEY") || "" : String(input.apiKey || "").trim();
+
+  env.set("AI_PROVIDER", provider);
+  env.set("LLM_BASE_URL", baseUrl);
+  env.set("LLM_MODEL", model);
+  env.set(modelKey, model);
+  env.set("LLM_API_KEY", apiKey);
+
+  fs.mkdirSync(path.dirname(envPath), { recursive: true });
+  const keys = [
+    "AI_PROVIDER",
+    "LLM_BASE_URL",
+    "LLM_MODEL",
+    "LLM_API_KEY",
+    "OPENAI_MODEL",
+    "GEMINI_MODEL",
+    "CLAUDE_MODEL",
+    "DEEPSEEK_MODEL",
+  ];
+  const lines = keys.map((key) => `${key}=${quoteEnv(env.get(key) || "")}`);
+  fs.writeFileSync(envPath, `${lines.join("\n")}\n`, "utf-8");
+
+  return getAiConfig();
+}
+
+function normalizeProvider(provider: string): AiProvider {
+  if (["mock", "openai", "gemini", "claude", "deepseek"].includes(provider)) return provider as AiProvider;
+  return "mock";
+}
+
+function maskSecret(value: string) {
+  if (!value) return "";
+  if (value.length <= 8) return "****";
+  return `${value.slice(0, 4)}****${value.slice(-4)}`;
+}
+
+function quoteEnv(value: string) {
+  if (!value) return "";
+  if (/[\s#"']/u.test(value)) return JSON.stringify(value);
+  return value;
+}
+
+function unquoteEnv(value: string) {
+  if (!value) return "";
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+
+  return value;
+}

@@ -34,16 +34,6 @@ export type Industry = {
   faq: { q: string; a: string }[];
 };
 
-export type BlogPost = {
-  slug: string;
-  title: string;
-  category: string;
-  excerpt: string;
-  date: string;
-  readTime: string;
-  content: string[];
-};
-
 export const nav = [
   { href: "/services", label: "翻译服务" },
   { href: "/industries", label: "行业方案" },
@@ -270,100 +260,6 @@ export const about = {
   ],
 };
 
-export const posts: BlogPost[] = [
-  {
-    slug: "poa-appeal-translation",
-    title: "为什么 POA 申诉信的翻译不能用机翻？",
-    category: "跨境电商",
-    excerpt: "POA 不是普通邮件，而是平台判断卖家是否真正理解问题和具备纠正能力的证据。",
-    date: "2026-04-20",
-    readTime: "6 分钟",
-    content: [
-      "POA 申诉信的核心不是把中文解释翻译成英文，而是用平台审核员能接受的结构说明根因、纠正措施和预防方案。",
-      "机器翻译最容易出现的问题是模板化、责任主体模糊、措施不可验证，以及把中文语气直接搬到英文里。",
-      "专业 POA 翻译会先重构逻辑，再翻译表达，确保每一项措施都具体、可执行、可验证。",
-    ],
-  },
-  {
-    slug: "listing-localization",
-    title: "Listing 本地化和普通翻译有什么区别？",
-    category: "跨境电商",
-    excerpt: "本地化需要重排卖点、关键词和消费者语言，而不是逐句翻译。",
-    date: "2026-04-18",
-    readTime: "5 分钟",
-    content: [
-      "不同市场的消费者关注点不同，同一款产品在美国、日本、德国站点的卖点顺序往往需要重新设计。",
-      "标题和五点描述需要兼顾搜索关键词、平台合规、购买理由和可读性。",
-      "真正的本地化是在目标市场重新讲一次产品故事。",
-    ],
-  },
-  {
-    slug: "contract-translation-risks",
-    title: "涉外合同翻译最常见的五个风险",
-    category: "法律合规",
-    excerpt: "管辖权、责任承担、不可抗力和违约金条款最容易在翻译中变形。",
-    date: "2026-04-16",
-    readTime: "7 分钟",
-    content: [
-      "合同翻译中最危险的错误通常不是明显错词，而是看似流畅但改变法律效果的表达。",
-      "shall、may、must、best efforts、reasonable efforts 等表达都需要结合条款功能处理。",
-      "重要合同建议采用翻译和法律语义审校分离的流程。",
-    ],
-  },
-  {
-    slug: "sdlxliff-safe-localization",
-    title: "SDLXLIFF 文件为什么容易被译坏？",
-    category: "技术本地化",
-    excerpt: "标签、占位符和段落结构一旦被破坏，文件可能无法导回 CAT 工具。",
-    date: "2026-04-12",
-    readTime: "6 分钟",
-    content: [
-      "SDLXLIFF 的价值在于保留源文件结构、段落和标签。直接在普通编辑器中修改很容易破坏隐藏结构。",
-      "安全处理流程包括标签锁定、变量保护、导出验证和 QA 报告。",
-      "客户交付的不应只是译文，而应是可以直接导回系统的目标文件。",
-    ],
-  },
-  {
-    slug: "ai-translation-quality",
-    title: "AI 翻译能替代人工译员吗？",
-    category: "翻译质量",
-    excerpt: "AI 可以提高效率，但专业项目仍需要术语、审校和责任归属。",
-    date: "2026-04-10",
-    readTime: "5 分钟",
-    content: [
-      "AI 擅长初稿和一致性建议，但并不天然理解合同风险、平台审核语境或工程现场责任。",
-      "我们的做法是让 AI 参与辅助处理，再由专业译员和审校承担最终质量责任。",
-      "对客户而言，关键不是是否使用 AI，而是谁为最终文本负责。",
-    ],
-  },
-  {
-    slug: "patent-claims-translation",
-    title: "专利权利要求书翻译为什么要单独审校？",
-    category: "法律合规",
-    excerpt: "权利要求定义保护范围，词语选择会直接影响专利边界。",
-    date: "2026-04-08",
-    readTime: "6 分钟",
-    content: [
-      "权利要求书不是技术说明的摘要，而是保护范围的法律表达。",
-      "comprising、consisting of、consisting essentially of 等词会对应不同的保护边界。",
-      "专利翻译应由技术译员和知识产权审校协作完成。",
-    ],
-  },
-  {
-    slug: "ce-document-translation",
-    title: "CE 认证文件翻译需要注意哪些材料？",
-    category: "跨境合规",
-    excerpt: "符合性声明、技术文件、测试报告、说明书和标签都需要一致表达。",
-    date: "2026-04-06",
-    readTime: "5 分钟",
-    content: [
-      "CE 认证常见材料包括符合性声明、技术文件、测试报告、用户手册、安全数据表和标签包装文字。",
-      "翻译时需要确保产品名称、型号、标准编号、风险提示和制造商信息前后一致。",
-      "合规文件翻译的目标是减少审核沟通成本和补件风险。",
-    ],
-  },
-];
-
 export function getService(slug: string) {
   return services.find((service) => service.slug === slug);
 }
@@ -372,6 +268,3 @@ export function getIndustry(slug: string) {
   return industries.find((industry) => industry.slug === slug);
 }
 
-export function getPost(slug: string) {
-  return posts.find((post) => post.slug === slug);
-}

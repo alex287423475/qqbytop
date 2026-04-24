@@ -9,3 +9,10 @@ dist/
 !.env.example
 .vercel/
 public/static/backup/
+local-brain/.env
+local-brain/drafts/
+local-brain/validated/
+local-brain/approved/
+local-brain/rejected/
+local-brain/reports/
+local-brain/status/pipeline.runtime.json

@@ -4,14 +4,28 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:panel": "next dev --hostname 127.0.0.1 --port 3011",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "brain:generate": "node local-brain/scripts/generate-article.mjs",
+    "brain:validate": "node local-brain/scripts/validate-article.mjs",
+    "brain:approve": "node local-brain/scripts/approve-article.mjs",
+    "brain:publish": "node local-brain/scripts/publish-article.mjs",
+    "brain:check-content": "node local-brain/scripts/check-content.mjs",
+    "brain:deploy": "npm run brain:publish && npm run brain:check-content && npm run typecheck && npm run build"
   },
   "dependencies": {
+    "csv-parse": "^6.2.1",
+    "gray-matter": "^4.0.3",
     "next": "16.2.4",
     "react": "19.2.5",
-    "react-dom": "19.2.5"
+    "react-dom": "19.2.5",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-rehype": "^11.1.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.4",

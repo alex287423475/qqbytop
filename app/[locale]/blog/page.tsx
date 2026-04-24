@@ -1,36 +1,92 @@
 import Link from "next/link";
-import { posts } from "@/lib/site-data";
+import { getAllArticles } from "@/lib/articles";
+import { locales, type Locale } from "@/lib/site-data";
 
-export const metadata = {
-  title: "专业资讯",
-  description: "QQBY 专业资讯：跨境电商、法律合规、技术本地化和翻译质量方法论。",
+const blogCopy: Record<Locale, { eyebrow: string; title: string; description: string; empty: string }> = {
+  zh: {
+    eyebrow: "专业资讯",
+    title: "把翻译、合规和本地化讲清楚",
+    description: "QQBY 专业资讯：翻译报价、法律合规、技术本地化与跨境内容运营方法。",
+    empty: "当前语言下还没有发布文章，后续会持续补充。",
+  },
+  en: {
+    eyebrow: "Insights",
+    title: "Translation, compliance, and localization explained clearly",
+    description: "QQBY insights on pricing, compliance, localization workflows, and multilingual delivery.",
+    empty: "No articles are published in this language yet.",
+  },
+  ja: {
+    eyebrow: "インサイト",
+    title: "翻訳、コンプライアンス、ローカライズを整理して解説",
+    description: "QQBY による翻訳価格、法務対応、技術ローカライズの実務記事。",
+    empty: "この言語ではまだ記事が公開されていません。",
+  },
 };
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
+
+  return {
+    title: blogCopy[normalized].eyebrow,
+    description: blogCopy[normalized].description,
+  };
+}
 
 export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const categories = Array.from(new Set(posts.map((post) => post.category)));
+  const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
+  const articles = getAllArticles(normalized);
+  const categories = Array.from(new Set(articles.map((article) => article.category).filter(Boolean)));
 
   return (
     <>
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">
-          <p className="text-sm font-semibold text-brand-600">专业资讯</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">把翻译、合规和本地化讲清楚</h1>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {categories.map((category) => <span key={category} className="bg-white px-3 py-1 text-sm text-slate-600">{category}</span>)}
-          </div>
+          <p className="text-sm font-semibold text-brand-600">{blogCopy[normalized].eyebrow}</p>
+          <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">{blogCopy[normalized].title}</h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">{blogCopy[normalized].description}</p>
+          {categories.length > 0 && (
+            <div className="mt-6 flex flex-wrap gap-2">
+              {categories.map((category) => (
+                <span key={category} className="rounded-full bg-white px-3 py-1 text-sm text-slate-600 shadow-sm">
+                  {category}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </section>
+
       <section className="py-16">
-        <div className="mx-auto grid max-w-7xl gap-6 px-5 md:grid-cols-2 lg:grid-cols-3">
-          {posts.map((post) => (
-            <article key={post.slug} className="border border-slate-200 p-6 hover:border-brand-600 hover:shadow-lg">
-              <p className="text-sm font-semibold text-brand-600">{post.category}</p>
-              <h2 className="mt-3 text-xl font-bold text-brand-900"><Link href={`/${locale}/blog/${post.slug}`}>{post.title}</Link></h2>
-              <p className="mt-4 leading-7 text-slate-600">{post.excerpt}</p>
-              <p className="mt-5 text-xs text-slate-500">{post.date} · {post.readTime}</p>
-            </article>
-          ))}
+        <div className="mx-auto max-w-7xl px-5">
+          {articles.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center text-slate-500">
+              {blogCopy[normalized].empty}
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {articles.map((article) => (
+                <article key={article.slug} className="rounded-2xl border border-slate-200 p-6 transition hover:border-brand-600 hover:shadow-lg">
+                  <p className="text-sm font-semibold text-brand-600">{article.category}</p>
+                  <h2 className="mt-3 text-xl font-bold text-brand-900">
+                    <Link href={`/${normalized}/blog/${article.slug}`}>{article.title}</Link>
+                  </h2>
+                  <p className="mt-4 leading-7 text-slate-600">{article.description}</p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {article.keywords.slice(0, 3).map((keyword) => (
+                      <span key={keyword} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                        {keyword}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-5 text-xs text-slate-500">
+                    {article.date} · {article.readTime}
+                  </p>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </>

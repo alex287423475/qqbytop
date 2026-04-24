@@ -1,49 +1,120 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPost, posts } from "@/lib/site-data";
+import { JsonLd } from "@/components/shared/JsonLd";
+import { getArticle, getAllArticleSlugs, getAllArticles } from "@/lib/articles";
+import { locales, type Locale } from "@/lib/site-data";
 
-export function generateStaticParams() {
-  return posts.flatMap((post) => ["zh", "en", "ja"].map((locale) => ({ locale, slug: post.slug })));
+function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof getArticle>>) {
+  if (!article) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: article.title,
+    description: article.description,
+    datePublished: article.date,
+    inLanguage: locale,
+    keywords: article.keywords.join(", "),
+    mainEntityOfPage: `https://qqbytop.com/${locale}/blog/${article.slug}`,
+    author: {
+      "@type": "Organization",
+      name: "QQBY",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "QQBY",
+    },
+  };
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  const post = getPost(slug);
+function buildFaqSchema(article: Awaited<ReturnType<typeof getArticle>>) {
+  if (!article || article.faq.length === 0) return null;
+
   return {
-    title: post?.title ?? "专业资讯",
-    description: post?.excerpt,
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: article.faq.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.a,
+      },
+    })),
+  };
+}
+
+export function generateStaticParams() {
+  return getAllArticleSlugs();
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }) {
+  const { locale, slug } = await params;
+  const article = await getArticle(locale, slug);
+
+  if (!article) {
+    return {
+      title: "专业资讯",
+      description: "QQBY 专业资讯文章。",
+    };
+  }
+
+  return {
+    title: article.title,
+    description: article.description,
   };
 }
 
 export default async function BlogPostPage({ params }: { params: Promise<{ locale: string; slug: string }> }) {
   const { locale, slug } = await params;
-  const post = getPost(slug);
-  if (!post) notFound();
+  const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
+  const article = await getArticle(normalized, slug);
 
-  const related = posts.filter((item) => item.slug !== slug && item.category === post.category).slice(0, 3);
+  if (!article) notFound();
+
+  const related = getAllArticles(normalized)
+    .filter((item) => item.slug !== slug && item.category === article.category)
+    .slice(0, 3);
+
+  const articleSchema = buildArticleSchema(normalized, article);
+  const faqSchema = buildFaqSchema(article);
 
   return (
     <>
+      {articleSchema && <JsonLd data={articleSchema} />}
+      {faqSchema && <JsonLd data={faqSchema} />}
+
       <article className="mx-auto max-w-3xl px-5 py-16">
-        <Link href={`/${locale}/blog`} className="text-sm font-semibold text-brand-600">返回资讯列表</Link>
-        <p className="mt-8 text-sm font-semibold text-brand-600">{post.category}</p>
-        <h1 className="mt-3 text-4xl font-bold text-brand-900">{post.title}</h1>
-        <p className="mt-4 text-sm text-slate-500">{post.date} · {post.readTime}</p>
-        <div className="prose-content mt-10">
-          {post.content.map((paragraph, index) => (
-            <p key={index}>{paragraph}</p>
-          ))}
-        </div>
+        <Link href={`/${normalized}/blog`} className="text-sm font-semibold text-brand-600">
+          返回资讯列表
+        </Link>
+        <p className="mt-8 text-sm font-semibold text-brand-600">{article.category}</p>
+        <h1 className="mt-3 text-4xl font-bold text-brand-900">{article.title}</h1>
+        <p className="mt-4 text-sm text-slate-500">
+          {article.date} · {article.readTime}
+        </p>
+        {article.keywords.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {article.keywords.map((keyword) => (
+              <span key={keyword} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-500">
+                {keyword}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="prose-content mt-10" dangerouslySetInnerHTML={{ __html: article.contentHtml }} />
       </article>
+
       {related.length > 0 && (
         <section className="bg-slate-50 py-12">
           <div className="mx-auto max-w-7xl px-5">
             <h2 className="text-2xl font-bold text-brand-900">相关文章</h2>
             <div className="mt-6 grid gap-6 md:grid-cols-3">
               {related.map((item) => (
-                <Link key={item.slug} href={`/${locale}/blog/${item.slug}`} className="bg-white p-6">
+                <Link key={item.slug} href={`/${normalized}/blog/${item.slug}`} className="rounded-2xl bg-white p-6 shadow-sm transition hover:shadow-md">
                   <p className="text-sm text-brand-600">{item.category}</p>
                   <h3 className="mt-2 font-bold text-brand-900">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-500">{item.description}</p>
                 </Link>
               ))}
             </div>

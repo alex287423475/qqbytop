@@ -1,0 +1,854 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+export type WorkflowStage = {
+  key: string;
+  label: string;
+  accent?: string;
+  activeSteps?: string[];
+};
+
+export type WorkflowAction = {
+  key: string;
+  label: string;
+  busyLabel?: string;
+};
+
+export type WorkflowProviderOption = {
+  value: string;
+  label: string;
+};
+
+export type WorkflowItem = {
+  id?: string;
+  slug?: string;
+  name?: string;
+  keyword?: string;
+  locale?: string;
+  stage: string;
+  errors?: string[];
+  [key: string]: unknown;
+};
+
+export type WorkflowStatus = {
+  updatedAt: string | null;
+  isRunning: boolean;
+  currentStep: string | null;
+  lock: { pid: number | null; step: string; startedAt: string } | null;
+  articles?: Record<string, WorkflowItem>;
+  items?: Record<string, WorkflowItem>;
+  log: Array<{ time: string; step: string; slug?: string | null; id?: string | null; message: string }>;
+  counts: Record<string, number>;
+};
+
+type KeywordRow = {
+  keyword: string;
+  slug: string;
+  locale: string;
+  category: string;
+  intent: string;
+  priority: string;
+};
+
+type KeywordPreview = {
+  row: KeywordRow;
+  articleUrl: string | null;
+  stage: string;
+  filePath: string | null;
+  markdown: string | null;
+};
+
+type AiConfig = {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  apiKeySet: boolean;
+  apiKeyMasked: string;
+};
+
+type AiConfigForm = {
+  provider: string;
+  baseUrl: string;
+  model: string;
+  apiKey: string;
+  apiKeySet: boolean;
+  apiKeyMasked: string;
+};
+
+type AiTestResult = {
+  success: boolean;
+  message: string;
+  provider?: string;
+  model?: string;
+  latencyMs?: number;
+};
+
+type KeywordManagerConfig = {
+  enabled: true;
+  apiBase: string;
+};
+
+type WorkflowDashboardProps = {
+  title: string;
+  eyebrow?: string;
+  description: string;
+  apiBase: string;
+  initialStatus?: WorkflowStatus;
+  stages: WorkflowStage[];
+  actions: WorkflowAction[];
+  stageLabels?: Record<string, string>;
+  providerOptions?: WorkflowProviderOption[];
+  defaultProvider?: string;
+  itemName?: string;
+  keywordManager?: KeywordManagerConfig;
+};
+
+const emptyKeywordForm: KeywordRow = {
+  keyword: "",
+  slug: "",
+  locale: "zh",
+  category: "",
+  intent: "信息",
+  priority: "P1",
+};
+
+function createDefaultStatus(stages: WorkflowStage[]): WorkflowStatus {
+  return {
+    updatedAt: null,
+    isRunning: false,
+    currentStep: null,
+    lock: null,
+    items: {},
+    log: [],
+    counts: Object.fromEntries(stages.map((stage) => [stage.key, 0])),
+  };
+}
+
+function createEmptyAiForm(provider: string): AiConfigForm {
+  return {
+    provider,
+    baseUrl: "",
+    model: "",
+    apiKey: "",
+    apiKeySet: false,
+    apiKeyMasked: "",
+  };
+}
+
+export function WorkflowDashboard({
+  title,
+  eyebrow = "Local Workflow",
+  description,
+  apiBase,
+  initialStatus,
+  stages,
+  actions,
+  stageLabels = {},
+  providerOptions,
+  defaultProvider = providerOptions?.[0]?.value || "mock",
+  itemName = "任务",
+  keywordManager,
+}: WorkflowDashboardProps) {
+  const [status, setStatus] = useState<WorkflowStatus>(() => initialStatus || createDefaultStatus(stages));
+  const [loading, setLoading] = useState(!initialStatus);
+  const [provider, setProvider] = useState(defaultProvider);
+  const [submitting, setSubmitting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [keywordRows, setKeywordRows] = useState<KeywordRow[]>([]);
+  const [keywordForm, setKeywordForm] = useState<KeywordRow>(emptyKeywordForm);
+  const [keywordBusy, setKeywordBusy] = useState<string | null>(null);
+  const [preview, setPreview] = useState<KeywordPreview | null>(null);
+  const [aiForm, setAiForm] = useState<AiConfigForm>(() => createEmptyAiForm(defaultProvider));
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiTestBusy, setAiTestBusy] = useState(false);
+  const [aiTestResult, setAiTestResult] = useState<AiTestResult | null>(null);
+
+  async function fetchStatus() {
+    const response = await fetch(`${apiBase}/status`, { cache: "no-store" });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.message || "无法读取流程状态。");
+    }
+
+    const nextStatus = (await response.json()) as WorkflowStatus;
+    setStatus(nextStatus);
+    setError(null);
+  }
+
+  async function fetchKeywords() {
+    if (!keywordManager) return;
+    const response = await fetch(keywordManager.apiBase, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = (await response.json()) as { rows: KeywordRow[] };
+    setKeywordRows(payload.rows || []);
+  }
+
+  async function fetchAiConfig() {
+    const response = await fetch(`${apiBase}/ai-config`, { cache: "no-store" });
+    if (!response.ok) return;
+    const config = (await response.json()) as AiConfig;
+    setProvider(config.provider);
+    setAiForm({
+      provider: config.provider,
+      baseUrl: config.baseUrl || "",
+      model: config.model || "",
+      apiKey: "",
+      apiKeySet: config.apiKeySet,
+      apiKeyMasked: config.apiKeyMasked,
+    });
+  }
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function load() {
+      try {
+        await Promise.all([fetchStatus(), fetchKeywords(), fetchAiConfig()]);
+      } catch (nextError) {
+        if (!disposed) setError(nextError instanceof Error ? nextError.message : "状态读取失败。");
+      } finally {
+        if (!disposed) setLoading(false);
+      }
+    }
+
+    load();
+
+    const timer = window.setInterval(() => {
+      fetchStatus().catch((nextError) => {
+        if (!disposed) setError(nextError instanceof Error ? nextError.message : "状态读取失败。");
+      });
+      fetchKeywords().catch(() => undefined);
+    }, 1200);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [apiBase, keywordManager?.apiBase]);
+
+  const itemEntries = useMemo(() => {
+    const source = status.items || status.articles || {};
+    return Object.values(source).sort((a, b) => getItemTitle(a).localeCompare(getItemTitle(b), "zh-Hans-CN"));
+  }, [status.items, status.articles]);
+
+  async function saveAiConfig() {
+    setAiBusy(true);
+
+    try {
+      const response = await fetch(`${apiBase}/ai-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: aiForm.provider,
+          baseUrl: aiForm.baseUrl,
+          model: aiForm.model,
+          apiKey: aiForm.apiKey || undefined,
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "保存 AI 配置失败。");
+
+      const config = payload.config as AiConfig;
+      setProvider(config.provider);
+      setAiForm({
+        provider: config.provider,
+        baseUrl: config.baseUrl || "",
+        model: config.model || "",
+        apiKey: "",
+        apiKeySet: config.apiKeySet,
+        apiKeyMasked: config.apiKeyMasked,
+      });
+      setError(null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "保存 AI 配置失败。");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function testAiConfig() {
+    setAiTestBusy(true);
+    setAiTestResult(null);
+
+    try {
+      const response = await fetch(`${apiBase}/ai-config/test`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: aiForm.provider,
+          baseUrl: aiForm.baseUrl,
+          model: aiForm.model,
+          apiKey: aiForm.apiKey || undefined,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as AiTestResult | null;
+      if (!response.ok) throw new Error(payload?.message || "测试连接失败。");
+      setAiTestResult(payload || { success: true, message: "测试连接成功。" });
+      setError(null);
+    } catch (nextError) {
+      const message = nextError instanceof Error ? nextError.message : "测试连接失败。";
+      setAiTestResult({ success: false, message });
+      setError(message);
+    } finally {
+      setAiTestBusy(false);
+    }
+  }
+
+  async function runStep(step: string, id?: string) {
+    setSubmitting(`${step}:${id || "all"}`);
+
+    try {
+      const response = await fetch(`${apiBase}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step, slug: id, id, provider }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || "流程执行失败。");
+      }
+
+      await fetchStatus();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "流程执行失败。");
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  async function addKeyword() {
+    if (!keywordManager) return;
+    setKeywordBusy("add");
+
+    try {
+      const response = await fetch(keywordManager.apiBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(keywordForm),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "添加关键词失败。");
+
+      setKeywordRows(payload.rows || []);
+      setKeywordForm(emptyKeywordForm);
+      await fetchStatus();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "添加关键词失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
+  async function deleteKeyword(slug: string) {
+    if (!keywordManager) return;
+    if (!window.confirm(`确认删除关键词：${slug}？`)) return;
+    setKeywordBusy(`delete:${slug}`);
+
+    try {
+      const response = await fetch(keywordManager.apiBase, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "删除关键词失败。");
+
+      setKeywordRows(payload.rows || []);
+      await fetchStatus();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "删除关键词失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
+  async function previewKeyword(slug: string) {
+    if (!keywordManager) return;
+    setKeywordBusy(`preview:${slug}`);
+
+    try {
+      const response = await fetch(`${keywordManager.apiBase}/preview?slug=${encodeURIComponent(slug)}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "预览失败。");
+      setPreview(payload as KeywordPreview);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "预览失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
+  const isBusy = status.isRunning || Boolean(submitting);
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto max-w-7xl px-5 py-10">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase text-brand-500">{eyebrow}</p>
+            <h1 className="mt-2 text-3xl font-bold">{title}</h1>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-400">{description}</p>
+          </div>
+          <div className="rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-300">
+            {status.isRunning ? `运行中：${status.currentStep}` : "当前空闲"}
+          </div>
+        </div>
+
+        {error && <div className="mt-6 rounded border border-rose-500/50 bg-rose-950/40 px-4 py-3 text-sm text-rose-100">{error}</div>}
+
+        <div className="mt-8 grid gap-4 lg:grid-cols-5">
+          {stages.map((stage) => (
+            <StageCard
+              key={stage.key}
+              label={stage.label}
+              value={status.counts?.[stage.key] || 0}
+              accent={stage.accent || "text-brand-400"}
+              active={Boolean(status.currentStep && (stage.activeSteps || [stage.key]).includes(status.currentStep))}
+            />
+          ))}
+        </div>
+
+        {providerOptions && (
+          <AiConfigPanel
+            form={aiForm}
+            providerOptions={providerOptions}
+            busy={aiBusy}
+            testBusy={aiTestBusy}
+            testResult={aiTestResult}
+            onChange={(nextForm) => {
+              setAiForm(nextForm);
+              setProvider(nextForm.provider);
+              setAiTestResult(null);
+            }}
+            onSave={saveAiConfig}
+            onTest={testAiConfig}
+          />
+        )}
+
+        {keywordManager && (
+          <KeywordManager
+            rows={keywordRows}
+            form={keywordForm}
+            busy={keywordBusy}
+            onFormChange={setKeywordForm}
+            onAdd={addKeyword}
+            onDelete={deleteKeyword}
+            onPreview={previewKeyword}
+          />
+        )}
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.9fr]">
+          <section className="pipeline-panel p-5">
+            <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
+              <h2 className="text-lg font-bold text-white">操作面板</h2>
+              <p className="text-sm text-slate-400">按流程阶段执行任务，运行时会自动刷新状态与日志。当前提供商：{provider}</p>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {actions.map((action) => (
+                <ActionButton
+                  key={action.key}
+                  label={action.label}
+                  busyLabel={action.busyLabel}
+                  onClick={() => runStep(action.key)}
+                  disabled={isBusy}
+                  busy={submitting === `${action.key}:all`}
+                />
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {loading ? (
+                <EmptyState text="正在读取状态..." />
+              ) : itemEntries.length === 0 ? (
+                <EmptyState text={`还没有${itemName}进入流程。`} />
+              ) : (
+                itemEntries.map((item) => {
+                  const itemId = getItemId(item);
+
+                  return (
+                    <article key={itemId} className="rounded border border-slate-700 bg-slate-900/60 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="font-semibold text-white">{getItemTitle(item)}</h3>
+                          <p className="mt-1 text-xs text-slate-400">{itemId}</p>
+                        </div>
+                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{stageLabels[item.stage] || item.stage}</span>
+                      </div>
+
+                      {item.errors && item.errors.length > 0 && (
+                        <ul className="mt-3 space-y-1 text-xs text-rose-300">
+                          {item.errors.map((itemError) => (
+                            <li key={itemError}>- {itemError}</li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {actions.map((action) => (
+                          <MiniButton key={action.key} label={action.label} onClick={() => runStep(action.key, itemId)} disabled={isBusy} />
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          <section className="pipeline-panel p-5">
+            <div className="flex items-center justify-between border-b border-slate-700 pb-5">
+              <div>
+                <h2 className="text-lg font-bold text-white">最近日志</h2>
+                <p className="mt-2 text-sm text-slate-400">展示流程脚本写入的最新状态事件。</p>
+              </div>
+              <div className="text-xs text-slate-500">{status.updatedAt ? new Date(status.updatedAt).toLocaleString("zh-CN") : "暂无更新时间"}</div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {status.log.length === 0 ? (
+                <EmptyState text="还没有运行日志。" />
+              ) : (
+                status.log
+                  .slice()
+                  .reverse()
+                  .map((entry, index) => (
+                    <div key={`${entry.time}-${index}`} className="rounded border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="font-medium text-slate-200">{entry.message}</span>
+                        <span className="text-xs text-slate-500">{new Date(entry.time).toLocaleTimeString("zh-CN")}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {entry.step}
+                        {entry.slug || entry.id ? ` / ${entry.slug || entry.id}` : ""}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+
+      {preview && <PreviewDialog preview={preview} onClose={() => setPreview(null)} />}
+    </div>
+  );
+}
+
+function AiConfigPanel({
+  form,
+  providerOptions,
+  busy,
+  testBusy,
+  testResult,
+  onChange,
+  onSave,
+  onTest,
+}: {
+  form: AiConfigForm;
+  providerOptions: WorkflowProviderOption[];
+  busy: boolean;
+  testBusy: boolean;
+  testResult: AiTestResult | null;
+  onChange: (form: AiConfigForm) => void;
+  onSave: () => void;
+  onTest: () => void;
+}) {
+  return (
+    <section className="pipeline-panel mt-8 p-5">
+      <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
+        <h2 className="text-lg font-bold text-white">AI 模型配置</h2>
+        <p className="text-sm text-slate-400">配置只保存在本地 local-brain/.env。API Key 不会提交到 Git，留空保存会保留原密钥。</p>
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[0.75fr_1.25fr_1fr_1fr_auto_auto]">
+        <label className="flex flex-col gap-2 text-sm text-slate-300">
+          提供商
+          <select
+            className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+            value={form.provider}
+            onChange={(event) => onChange({ ...form, provider: event.target.value })}
+          >
+            {providerOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <TextInput label="Base URL" value={form.baseUrl} onChange={(baseUrl) => onChange({ ...form, baseUrl })} placeholder="留空使用官方默认地址" />
+        <TextInput label="Model" value={form.model} onChange={(model) => onChange({ ...form, model })} placeholder="gpt-4o-mini" />
+        <TextInput
+          label="API Key"
+          type="password"
+          value={form.apiKey}
+          onChange={(apiKey) => onChange({ ...form, apiKey })}
+          placeholder={form.apiKeySet ? `已保存：${form.apiKeyMasked}` : "请输入 API Key"}
+        />
+        <button
+          onClick={onSave}
+          disabled={busy}
+          className="self-end rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-slate-700"
+        >
+          {busy ? "保存中" : "保存配置"}
+        </button>
+        <button
+          onClick={onTest}
+          disabled={testBusy}
+          className="self-end rounded border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-brand-500 disabled:text-slate-500"
+        >
+          {testBusy ? "测试中" : "测试连接"}
+        </button>
+      </div>
+      {testResult && (
+        <div
+          className={`mt-4 rounded border px-4 py-3 text-sm ${
+            testResult.success ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-100" : "border-rose-500/50 bg-rose-950/40 text-rose-100"
+          }`}
+        >
+          {testResult.success ? "连接成功：" : "连接失败："}
+          {testResult.message}
+          {typeof testResult.latencyMs === "number" ? `（${testResult.latencyMs}ms）` : ""}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function KeywordManager({
+  rows,
+  form,
+  busy,
+  onFormChange,
+  onAdd,
+  onDelete,
+  onPreview,
+}: {
+  rows: KeywordRow[];
+  form: KeywordRow;
+  busy: string | null;
+  onFormChange: (form: KeywordRow) => void;
+  onAdd: () => void;
+  onDelete: (slug: string) => void;
+  onPreview: (slug: string) => void;
+}) {
+  return (
+    <section className="pipeline-panel mt-8 p-5">
+      <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
+        <h2 className="text-lg font-bold text-white">关键词文件</h2>
+        <p className="text-sm text-slate-400">直接管理 local-brain/inputs/keywords.csv，新增后即可进入生成流程。</p>
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1.3fr_1fr_0.8fr_0.8fr_0.7fr_0.6fr_auto]">
+        <TextInput label="关键词" value={form.keyword} onChange={(keyword) => onFormChange({ ...form, keyword })} />
+        <TextInput label="slug" value={form.slug} onChange={(slug) => onFormChange({ ...form, slug })} placeholder="beijing-translation-price" />
+        <SelectInput label="语言" value={form.locale} options={["zh", "en", "ja"]} onChange={(locale) => onFormChange({ ...form, locale })} />
+        <TextInput label="分类" value={form.category} onChange={(category) => onFormChange({ ...form, category })} />
+        <TextInput label="意图" value={form.intent} onChange={(intent) => onFormChange({ ...form, intent })} />
+        <SelectInput label="优先级" value={form.priority} options={["P0", "P1", "P2", "P3"]} onChange={(priority) => onFormChange({ ...form, priority })} />
+        <button
+          onClick={onAdd}
+          disabled={busy === "add"}
+          className="self-end rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-slate-700"
+        >
+          {busy === "add" ? "添加中" : "添加"}
+        </button>
+      </div>
+
+      <div className="mt-6 overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-slate-700 text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-3 py-3">关键词</th>
+              <th className="px-3 py-3">slug</th>
+              <th className="px-3 py-3">语言</th>
+              <th className="px-3 py-3">分类</th>
+              <th className="px-3 py-3">意图</th>
+              <th className="px-3 py-3">优先级</th>
+              <th className="px-3 py-3">操作</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {rows.map((row) => (
+              <tr key={row.slug} className="text-slate-200">
+                <td className="max-w-xs px-3 py-3 font-medium">{row.keyword}</td>
+                <td className="px-3 py-3 text-slate-400">{row.slug}</td>
+                <td className="px-3 py-3 text-slate-400">{row.locale}</td>
+                <td className="px-3 py-3 text-slate-400">{row.category}</td>
+                <td className="px-3 py-3 text-slate-400">{row.intent}</td>
+                <td className="px-3 py-3 text-slate-400">{row.priority}</td>
+                <td className="px-3 py-3">
+                  <div className="flex gap-2">
+                    <MiniButton label="预览" onClick={() => onPreview(row.slug)} disabled={busy === `preview:${row.slug}`} />
+                    <MiniButton label="删除" onClick={() => onDelete(row.slug)} disabled={busy === `delete:${row.slug}`} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                  关键词文件为空。
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function PreviewDialog({ preview, onClose }: { preview: KeywordPreview; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
+      <div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded border border-slate-700 bg-slate-900 shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-700 px-5 py-4">
+          <div>
+            <p className="text-xs uppercase text-slate-500">{preview.stage}</p>
+            <h2 className="mt-1 text-xl font-bold text-white">{preview.row.keyword}</h2>
+            <p className="mt-1 text-sm text-slate-400">{preview.row.slug}</p>
+          </div>
+          <button onClick={onClose} className="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-200 hover:border-brand-500">
+            关闭
+          </button>
+        </div>
+        <div className="grid max-h-[70vh] gap-0 overflow-y-auto lg:grid-cols-[0.85fr_1.15fr]">
+          <div className="border-b border-slate-800 p-5 lg:border-b-0 lg:border-r">
+            <dl className="space-y-3 text-sm">
+              <MetaRow label="语言" value={preview.row.locale} />
+              <MetaRow label="分类" value={preview.row.category} />
+              <MetaRow label="意图" value={preview.row.intent} />
+              <MetaRow label="优先级" value={preview.row.priority} />
+              <MetaRow label="文件" value={preview.filePath || "暂无生成文件"} />
+            </dl>
+            {preview.articleUrl && (
+              <a className="mt-5 inline-flex rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500" href={preview.articleUrl} target="_blank">
+                打开已发布文章
+              </a>
+            )}
+          </div>
+          <pre className="whitespace-pre-wrap break-words p-5 text-xs leading-6 text-slate-300">
+            {preview.markdown ? preview.markdown.slice(0, 6000) : "这个关键词还没有生成草稿或已发布文章。"}
+          </pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-slate-200">{value}</dd>
+    </div>
+  );
+}
+
+function TextInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-2 text-sm text-slate-300">
+      {label}
+      <input
+        type={type}
+        className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+}
+
+function SelectInput({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return (
+    <label className="flex flex-col gap-2 text-sm text-slate-300">
+      {label}
+      <select
+        className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function getItemId(item: WorkflowItem) {
+  return item.slug || item.id || item.name || item.keyword || "unknown";
+}
+
+function getItemTitle(item: WorkflowItem) {
+  return item.keyword || item.name || item.slug || item.id || "未命名任务";
+}
+
+function StageCard({ label, value, accent, active = false }: { label: string; value: number; accent: string; active?: boolean }) {
+  return (
+    <div className={`pipeline-panel p-5 ${active ? "ring-2 ring-brand-500" : ""}`}>
+      <p className="text-sm text-slate-400">{label}</p>
+      <p className={`mt-3 text-3xl font-bold ${accent}`}>{value}</p>
+    </div>
+  );
+}
+
+function ActionButton({
+  label,
+  busyLabel = "执行中...",
+  onClick,
+  disabled,
+  busy = false,
+}: {
+  label: string;
+  busyLabel?: string;
+  onClick: () => void;
+  disabled: boolean;
+  busy?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+    >
+      {busy ? busyLabel : label}
+    </button>
+  );
+}
+
+function MiniButton({ label, onClick, disabled }: { label: string; onClick: () => void; disabled: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded border border-slate-700 px-3 py-1.5 text-xs text-slate-200 transition hover:border-brand-500 hover:text-white disabled:cursor-not-allowed disabled:text-slate-500"
+    >
+      {label}
+    </button>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return <div className="rounded border border-dashed border-slate-700 px-4 py-10 text-center text-sm text-slate-500">{text}</div>;
+}
