@@ -61,6 +61,9 @@ type KeywordPreview = {
 };
 
 type AiConfig = {
+  role: "modelA" | "modelB";
+  label: string;
+  purpose: string;
   provider: string;
   baseUrl: string;
   model: string;
@@ -68,7 +71,15 @@ type AiConfig = {
   apiKeyMasked: string;
 };
 
+type AiConfigBundle = {
+  modelA: AiConfig;
+  modelB: AiConfig;
+};
+
 type AiConfigForm = {
+  role: "modelA" | "modelB";
+  label: string;
+  purpose: string;
   provider: string;
   baseUrl: string;
   model: string;
@@ -128,12 +139,29 @@ function createDefaultStatus(stages: WorkflowStage[]): WorkflowStatus {
 
 function createEmptyAiForm(provider: string): AiConfigForm {
   return {
+    role: "modelA",
+    label: "模型A",
+    purpose: "生成文章",
     provider,
     baseUrl: "",
     model: "",
     apiKey: "",
     apiKeySet: false,
     apiKeyMasked: "",
+  };
+}
+
+function toAiForm(config: AiConfig): AiConfigForm {
+  return {
+    role: config.role,
+    label: config.label,
+    purpose: config.purpose,
+    provider: config.provider,
+    baseUrl: config.baseUrl || "",
+    model: config.model || "",
+    apiKey: "",
+    apiKeySet: config.apiKeySet,
+    apiKeyMasked: config.apiKeyMasked,
   };
 }
 
@@ -162,10 +190,13 @@ export function WorkflowDashboard({
   const [preview, setPreview] = useState<KeywordPreview | null>(null);
   const [editorMarkdown, setEditorMarkdown] = useState("");
   const [editorBusy, setEditorBusy] = useState(false);
-  const [aiForm, setAiForm] = useState<AiConfigForm>(() => createEmptyAiForm(defaultProvider));
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiTestBusy, setAiTestBusy] = useState(false);
-  const [aiTestResult, setAiTestResult] = useState<AiTestResult | null>(null);
+  const [aiForms, setAiForms] = useState<Record<"modelA" | "modelB", AiConfigForm>>(() => ({
+    modelA: createEmptyAiForm(defaultProvider),
+    modelB: { ...createEmptyAiForm(defaultProvider), role: "modelB", label: "模型B", purpose: "AI质检与AI重写" },
+  }));
+  const [aiBusy, setAiBusy] = useState<"modelA" | "modelB" | null>(null);
+  const [aiTestBusy, setAiTestBusy] = useState<"modelA" | "modelB" | null>(null);
+  const [aiTestResult, setAiTestResult] = useState<Record<"modelA" | "modelB", AiTestResult | null>>({ modelA: null, modelB: null });
 
   async function fetchStatus() {
     const response = await fetch(`${apiBase}/status`, { cache: "no-store" });
@@ -190,15 +221,11 @@ export function WorkflowDashboard({
   async function fetchAiConfig() {
     const response = await fetch(`${apiBase}/ai-config`, { cache: "no-store" });
     if (!response.ok) return;
-    const config = (await response.json()) as AiConfig;
-    setProvider(config.provider);
-    setAiForm({
-      provider: config.provider,
-      baseUrl: config.baseUrl || "",
-      model: config.model || "",
-      apiKey: "",
-      apiKeySet: config.apiKeySet,
-      apiKeyMasked: config.apiKeyMasked,
+    const config = (await response.json()) as AiConfigBundle;
+    setProvider(config.modelA.provider);
+    setAiForms({
+      modelA: toAiForm(config.modelA),
+      modelB: toAiForm(config.modelB),
     });
   }
 
@@ -235,66 +262,66 @@ export function WorkflowDashboard({
     return Object.values(source).sort((a, b) => getItemTitle(a).localeCompare(getItemTitle(b), "zh-Hans-CN"));
   }, [status.items, status.articles]);
 
-  async function saveAiConfig() {
-    setAiBusy(true);
+  async function saveAiConfig(role: "modelA" | "modelB") {
+    const form = aiForms[role];
+    setAiBusy(role);
 
     try {
       const response = await fetch(`${apiBase}/ai-config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: aiForm.provider,
-          baseUrl: aiForm.baseUrl,
-          model: aiForm.model,
-          apiKey: aiForm.apiKey || undefined,
+          role,
+          provider: form.provider,
+          baseUrl: form.baseUrl,
+          model: form.model,
+          apiKey: form.apiKey || undefined,
         }),
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.message || "保存 AI 配置失败。");
 
-      const config = payload.config as AiConfig;
-      setProvider(config.provider);
-      setAiForm({
-        provider: config.provider,
-        baseUrl: config.baseUrl || "",
-        model: config.model || "",
-        apiKey: "",
-        apiKeySet: config.apiKeySet,
-        apiKeyMasked: config.apiKeyMasked,
+      const config = payload.config as AiConfigBundle;
+      setProvider(config.modelA.provider);
+      setAiForms({
+        modelA: toAiForm(config.modelA),
+        modelB: toAiForm(config.modelB),
       });
       setError(null);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "保存 AI 配置失败。");
     } finally {
-      setAiBusy(false);
+      setAiBusy(null);
     }
   }
 
-  async function testAiConfig() {
-    setAiTestBusy(true);
-    setAiTestResult(null);
+  async function testAiConfig(role: "modelA" | "modelB") {
+    const form = aiForms[role];
+    setAiTestBusy(role);
+    setAiTestResult((current) => ({ ...current, [role]: null }));
 
     try {
       const response = await fetch(`${apiBase}/ai-config/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: aiForm.provider,
-          baseUrl: aiForm.baseUrl,
-          model: aiForm.model,
-          apiKey: aiForm.apiKey || undefined,
+          role,
+          provider: form.provider,
+          baseUrl: form.baseUrl,
+          model: form.model,
+          apiKey: form.apiKey || undefined,
         }),
       });
       const payload = (await response.json().catch(() => null)) as AiTestResult | null;
       if (!response.ok) throw new Error(payload?.message || "测试连接失败。");
-      setAiTestResult(payload || { success: true, message: "测试连接成功。" });
+      setAiTestResult((current) => ({ ...current, [role]: payload || { success: true, message: "测试连接成功。" } }));
       setError(null);
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "测试连接失败。";
-      setAiTestResult({ success: false, message });
+      setAiTestResult((current) => ({ ...current, [role]: { success: false, message } }));
       setError(message);
     } finally {
-      setAiTestBusy(false);
+      setAiTestBusy(null);
     }
   }
 
@@ -305,7 +332,7 @@ export function WorkflowDashboard({
       const response = await fetch(`${apiBase}/run`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step, slug: id, id, provider }),
+        body: JSON.stringify({ step, slug: id, id }),
       });
 
       if (!response.ok) {
@@ -480,15 +507,15 @@ export function WorkflowDashboard({
 
         {providerOptions && (
           <AiConfigPanel
-            form={aiForm}
+            forms={aiForms}
             providerOptions={providerOptions}
             busy={aiBusy}
             testBusy={aiTestBusy}
             testResult={aiTestResult}
-            onChange={(nextForm) => {
-              setAiForm(nextForm);
-              setProvider(nextForm.provider);
-              setAiTestResult(null);
+            onChange={(role, nextForm) => {
+              setAiForms((current) => ({ ...current, [role]: nextForm }));
+              if (role === "modelA") setProvider(nextForm.provider);
+              setAiTestResult((current) => ({ ...current, [role]: null }));
             }}
             onSave={saveAiConfig}
             onTest={testAiConfig}
@@ -554,6 +581,14 @@ export function WorkflowDashboard({
                         </ul>
                       )}
 
+                      {typeof item.reviewScore === "number" && (
+                        <div className="mt-3 rounded border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
+                          AI质检：{item.reviewScore} 分
+                          {typeof item.reviewRecommendation === "string" ? ` / ${item.reviewRecommendation}` : ""}
+                          {typeof item.reviewSummary === "string" ? ` / ${item.reviewSummary}` : ""}
+                        </div>
+                      )}
+
                       <div className="mt-4 flex flex-wrap gap-2">
                         <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
                         {actions.map((action) => (
@@ -616,7 +651,7 @@ export function WorkflowDashboard({
 }
 
 function AiConfigPanel({
-  form,
+  forms,
   providerOptions,
   busy,
   testBusy,
@@ -625,29 +660,41 @@ function AiConfigPanel({
   onSave,
   onTest,
 }: {
-  form: AiConfigForm;
+  forms: Record<"modelA" | "modelB", AiConfigForm>;
   providerOptions: WorkflowProviderOption[];
-  busy: boolean;
-  testBusy: boolean;
-  testResult: AiTestResult | null;
-  onChange: (form: AiConfigForm) => void;
-  onSave: () => void;
-  onTest: () => void;
+  busy: "modelA" | "modelB" | null;
+  testBusy: "modelA" | "modelB" | null;
+  testResult: Record<"modelA" | "modelB", AiTestResult | null>;
+  onChange: (role: "modelA" | "modelB", form: AiConfigForm) => void;
+  onSave: (role: "modelA" | "modelB") => void;
+  onTest: (role: "modelA" | "modelB") => void;
 }) {
+  const form = forms.modelA;
+  const modelBForm = forms.modelB;
+  const modelATestResult = testResult.modelA;
+  const modelBTestResult = testResult.modelB;
+
   return (
     <section className="pipeline-panel mt-8 p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">AI 模型配置</h2>
-        <p className="text-sm text-slate-400">配置只保存在本地 local-brain/.env。API Key 不会提交到 Git，留空保存会保留原密钥。</p>
+        <p className="text-sm text-slate-400">模型A用于生成文章；模型B用于AI质检和AI重写。配置只保存在本地 local-brain/.env，API Key 不会提交到 Git。</p>
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[0.75fr_1.25fr_1fr_1fr_auto_auto]">
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-white">模型A</h3>
+          <p className="mt-1 text-xs text-slate-400">用于生成文章草稿。</p>
+        </div>
+        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">生成</span>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-[0.75fr_1.25fr_1fr_1fr_auto_auto]">
         <label className="flex flex-col gap-2 text-sm text-slate-300">
           提供商
           <select
             className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
             value={form.provider}
-            onChange={(event) => onChange({ ...form, provider: event.target.value })}
+            onChange={(event) => onChange("modelA", { ...form, provider: event.target.value })}
           >
             {providerOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -656,41 +703,101 @@ function AiConfigPanel({
             ))}
           </select>
         </label>
-        <TextInput label="Base URL" value={form.baseUrl} onChange={(baseUrl) => onChange({ ...form, baseUrl })} placeholder="留空使用官方默认地址" />
-        <TextInput label="Model" value={form.model} onChange={(model) => onChange({ ...form, model })} placeholder="gpt-4o-mini" />
+        <TextInput label="Base URL" value={form.baseUrl} onChange={(baseUrl) => onChange("modelA", { ...form, baseUrl })} placeholder="留空使用官方默认地址" />
+        <TextInput label="Model" value={form.model} onChange={(model) => onChange("modelA", { ...form, model })} placeholder="gpt-4o-mini" />
         <TextInput
           label="API Key"
           type="password"
           value={form.apiKey}
-          onChange={(apiKey) => onChange({ ...form, apiKey })}
+          onChange={(apiKey) => onChange("modelA", { ...form, apiKey })}
           placeholder={form.apiKeySet ? `已保存：${form.apiKeyMasked}` : "请输入 API Key"}
         />
         <button
-          onClick={onSave}
-          disabled={busy}
+          onClick={() => onSave("modelA")}
+          disabled={busy === "modelA"}
           className="self-end rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-slate-700"
         >
-          {busy ? "保存中" : "保存配置"}
+          {busy === "modelA" ? "保存中" : "保存模型A"}
         </button>
         <button
-          onClick={onTest}
-          disabled={testBusy}
+          onClick={() => onTest("modelA")}
+          disabled={testBusy === "modelA"}
           className="self-end rounded border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-brand-500 disabled:text-slate-500"
         >
-          {testBusy ? "测试中" : "测试连接"}
+          {testBusy === "modelA" ? "测试中" : "测试模型A"}
         </button>
       </div>
-      {testResult && (
+      {modelATestResult && (
         <div
           className={`mt-4 rounded border px-4 py-3 text-sm ${
-            testResult.success ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-100" : "border-rose-500/50 bg-rose-950/40 text-rose-100"
+            modelATestResult.success ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-100" : "border-rose-500/50 bg-rose-950/40 text-rose-100"
           }`}
         >
-          {testResult.success ? "连接成功：" : "连接失败："}
-          {testResult.message}
-          {typeof testResult.latencyMs === "number" ? `（${testResult.latencyMs}ms）` : ""}
+          {modelATestResult.success ? "连接成功：" : "连接失败："}
+          {modelATestResult.message}
+          {typeof modelATestResult.latencyMs === "number" ? `（${modelATestResult.latencyMs}ms）` : ""}
         </div>
       )}
+
+      <div className="mt-6 rounded border border-slate-700 bg-slate-900/50 p-4">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-white">模型B</h3>
+            <p className="mt-1 text-xs text-slate-400">用于AI质检和AI重写，建议选择更擅长审校、结构化输出和改写的模型。</p>
+          </div>
+          <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">质检/重写</span>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-[0.75fr_1.25fr_1fr_1fr_auto_auto]">
+          <label className="flex flex-col gap-2 text-sm text-slate-300">
+            提供商
+            <select
+              className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+              value={modelBForm.provider}
+              onChange={(event) => onChange("modelB", { ...modelBForm, provider: event.target.value })}
+            >
+              {providerOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <TextInput label="Base URL" value={modelBForm.baseUrl} onChange={(baseUrl) => onChange("modelB", { ...modelBForm, baseUrl })} placeholder="留空使用官方默认地址" />
+          <TextInput label="Model" value={modelBForm.model} onChange={(model) => onChange("modelB", { ...modelBForm, model })} placeholder="gpt-4o-mini" />
+          <TextInput
+            label="API Key"
+            type="password"
+            value={modelBForm.apiKey}
+            onChange={(apiKey) => onChange("modelB", { ...modelBForm, apiKey })}
+            placeholder={modelBForm.apiKeySet ? `已保存：${modelBForm.apiKeyMasked}` : "请输入 API Key"}
+          />
+          <button
+            onClick={() => onSave("modelB")}
+            disabled={busy === "modelB"}
+            className="self-end rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-slate-700"
+          >
+            {busy === "modelB" ? "保存中" : "保存模型B"}
+          </button>
+          <button
+            onClick={() => onTest("modelB")}
+            disabled={testBusy === "modelB"}
+            className="self-end rounded border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-brand-500 disabled:text-slate-500"
+          >
+            {testBusy === "modelB" ? "测试中" : "测试模型B"}
+          </button>
+        </div>
+        {modelBTestResult && (
+          <div
+            className={`mt-4 rounded border px-4 py-3 text-sm ${
+              modelBTestResult.success ? "border-emerald-500/50 bg-emerald-950/30 text-emerald-100" : "border-rose-500/50 bg-rose-950/40 text-rose-100"
+            }`}
+          >
+            {modelBTestResult.success ? "连接成功：" : "连接失败："}
+            {modelBTestResult.message}
+            {typeof modelBTestResult.latencyMs === "number" ? `（${modelBTestResult.latencyMs}ms）` : ""}
+          </div>
+        )}
+      </div>
     </section>
   );
 }

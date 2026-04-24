@@ -2,8 +2,12 @@ import fs from "fs";
 import path from "path";
 
 export type AiProvider = "mock" | "openai" | "gemini" | "claude" | "deepseek";
+export type AiRole = "modelA" | "modelB";
 
 export type AiConfig = {
+  role: AiRole;
+  label: string;
+  purpose: string;
   provider: AiProvider;
   baseUrl: string;
   model: string;
@@ -11,7 +15,13 @@ export type AiConfig = {
   apiKeyMasked: string;
 };
 
+export type AiConfigBundle = {
+  modelA: AiConfig;
+  modelB: AiConfig;
+};
+
 export type AiConfigInput = {
+  role?: AiRole;
   provider?: string;
   baseUrl?: string;
   model?: string;
@@ -36,6 +46,11 @@ const defaultModels: Record<AiProvider, string> = {
   deepseek: "deepseek-chat",
 };
 
+const roleMeta: Record<AiRole, { label: string; purpose: string; prefix: string }> = {
+  modelA: { label: "模型A", purpose: "生成文章", prefix: "MODEL_A" },
+  modelB: { label: "模型B", purpose: "AI质检与AI重写", prefix: "MODEL_B" },
+};
+
 export function readLocalEnv() {
   if (!fs.existsSync(envPath)) return new Map<string, string>();
 
@@ -52,31 +67,48 @@ export function readLocalEnv() {
   return values;
 }
 
-export function getAiConfig(): AiConfig {
+export function getAiConfig(): AiConfigBundle {
+  return {
+    modelA: getAiRoleConfig("modelA"),
+    modelB: getAiRoleConfig("modelB"),
+  };
+}
+
+export function getAiRoleConfig(role: AiRole): AiConfig {
   const env = readLocalEnv();
-  const provider = normalizeProvider(env.get("AI_PROVIDER") || process.env.AI_PROVIDER || "mock");
-  const apiKey = env.get("LLM_API_KEY") || "";
+  const meta = roleMeta[role];
+  const legacyProvider = env.get("AI_PROVIDER") || process.env.AI_PROVIDER || "mock";
+  const provider = normalizeProvider(env.get(`${meta.prefix}_PROVIDER`) || legacyProvider);
   const modelKey = providerModelKeys[provider];
+  const legacyModel = env.get("LLM_MODEL") || env.get(modelKey) || defaultModels[provider];
+  const apiKey = env.get(`${meta.prefix}_API_KEY`) || env.get("LLM_API_KEY") || "";
 
   return {
+    role,
+    label: meta.label,
+    purpose: meta.purpose,
     provider,
-    baseUrl: env.get("LLM_BASE_URL") || "",
-    model: env.get("LLM_MODEL") || env.get(modelKey) || defaultModels[provider],
+    baseUrl: env.get(`${meta.prefix}_BASE_URL`) || env.get("LLM_BASE_URL") || "",
+    model: env.get(`${meta.prefix}_MODEL`) || legacyModel,
     apiKeySet: apiKey.length > 0,
     apiKeyMasked: maskSecret(apiKey),
   };
 }
 
-export function getAiEnvForChild(providerOverride?: string) {
+export function getAiEnvForChild(role: AiRole = "modelA", providerOverride?: string) {
   const env = readLocalEnv();
-  const provider = normalizeProvider(providerOverride || env.get("AI_PROVIDER") || "mock");
+  const meta = roleMeta[role];
+  const config = getAiRoleConfig(role);
+  const provider = normalizeProvider(providerOverride || config.provider);
   const modelKey = providerModelKeys[provider];
-  const model = env.get("LLM_MODEL") || env.get(modelKey) || defaultModels[provider];
-  const apiKey = env.get("LLM_API_KEY") || "";
+  const model = env.get(`${meta.prefix}_MODEL`) || config.model || defaultModels[provider];
+  const apiKey = env.get(`${meta.prefix}_API_KEY`) || env.get("LLM_API_KEY") || "";
+  const baseUrl = env.get(`${meta.prefix}_BASE_URL`) || env.get("LLM_BASE_URL") || "";
 
   return {
     AI_PROVIDER: provider,
-    LLM_BASE_URL: env.get("LLM_BASE_URL") || "",
+    AI_ROLE: role,
+    LLM_BASE_URL: baseUrl,
     LLM_API_KEY: apiKey,
     LLM_MODEL: model,
     [modelKey]: model,
@@ -87,22 +119,54 @@ export function getAiEnvForChild(providerOverride?: string) {
   };
 }
 
-export function saveAiConfig(input: AiConfigInput): AiConfig {
+export function saveAiConfig(input: AiConfigInput): AiConfigBundle {
   const env = readLocalEnv();
-  const provider = normalizeProvider(input.provider || env.get("AI_PROVIDER") || "mock");
-  const modelKey = providerModelKeys[provider];
+  const role = normalizeRole(input.role || "modelA");
+  const meta = roleMeta[role];
+  const current = getAiRoleConfig(role);
+  const provider = normalizeProvider(input.provider || current.provider);
   const model = String(input.model || "").trim() || defaultModels[provider];
   const baseUrl = String(input.baseUrl || "").trim();
-  const apiKey = input.apiKey === undefined ? env.get("LLM_API_KEY") || "" : String(input.apiKey || "").trim();
+  const apiKey = input.apiKey === undefined ? env.get(`${meta.prefix}_API_KEY`) || env.get("LLM_API_KEY") || "" : String(input.apiKey || "").trim();
 
-  env.set("AI_PROVIDER", provider);
-  env.set("LLM_BASE_URL", baseUrl);
-  env.set("LLM_MODEL", model);
-  env.set(modelKey, model);
-  env.set("LLM_API_KEY", apiKey);
+  env.set(`${meta.prefix}_PROVIDER`, provider);
+  env.set(`${meta.prefix}_BASE_URL`, baseUrl);
+  env.set(`${meta.prefix}_MODEL`, model);
+  env.set(`${meta.prefix}_API_KEY`, apiKey);
 
+  if (role === "modelA") {
+    env.set("AI_PROVIDER", provider);
+    env.set("LLM_BASE_URL", baseUrl);
+    env.set("LLM_MODEL", model);
+    env.set("LLM_API_KEY", apiKey);
+    env.set(providerModelKeys[provider], model);
+  }
+
+  writeLocalEnv(env);
+  return getAiConfig();
+}
+
+export function normalizeRole(role: string): AiRole {
+  return role === "modelB" ? "modelB" : "modelA";
+}
+
+function normalizeProvider(provider: string): AiProvider {
+  if (["mock", "openai", "gemini", "claude", "deepseek"].includes(provider)) return provider as AiProvider;
+  return "mock";
+}
+
+function writeLocalEnv(env: Map<string, string>) {
   fs.mkdirSync(path.dirname(envPath), { recursive: true });
-  const keys = [
+
+  const priorityKeys = [
+    "MODEL_A_PROVIDER",
+    "MODEL_A_BASE_URL",
+    "MODEL_A_MODEL",
+    "MODEL_A_API_KEY",
+    "MODEL_B_PROVIDER",
+    "MODEL_B_BASE_URL",
+    "MODEL_B_MODEL",
+    "MODEL_B_API_KEY",
     "AI_PROVIDER",
     "LLM_BASE_URL",
     "LLM_MODEL",
@@ -112,15 +176,9 @@ export function saveAiConfig(input: AiConfigInput): AiConfig {
     "CLAUDE_MODEL",
     "DEEPSEEK_MODEL",
   ];
-  const lines = keys.map((key) => `${key}=${quoteEnv(env.get(key) || "")}`);
+  const allKeys = [...priorityKeys, ...Array.from(env.keys()).filter((key) => !priorityKeys.includes(key)).sort()];
+  const lines = allKeys.map((key) => `${key}=${quoteEnv(env.get(key) || "")}`);
   fs.writeFileSync(envPath, `${lines.join("\n")}\n`, "utf-8");
-
-  return getAiConfig();
-}
-
-function normalizeProvider(provider: string): AiProvider {
-  if (["mock", "openai", "gemini", "claude", "deepseek"].includes(provider)) return provider as AiProvider;
-  return "mock";
 }
 
 function maskSecret(value: string) {

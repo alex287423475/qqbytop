@@ -9,6 +9,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "brain:generate": "node local-brain/scripts/generate-article.mjs",
+    "brain:review": "node local-brain/scripts/review-article-agent.mjs",
+    "brain:rewrite": "node local-brain/scripts/rewrite-article-agent.mjs",
     "brain:validate": "node local-brain/scripts/validate-article.mjs",
     "brain:approve": "node local-brain/scripts/approve-article.mjs",
     "brain:publish": "node local-brain/scripts/publish-article.mjs",

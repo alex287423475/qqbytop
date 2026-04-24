@@ -11,6 +11,7 @@ dist/
 public/static/backup/
 local-brain/.env
 local-brain/drafts/
+local-brain/rewritten/
 local-brain/validated/
 local-brain/approved/
 local-brain/rejected/

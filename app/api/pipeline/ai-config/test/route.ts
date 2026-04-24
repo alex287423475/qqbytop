@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAiConfig, readLocalEnv } from "@/lib/pipeline-ai-config";
+import { getAiRoleConfig, normalizeRole, readLocalEnv } from "@/lib/pipeline-ai-config";
 
 export const runtime = "nodejs";
 
 type TestInput = {
+  role?: "modelA" | "modelB";
   provider?: string;
   baseUrl?: string;
   model?: string;
@@ -17,16 +18,18 @@ export async function POST(request: NextRequest) {
 
   const startedAt = Date.now();
   const body = (await request.json().catch(() => ({}))) as TestInput;
-  const saved = getAiConfig();
+  const role = normalizeRole(body.role || "modelA");
+  const saved = getAiRoleConfig(role);
   const env = readLocalEnv();
   const provider = normalizeProvider(body.provider || saved.provider);
   const baseUrl = String(body.baseUrl ?? saved.baseUrl ?? "").trim();
   const model = String(body.model || saved.model || defaultModel(provider)).trim();
-  const apiKey = String(body.apiKey || env.get("LLM_API_KEY") || "").trim();
+  const apiKey = String(body.apiKey || env.get(`${role === "modelB" ? "MODEL_B" : "MODEL_A"}_API_KEY`) || env.get("LLM_API_KEY") || "").trim();
 
   if (provider === "mock") {
     return NextResponse.json({
       success: true,
+      role,
       provider,
       model,
       latencyMs: Date.now() - startedAt,
@@ -42,6 +45,7 @@ export async function POST(request: NextRequest) {
     const result = await testProvider({ provider, baseUrl, model, apiKey });
     return NextResponse.json({
       success: true,
+      role,
       provider,
       model,
       latencyMs: Date.now() - startedAt,
@@ -51,6 +55,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
+        role,
         provider,
         model,
         latencyMs: Date.now() - startedAt,

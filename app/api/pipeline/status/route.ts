@@ -33,6 +33,11 @@ function countDirItems(dirPath: string) {
   return fs.readdirSync(dirPath).filter((item) => item.endsWith(".md")).length;
 }
 
+function countJsonItems(dirPath: string) {
+  if (!fs.existsSync(dirPath)) return 0;
+  return fs.readdirSync(dirPath).filter((item) => item.endsWith(".json")).length;
+}
+
 export async function GET() {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ message: "Pipeline console is disabled in production." }, { status: 403 });
@@ -74,6 +79,8 @@ export async function GET() {
     counts: {
       keywords: keywordRows.length,
       drafts: countDirItems(path.join(process.cwd(), "local-brain", "drafts")),
+      reviewed: countJsonItems(path.join(process.cwd(), "local-brain", "reports", "review-agent")),
+      rewritten: countDirItems(path.join(process.cwd(), "local-brain", "rewritten")),
       validated: countDirItems(path.join(process.cwd(), "local-brain", "validated")),
       approved: countDirItems(path.join(process.cwd(), "local-brain", "approved")),
       published: contentArticles.length,

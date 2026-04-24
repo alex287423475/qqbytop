@@ -7,9 +7,20 @@ export const runtime = "nodejs";
 
 const scriptMap: Record<string, string> = {
   generate: "generate-article.mjs",
+  review: "review-article-agent.mjs",
+  rewrite: "rewrite-article-agent.mjs",
   validate: "validate-article.mjs",
   approve: "approve-article.mjs",
   publish: "publish-article.mjs",
+};
+
+const roleMap: Record<string, "modelA" | "modelB"> = {
+  generate: "modelA",
+  review: "modelB",
+  rewrite: "modelB",
+  validate: "modelA",
+  approve: "modelA",
+  publish: "modelA",
 };
 
 const statusPath = path.join(process.cwd(), "local-brain", "status", "pipeline.runtime.json");
@@ -50,7 +61,7 @@ export async function POST(request: NextRequest) {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      ...getAiEnvForChild(body.provider),
+      ...getAiEnvForChild(roleMap[step] || "modelA", body.provider),
     },
     detached: true,
     stdio: "ignore",

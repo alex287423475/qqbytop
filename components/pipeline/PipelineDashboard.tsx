@@ -6,6 +6,8 @@ import type { WorkflowStatus } from "@/components/workflow/WorkflowDashboard";
 const stages = [
   { key: "keywords", label: "关键词", accent: "text-brand-400", activeSteps: ["keywords"] },
   { key: "drafts", label: "草稿", accent: "text-amber-300", activeSteps: ["generate"] },
+  { key: "reviewed", label: "AI质检", accent: "text-cyan-300", activeSteps: ["review"] },
+  { key: "rewritten", label: "AI重写", accent: "text-fuchsia-300", activeSteps: ["rewrite"] },
   { key: "validated", label: "已校验", accent: "text-sky-300", activeSteps: ["validate"] },
   { key: "approved", label: "已审核", accent: "text-violet-300", activeSteps: ["approve"] },
   { key: "published", label: "已发布", accent: "text-emerald-300", activeSteps: ["publish"] },
@@ -13,6 +15,8 @@ const stages = [
 
 const actions = [
   { key: "generate", label: "生成文章" },
+  { key: "review", label: "AI质检" },
+  { key: "rewrite", label: "AI重写" },
   { key: "validate", label: "校验草稿" },
   { key: "approve", label: "审核通过" },
   { key: "publish", label: "发布网站" },
@@ -29,6 +33,9 @@ const providerOptions = [
 const stageLabels = {
   draft: "草稿",
   generating: "生成中",
+  reviewed: "AI已质检",
+  rewriting: "重写中",
+  rewritten: "AI已重写",
   validated: "已校验",
   approved: "已审核",
   published: "已发布",
