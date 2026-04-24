@@ -184,7 +184,7 @@ export async function callLLM(systemPrompt, userPrompt, options = {}) {
 
     const data = await response.json();
     const content = config.parse(data);
-    if (!content) throw new Error(`${provider} returned empty content`);
+    if (!content) throw new Error(`${provider} returned empty content. ${summarizeModelResponse(data)}`);
     return content;
   } catch (error) {
     if (provider === "mock" && typeof options.fallback === "function") {
@@ -193,4 +193,29 @@ export async function callLLM(systemPrompt, userPrompt, options = {}) {
 
     throw error;
   }
+}
+
+function summarizeModelResponse(data) {
+  if (!data || typeof data !== "object") return `response=${formatResponse(data)}`;
+
+  const choice = data.choices?.[0];
+  const message = choice?.message;
+  const content = message && "content" in message ? message.content : data.content;
+  const output = Array.isArray(data.output) ? `array(${data.output.length})` : typeof data.output;
+  const candidates = Array.isArray(data.candidates) ? `array(${data.candidates.length})` : typeof data.candidates;
+  const usage = data.usage ? JSON.stringify(data.usage).slice(0, 220) : "none";
+
+  return [
+    `object=${String(data.object ?? "unknown")}`,
+    `finish=${String(choice?.finish_reason ?? data.stop_reason ?? data.status ?? "unknown")}`,
+    `content=${content === null ? "null" : typeof content}`,
+    `output=${output}`,
+    `candidates=${candidates}`,
+    `usage=${usage}`,
+  ].join(", ");
+}
+
+function formatResponse(data) {
+  if (typeof data === "string") return data.slice(0, 500);
+  return JSON.stringify(data).slice(0, 500);
 }

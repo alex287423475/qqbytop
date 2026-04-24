@@ -77,7 +77,7 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
 
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`${provider} request failed: ${response.status} ${formatResponse(data)}`);
-    return extractModelText(data) || "Connection test passed.";
+    return requireModelText(provider, data);
   }
 
   if (provider === "gemini") {
@@ -92,7 +92,7 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
 
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`gemini request failed: ${response.status} ${formatResponse(data)}`);
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Connection test passed.";
+    return requireModelText("gemini", data);
   }
 
   if (provider === "claude") {
@@ -113,7 +113,7 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
 
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`claude request failed: ${response.status} ${formatResponse(data)}`);
-    return data?.content?.[0]?.text || "Connection test passed.";
+    return requireModelText("claude", data);
   }
 
   throw new Error(`Unsupported provider: ${provider}`);
@@ -226,6 +226,33 @@ function extractModelText(data: any) {
       .join("\n");
   }
   return "";
+}
+
+function requireModelText(provider: string, data: unknown) {
+  const text = extractModelText(data);
+  if (text.trim()) return text.trim();
+  throw new Error(`${provider} returned empty content. ${summarizeModelResponse(data)}`);
+}
+
+function summarizeModelResponse(data: unknown) {
+  if (!data || typeof data !== "object") return `response=${formatResponse(data)}`;
+
+  const value = data as any;
+  const choice = value.choices?.[0];
+  const message = choice?.message;
+  const content = message && "content" in message ? message.content : value.content;
+  const output = Array.isArray(value.output) ? `array(${value.output.length})` : typeof value.output;
+  const candidates = Array.isArray(value.candidates) ? `array(${value.candidates.length})` : typeof value.candidates;
+  const usage = value.usage ? JSON.stringify(value.usage).slice(0, 220) : "none";
+
+  return [
+    `object=${String(value.object ?? "unknown")}`,
+    `finish=${String(choice?.finish_reason ?? value.stop_reason ?? value.status ?? "unknown")}`,
+    `content=${content === null ? "null" : typeof content}`,
+    `output=${output}`,
+    `candidates=${candidates}`,
+    `usage=${usage}`,
+  ].join(", ");
 }
 
 function formatResponse(data: unknown) {
