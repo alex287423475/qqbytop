@@ -11,6 +11,8 @@ type QuoteSubmission = {
   file_format: string;
   word_count: string;
   estimated_fee: string;
+  source: string;
+  category: string;
   notes: string;
   submitted_at: string;
 };
@@ -29,6 +31,8 @@ function buildSubmission(body: Record<string, unknown>): QuoteSubmission {
     file_format: clean(body.file_format, 120),
     word_count: clean(body.word_count, 40),
     estimated_fee: clean(body.estimated_fee, 40),
+    source: clean(body.source, 40),
+    category: clean(body.category, 80),
     notes: clean(body.notes, 2000),
     submitted_at: new Date().toISOString(),
   };
@@ -43,7 +47,9 @@ function buildFeishuText(submission: QuoteSubmission) {
     `翻译方向：${submission.language_pair || "未填写"}`,
     `文件格式：${submission.file_format || "未填写"}`,
     `预估字数：${submission.word_count || "未填写"}`,
-    `预估费用：${submission.estimated_fee ? `¥${submission.estimated_fee}` : "待计算"}`,
+    `预估费用：${submission.estimated_fee ? `约${submission.estimated_fee}元` : "待计算"}`,
+    `来源：${submission.source || "直接访问"}`,
+    `分类：${submission.category || "无"}`,
     `需求说明：${submission.notes || "无"}`,
     `提交时间：${submission.submitted_at}`,
   ].join("\n");
