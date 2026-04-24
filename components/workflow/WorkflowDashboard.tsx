@@ -55,6 +55,7 @@ type KeywordPreview = {
   row: KeywordRow;
   articleUrl: string | null;
   stage: string;
+  editable?: boolean;
   filePath: string | null;
   markdown: string | null;
 };
@@ -159,6 +160,8 @@ export function WorkflowDashboard({
   const [keywordForm, setKeywordForm] = useState<KeywordRow>(emptyKeywordForm);
   const [keywordBusy, setKeywordBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<KeywordPreview | null>(null);
+  const [editorMarkdown, setEditorMarkdown] = useState("");
+  const [editorBusy, setEditorBusy] = useState(false);
   const [aiForm, setAiForm] = useState<AiConfigForm>(() => createEmptyAiForm(defaultProvider));
   const [aiBusy, setAiBusy] = useState(false);
   const [aiTestBusy, setAiTestBusy] = useState(false);
@@ -375,10 +378,73 @@ export function WorkflowDashboard({
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.message || "预览失败。");
       setPreview(payload as KeywordPreview);
+      setEditorMarkdown(payload?.markdown || "");
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "预览失败。");
     } finally {
       setKeywordBusy(null);
+    }
+  }
+
+  async function openArticleEditor(item: WorkflowItem) {
+    const itemId = getItemId(item);
+    setKeywordBusy(`edit:${itemId}`);
+
+    try {
+      const response = await fetch(`${apiBase}/articles/${encodeURIComponent(itemId)}`, { cache: "no-store" });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "读取文章失败。");
+
+      setPreview({
+        row: {
+          keyword: getItemTitle(item),
+          slug: itemId,
+          locale: String(payload.locale || item.locale || "zh"),
+          category: String(item.category || ""),
+          intent: String(item.intent || ""),
+          priority: String(item.priority || ""),
+        },
+        articleUrl: payload.articleUrl || null,
+        stage: payload.stage,
+        editable: payload.editable,
+        filePath: payload.filePath || null,
+        markdown: payload.markdown || null,
+      });
+      setEditorMarkdown(payload.markdown || "");
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "读取文章失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
+  async function saveArticleEdit() {
+    if (!preview) return;
+    setEditorBusy(true);
+
+    try {
+      const response = await fetch(`${apiBase}/articles/${encodeURIComponent(preview.row.slug)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markdown: editorMarkdown }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "保存文章失败。");
+
+      setPreview({
+        ...preview,
+        stage: payload.stage || "draft",
+        filePath: payload.filePath || preview.filePath,
+        markdown: payload.markdown || editorMarkdown,
+        editable: true,
+      });
+      setEditorMarkdown(payload.markdown || editorMarkdown);
+      await fetchStatus();
+      setError(payload.message || null);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "保存文章失败。");
+    } finally {
+      setEditorBusy(false);
     }
   }
 
@@ -489,6 +555,7 @@ export function WorkflowDashboard({
                       )}
 
                       <div className="mt-4 flex flex-wrap gap-2">
+                        <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
                         {actions.map((action) => (
                           <MiniButton key={action.key} label={action.label} onClick={() => runStep(action.key, itemId)} disabled={isBusy} />
                         ))}
@@ -534,7 +601,16 @@ export function WorkflowDashboard({
         </div>
       </div>
 
-      {preview && <PreviewDialog preview={preview} onClose={() => setPreview(null)} />}
+      {preview && (
+        <PreviewDialog
+          preview={preview}
+          markdown={editorMarkdown}
+          saving={editorBusy}
+          onMarkdownChange={setEditorMarkdown}
+          onSave={saveArticleEdit}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   );
 }
@@ -703,7 +779,21 @@ function KeywordManager({
   );
 }
 
-function PreviewDialog({ preview, onClose }: { preview: KeywordPreview; onClose: () => void }) {
+function PreviewDialog({
+  preview,
+  markdown,
+  saving,
+  onMarkdownChange,
+  onSave,
+  onClose,
+}: {
+  preview: KeywordPreview;
+  markdown: string;
+  saving: boolean;
+  onMarkdownChange: (value: string) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4">
       <div className="max-h-[86vh] w-full max-w-4xl overflow-hidden rounded border border-slate-700 bg-slate-900 shadow-2xl">
@@ -731,10 +821,28 @@ function PreviewDialog({ preview, onClose }: { preview: KeywordPreview; onClose:
                 打开已发布文章
               </a>
             )}
+            {preview.editable && (
+              <button
+                onClick={onSave}
+                disabled={saving}
+                className="mt-3 inline-flex rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-slate-700"
+              >
+                {saving ? "保存中" : "保存修改"}
+              </button>
+            )}
+            {preview.editable && <p className="mt-3 text-xs leading-5 text-slate-500">保存后会退回草稿阶段，请重新执行“校验草稿”。</p>}
           </div>
-          <pre className="whitespace-pre-wrap break-words p-5 text-xs leading-6 text-slate-300">
-            {preview.markdown ? preview.markdown.slice(0, 6000) : "这个关键词还没有生成草稿或已发布文章。"}
-          </pre>
+          {preview.editable ? (
+            <textarea
+              className="min-h-[70vh] w-full resize-none bg-slate-950 p-5 font-mono text-xs leading-6 text-slate-200 outline-none"
+              value={markdown}
+              onChange={(event) => onMarkdownChange(event.target.value)}
+            />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words p-5 text-xs leading-6 text-slate-300">
+              {preview.markdown ? preview.markdown.slice(0, 6000) : "这个关键词还没有生成草稿或已发布文章。"}
+            </pre>
+          )}
         </div>
       </div>
     </div>

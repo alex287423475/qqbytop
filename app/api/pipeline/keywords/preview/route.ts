@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     row,
     articleUrl: source?.stage === "published" ? `/${row.locale}/blog/${row.slug}` : null,
     stage: source?.stage || "keyword-only",
+    editable: source?.stage === "draft" || source?.stage === "validated" || source?.stage === "approved",
     filePath: source?.filePath || null,
     markdown: source?.markdown || null,
   });
