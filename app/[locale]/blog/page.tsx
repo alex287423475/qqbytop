@@ -171,7 +171,7 @@ export default async function BlogPage({
                 </section>
 
                 {featuredArticle && feature && (
-                  <section className="overflow-hidden rounded-3xl border border-brand-200 bg-brand-950 text-white shadow-sm">
+                  <section className="overflow-hidden rounded-3xl border border-slate-700 bg-brand-900 text-white shadow-sm">
                     {featuredArticle.coverImage && (
                       <Link
                         href={`/${normalized}/blog/${featuredArticle.slug}`}
@@ -188,7 +188,7 @@ export default async function BlogPage({
                       </Link>
                     )}
                     <div className="p-6">
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-200">{feature.eyebrow}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-100">{feature.eyebrow}</p>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
                         <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-brand-100">
                           {feature.badge}
@@ -196,7 +196,7 @@ export default async function BlogPage({
                         <span className="text-xs text-brand-100/80">{featuredArticle.category}</span>
                       </div>
                       <h2 className="mt-4 text-2xl font-bold leading-tight text-white">{featuredArticle.title}</h2>
-                      <p className="mt-3 text-sm leading-7 text-brand-50/90">{feature.description}</p>
+                      <p className="mt-3 text-sm leading-7 text-white/90">{feature.description}</p>
                       <p className="mt-4 text-sm leading-7 text-brand-100/80">{featuredArticle.description}</p>
                       <div className="mt-5 flex flex-wrap gap-2">
                         {featuredArticle.keywords.slice(0, 3).map((keyword) => (
@@ -214,7 +214,7 @@ export default async function BlogPage({
                         </p>
                         <Link
                           href={`/${normalized}/blog/${featuredArticle.slug}`}
-                          className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-brand-900 transition hover:bg-brand-50"
+                          className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-semibold text-brand-900 transition hover:bg-slate-100"
                         >
                           {feature.cta}
                         </Link>
