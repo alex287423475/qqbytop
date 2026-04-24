@@ -68,6 +68,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   const body = (await request.json().catch(() => ({}))) as { markdown?: string };
   const markdown = typeof body.markdown === "string" ? body.markdown : "";
   if (!markdown.trim()) return NextResponse.json({ message: "文章内容不能为空。" }, { status: 400 });
+  if (looksLikeMojibake(markdown)) {
+    return NextResponse.json({ message: "检测到疑似乱码内容，已拒绝保存。请刷新后重新编辑。" }, { status: 400 });
+  }
 
   const locale = getLocale(slug);
   const article = findArticleFile(locale, slug);
@@ -95,6 +98,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     markdown,
     message: "已保存为草稿，请重新执行校验草稿。",
   });
+}
+
+function looksLikeMojibake(markdown: string) {
+  const sample = markdown.slice(0, 4000);
+  const suspicious = sample.match(/[ÃÂ][\u0080-\u00ff]|å[\u0080-\u00ff]|ç[\u0080-\u00ff]|è[\u0080-\u00ff]|é[\u0080-\u00ff]/gu) || [];
+  const replacementRuns = sample.match(/\?{6,}|�{3,}/gu) || [];
+  return suspicious.length >= 8 || replacementRuns.length > 0;
 }
 
 function updateRuntimeStatus(slug: string, locale: string) {
