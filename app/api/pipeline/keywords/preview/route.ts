@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeSiteLocale } from "@/lib/pipeline-article-editor";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
@@ -64,21 +65,22 @@ export async function GET(request: NextRequest) {
 
   const row = readKeywordRows().find((item) => item.slug === slug);
   if (!row) return NextResponse.json({ message: `没有找到 slug：${slug}` }, { status: 404 });
+  const locale = normalizeSiteLocale(row.locale);
 
   const source = stagePaths
     .map((item) => {
-      const filePath = item.resolve(row.locale, row.slug);
+      const filePath = item.resolve(locale, row.slug);
       return fs.existsSync(filePath) ? { stage: item.stage, filePath, markdown: fs.readFileSync(filePath, "utf-8") } : null;
     })
     .find(Boolean);
 
   return NextResponse.json({
-    row,
-    articleUrl: source?.stage === "published" ? `/${row.locale}/blog/${row.slug}` : null,
+    row: { ...row, locale },
+    articleUrl: source?.stage === "published" ? `/${locale}/blog/${row.slug}` : null,
     stage: source?.stage || "keyword-only",
     editable: source?.stage === "draft" || source?.stage === "validated" || source?.stage === "approved",
     filePath: source?.filePath || null,
     markdown: source?.markdown || null,
-    visualAssets: source?.markdown ? extractVisualAssets(source.markdown, row.locale, row.slug) : [],
+    visualAssets: source?.markdown ? extractVisualAssets(source.markdown, locale, row.slug) : [],
   });
 }

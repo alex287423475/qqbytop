@@ -10,6 +10,14 @@ export function canCreateRevisionDraft(stage: string) {
   return stage === "published";
 }
 
+export function normalizeSiteLocale(value: string | null | undefined) {
+  const locale = String(value || "zh").trim().toLowerCase();
+  if (locale.startsWith("zh")) return "zh";
+  if (locale.startsWith("en")) return "en";
+  if (locale.startsWith("ja")) return "ja";
+  return "zh";
+}
+
 export function shouldDeleteOriginalAfterSave(stage: string, originalPath: string, draftPath: string) {
   if (stage === "published") return false;
   return originalPath !== draftPath;

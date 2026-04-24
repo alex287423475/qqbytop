@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { execFileSync } from "child_process";
 import matter from "gray-matter";
+import { normalizeLocale } from "./lib/normalize-locale.mjs";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
 
 const approvedDir = path.resolve("local-brain/approved");
@@ -72,13 +73,14 @@ async function main() {
     for (const file of files) {
       const sourcePath = path.join(approvedDir, file);
       const raw = fs.readFileSync(sourcePath, "utf-8");
-      const { data } = matter(raw);
-      const locale = data.locale || "zh";
-      const slugValue = data.slug || file.replace(/\.md$/, "");
+      const parsed = matter(raw);
+      const locale = normalizeLocale(parsed.data.locale);
+      const slugValue = parsed.data.slug || file.replace(/\.md$/, "");
       const targetDir = path.join(articlesDir, locale, slugValue);
+      parsed.data.locale = locale;
 
       fs.mkdirSync(targetDir, { recursive: true });
-      fs.copyFileSync(sourcePath, path.join(targetDir, "index.md"));
+      fs.writeFileSync(path.join(targetDir, "index.md"), matter.stringify(parsed.content, parsed.data), "utf-8");
       fs.unlinkSync(sourcePath);
       publishedSlugs.push(slugValue);
 

@@ -3,6 +3,7 @@ import path from "path";
 import matter from "gray-matter";
 import { parse } from "csv-parse/sync";
 import { ensureArticleVisualAssets } from "./lib/visual-assets.mjs";
+import { normalizeLocale } from "./lib/normalize-locale.mjs";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
 
 const inputsDir = path.resolve("local-brain/inputs");
@@ -45,7 +46,7 @@ function normalizeContentMode(row, markdown = "") {
 }
 
 function findArticleFile(row) {
-  const locale = row.locale || "zh";
+  const locale = normalizeLocale(row.locale);
   const slug = row.slug;
   const candidates = [
     { stage: "draft", filePath: path.join(draftsDir, `${slug}.md`) },
@@ -94,7 +95,7 @@ async function main() {
 
       updateArticleStage(row.slug, article.stage, {
         keyword: row.keyword,
-        locale: row.locale || "zh",
+        locale: normalizeLocale(row.locale),
         category: row.category,
         contentMode,
         visualCount: visuals.length,

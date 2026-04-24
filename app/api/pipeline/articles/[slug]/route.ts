@@ -6,6 +6,7 @@ import {
   canCreateRevisionDraft,
   canEditArticleStage,
   getArticleEditMessages,
+  normalizeSiteLocale,
   shouldDeleteOriginalAfterSave,
 } from "@/lib/pipeline-article-editor";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
@@ -43,7 +44,7 @@ function findReviewReport(slug: string) {
 }
 
 function getLocale(slug: string) {
-  return readKeywordRows().find((row) => row.slug === slug)?.locale || "zh";
+  return normalizeSiteLocale(readKeywordRows().find((row) => row.slug === slug)?.locale);
 }
 
 function extractVisualAssets(markdown: string, locale: string, slug: string) {

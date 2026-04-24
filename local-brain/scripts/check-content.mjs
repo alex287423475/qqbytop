@@ -1,14 +1,17 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
+import { normalizeLocale } from "./lib/normalize-locale.mjs";
 
 const articlesDir = path.resolve("content/articles");
 const publicDir = path.resolve("public");
+const supportedLocales = new Set(["zh", "en", "ja"]);
 
 function validateArticle(filePath) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const { data, content } = matter(raw);
   const errors = [];
+  const normalizedLocale = normalizeLocale(data.locale);
   const faqCount = Array.isArray(data.faq) ? data.faq.length : 0;
   const textOnly = content.replace(/[#>*`\-\[\]\(\)|]/g, "").replace(/\s+/g, "");
   const imageLinks = [...content.matchAll(/!\[[^\]]+\]\((\/article-assets\/[^)]+)\)/g)].map((match) => match[1]);
@@ -19,6 +22,7 @@ function validateArticle(filePath) {
   if (!data.category) errors.push("category 为空");
   if (!data.date) errors.push("date 为空");
   if (!data.locale) errors.push("locale 为空");
+  if (data.locale && data.locale !== normalizedLocale) errors.push(`locale 必须归一化为站点语言代码（当前 ${data.locale}，建议 ${normalizedLocale}）`);
   if (!Array.isArray(data.keywords) || data.keywords.length === 0) errors.push("keywords 为空");
   if (!content.match(/^# /m)) errors.push("缺少 H1");
   if ((content.match(/^## /gm) || []).length < 3) errors.push("H2 少于 3 个");
@@ -27,8 +31,8 @@ function validateArticle(filePath) {
   if (!content.includes("/quote") && !content.includes("/services/") && !content.includes("/industries/")) {
     errors.push("缺少站内 CTA 或内链");
   }
-  if (data.locale === "zh" && textOnly.length < 1200) errors.push(`中文正文不足 1200 字（当前约 ${textOnly.length}）`);
-  if (data.locale === "en" && content.split(/\s+/).filter(Boolean).length < 1000) errors.push("英文正文不足 1000 words");
+  if (normalizedLocale === "zh" && textOnly.length < 1200) errors.push(`中文正文不足 1200 字（当前约 ${textOnly.length}）`);
+  if (normalizedLocale === "en" && content.split(/\s+/).filter(Boolean).length < 1000) errors.push("英文正文不足 1000 words");
 
   if (data.contentMode === "fact-source") {
     if (imageLinks.length < 3) errors.push("fact-source article needs at least 3 image links");
@@ -51,6 +55,10 @@ function main() {
   for (const locale of fs.readdirSync(articlesDir)) {
     const localeDir = path.join(articlesDir, locale);
     if (!fs.statSync(localeDir).isDirectory()) continue;
+    if (!supportedLocales.has(locale)) {
+      problems.push(`${locale}: 不属于站点支持的语言目录，应迁移到 zh/en/ja`);
+      continue;
+    }
 
     for (const entry of fs.readdirSync(localeDir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;

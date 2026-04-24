@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { NextResponse } from "next/server";
 import { getAllArticleSlugs } from "@/lib/articles";
+import { normalizeSiteLocale } from "@/lib/pipeline-article-editor";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
@@ -67,7 +68,7 @@ export async function GET() {
         {
           slug: row.slug,
           keyword: row.keyword,
-          locale: row.locale,
+          locale: normalizeSiteLocale(row.locale),
           category: row.category,
           intent: row.intent,
           priority: row.priority,
@@ -75,7 +76,7 @@ export async function GET() {
           errors: [],
           ...review,
           ...current,
-          stage: current?.stage || getKeywordArtifactStage(row.locale, row.slug),
+          stage: current?.stage || getKeywordArtifactStage(normalizeSiteLocale(row.locale), row.slug),
         },
       ];
     }),

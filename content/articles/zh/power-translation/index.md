@@ -7,7 +7,7 @@ category:
   - 技术翻译
   - 翻译服务
 date: '2025-02-14'
-locale: zh-CN
+locale: zh
 keywords:
   - 电气设备手册翻译
   - 电气说明书翻译

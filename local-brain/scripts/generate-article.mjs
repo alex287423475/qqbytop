@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 import { callLLM, getProviderLabel } from "./ai-provider.mjs";
+import { normalizeLocale } from "./lib/normalize-locale.mjs";
 import { appendLog, setIdle, setRunning, updateArticleStage } from "./status-updater.mjs";
 import { ensureArticleVisualAssets } from "./lib/visual-assets.mjs";
 
@@ -28,11 +29,12 @@ function readCsv(filePath) {
 }
 
 function hasGeneratedArtifact(row) {
+  const locale = normalizeLocale(row.locale);
   const candidates = [
     path.join(draftsDir, `${row.slug}.md`),
     path.resolve("local-brain/validated", `${row.slug}.md`),
     path.resolve("local-brain/approved", `${row.slug}.md`),
-    path.resolve("content/articles", row.locale || "zh", row.slug, "index.md"),
+    path.resolve("content/articles", locale, row.slug, "index.md"),
   ];
 
   return candidates.some((filePath) => fs.existsSync(filePath));
@@ -86,6 +88,7 @@ function buildFaq(keyword, category) {
 }
 
 function buildFallbackMarkdown(row, redLines) {
+  const locale = normalizeLocale(row.locale);
   const faq = buildFaq(row.keyword, row.category);
   const faqFrontmatter = faq
     .map((item) => `  - q: "${item.q}"\n    a: "${item.a}"`)
@@ -97,7 +100,7 @@ slug: "${row.slug}"
 description: "围绕${row.keyword}，解答报价逻辑、交付标准、常见风险和询价要点。"
 category: "${row.category}"
 date: "${today()}"
-locale: "${row.locale}"
+locale: "${locale}"
 keywords:
   - "${row.keyword}"
   - "${row.category}"
@@ -201,11 +204,12 @@ async function main() {
 
   try {
     for (const row of rows) {
+      const locale = normalizeLocale(row.locale);
       const contentMode = normalizeContentMode(row);
       const factSourcePack = contentMode === "fact-source" ? readFactSourcePack(row.slug) : { filePath: null, content: "" };
       updateArticleStage(row.slug, "generating", {
         keyword: row.keyword,
-        locale: row.locale,
+        locale,
         category: row.category,
         contentMode,
         factSourcePath: factSourcePack.filePath,
@@ -232,7 +236,7 @@ async function main() {
       } catch (error) {
         updateArticleStage(row.slug, "generate-failed", {
           keyword: row.keyword,
-          locale: row.locale,
+          locale,
           category: row.category,
           contentMode,
           errors: [error.message],
@@ -244,7 +248,7 @@ async function main() {
       if (!validateGeneratedMarkdown(markdown)) {
         updateArticleStage(row.slug, "generate-failed", {
           keyword: row.keyword,
-          locale: row.locale,
+          locale,
           category: row.category,
           contentMode,
           errors: ["模型返回内容未通过基础 Markdown 结构检查，未写入模板文章。"],
@@ -261,7 +265,7 @@ async function main() {
           {
             slug: row.slug,
             keyword: row.keyword,
-            locale: row.locale,
+            locale,
             contentMode,
             factSourcePath: factSourcePack.filePath,
             visuals: contentMode === "fact-source" ? "public/article-assets" : null,
@@ -276,6 +280,7 @@ async function main() {
 
       updateArticleStage(row.slug, "draft", {
         generatedAt: new Date().toISOString(),
+        locale,
         contentMode,
         factSourcePath: factSourcePack.filePath,
         errors: [],

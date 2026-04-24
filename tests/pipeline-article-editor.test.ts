@@ -5,6 +5,7 @@ import {
   canEditArticleStage,
   canCreateRevisionDraft,
   getArticleEditMessages,
+  normalizeSiteLocale,
   shouldDeleteOriginalAfterSave,
 } from "../lib/pipeline-article-editor.ts";
 
@@ -38,4 +39,12 @@ test("only published articles expose direct revision-draft creation", () => {
   assert.equal(canCreateRevisionDraft("published"), true);
   assert.equal(canCreateRevisionDraft("draft"), false);
   assert.equal(canCreateRevisionDraft("validated"), false);
+});
+
+test("locale variants collapse to site locales", () => {
+  assert.equal(normalizeSiteLocale("zh-CN"), "zh");
+  assert.equal(normalizeSiteLocale("ZH-hans"), "zh");
+  assert.equal(normalizeSiteLocale("en-US"), "en");
+  assert.equal(normalizeSiteLocale("ja-JP"), "ja");
+  assert.equal(normalizeSiteLocale(""), "zh");
 });
