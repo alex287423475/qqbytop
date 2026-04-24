@@ -161,6 +161,7 @@ function extractTextParts(parts) {
 }
 
 function extractTextPart(part) {
+  if (Array.isArray(part)) return extractTextParts(part);
   if (typeof part === "string") return part;
   if (typeof part?.text === "string") return part.text;
   if (typeof part?.content === "string") return part.content;
@@ -186,10 +187,28 @@ export async function callLLM(systemPrompt, userPrompt, options = {}) {
   }
 
   try {
+    const body = config.body(systemPrompt, userPrompt, options, config.endpointType);
+
+    if (config.endpointType === "chat") {
+      const streamResponse = await fetch(config.url, {
+        method: "POST",
+        headers: config.headers,
+        body: JSON.stringify({ ...body, stream: true }),
+      });
+
+      if (!streamResponse.ok) {
+        throw new Error(`${provider} request failed: ${streamResponse.status} ${await streamResponse.text()}`);
+      }
+
+      const streamText = await streamResponse.text();
+      const streamedContent = parseOpenAICompatibleStream(streamText);
+      if (streamedContent) return streamedContent;
+    }
+
     const response = await fetch(config.url, {
       method: "POST",
       headers: config.headers,
-      body: JSON.stringify(config.body(systemPrompt, userPrompt, options, config.endpointType)),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -232,4 +251,38 @@ function summarizeModelResponse(data) {
 function formatResponse(data) {
   if (typeof data === "string") return data.slice(0, 500);
   return JSON.stringify(data).slice(0, 500);
+}
+
+function parseOpenAICompatibleStream(text) {
+  if (!text.trim()) return "";
+
+  if (text.trimStart().startsWith("{")) {
+    try {
+      return extractModelText(JSON.parse(text));
+    } catch {
+      return "";
+    }
+  }
+
+  const chunks = [];
+  for (const line of text.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+
+    try {
+      const data = JSON.parse(payload);
+      const choice = data.choices?.[0];
+      const deltaContent = choice?.delta?.content;
+      const messageContent = choice?.message?.content;
+      const textPart = extractTextPart(deltaContent) || extractTextPart(messageContent) || extractTextPart(choice?.text);
+      if (textPart) chunks.push(textPart);
+    } catch {
+      // Ignore malformed stream keep-alive lines from compatible gateways.
+    }
+  }
+
+  return chunks.join("").trim();
 }

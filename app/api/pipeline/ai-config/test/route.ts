@@ -69,10 +69,25 @@ export async function POST(request: NextRequest) {
 async function testProvider({ provider, baseUrl, model, apiKey }: { provider: string; baseUrl: string; model: string; apiKey: string }) {
   if (provider === "openai" || provider === "deepseek") {
     const endpoint = resolveOpenAICompatibleEndpoint(baseUrl || defaultBaseUrl(provider));
+    const body = buildOpenAICompatibleBody(endpoint.type, model, "You are a connection test endpoint. Reply with OK.", "ping", 80);
+
+    if (endpoint.type === "chat") {
+      const streamResponse = await fetch(endpoint.url, {
+        method: "POST",
+        headers: buildOpenAICompatibleHeaders(apiKey, endpoint.type),
+        body: JSON.stringify({ ...body, stream: true }),
+      });
+
+      const streamData = await streamResponse.text();
+      if (!streamResponse.ok) throw new Error(`${provider} request failed: ${streamResponse.status} ${streamData.slice(0, 500)}`);
+      const streamedText = parseOpenAICompatibleStream(streamData);
+      if (streamedText) return streamedText;
+    }
+
     const response = await fetch(endpoint.url, {
       method: "POST",
       headers: buildOpenAICompatibleHeaders(apiKey, endpoint.type),
-      body: JSON.stringify(buildOpenAICompatibleBody(endpoint.type, model, "You are a connection test endpoint. Reply with OK.", "ping", 8)),
+      body: JSON.stringify(body),
     });
 
     const data = await readJsonOrText(response);
@@ -230,11 +245,12 @@ function extractModelText(data: any) {
   return "";
 }
 
-function extractTextParts(parts: any[]) {
+function extractTextParts(parts: any[]): string {
   return parts.map((part) => extractTextPart(part)).filter(Boolean).join("\n");
 }
 
-function extractTextPart(part: any) {
+function extractTextPart(part: any): string {
+  if (Array.isArray(part)) return extractTextParts(part);
   if (typeof part === "string") return part;
   if (typeof part?.text === "string") return part.text;
   if (typeof part?.content === "string") return part.content;
@@ -272,4 +288,37 @@ function summarizeModelResponse(data: unknown) {
 function formatResponse(data: unknown) {
   if (typeof data === "string") return data.slice(0, 500);
   return JSON.stringify(data).slice(0, 500);
+}
+
+function parseOpenAICompatibleStream(text: string) {
+  if (!text.trim()) return "";
+
+  if (text.trimStart().startsWith("{")) {
+    try {
+      return extractModelText(JSON.parse(text));
+    } catch {
+      return "";
+    }
+  }
+
+  const chunks: string[] = [];
+  for (const line of text.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+
+    try {
+      const data = JSON.parse(payload);
+      const choice = data.choices?.[0];
+      const textPart =
+        extractTextPart(choice?.delta?.content) || extractTextPart(choice?.message?.content) || extractTextPart(choice?.text);
+      if (textPart) chunks.push(textPart);
+    } catch {
+      // Compatible gateways can emit non-JSON keep-alive lines.
+    }
+  }
+
+  return chunks.join("").trim();
 }
