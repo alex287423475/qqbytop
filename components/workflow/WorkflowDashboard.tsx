@@ -233,6 +233,7 @@ export function WorkflowDashboard({
   const [keywordRows, setKeywordRows] = useState<KeywordRow[]>([]);
   const [keywordOptions, setKeywordOptions] = useState<KeywordOptions>({ category: defaultCategoryOptions, intent: defaultIntentOptions });
   const [keywordForm, setKeywordForm] = useState<KeywordRow>(emptyKeywordForm);
+  const [slugTouched, setSlugTouched] = useState(false);
   const [keywordBusy, setKeywordBusy] = useState<string | null>(null);
   const [keywordOptionBusy, setKeywordOptionBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<KeywordPreview | null>(null);
@@ -280,6 +281,18 @@ export function WorkflowDashboard({
       category: payload.options?.category || defaultCategoryOptions,
       intent: payload.options?.intent || defaultIntentOptions,
     });
+  }
+
+  async function generateKeywordSlug(keyword: string) {
+    if (!keywordManager) return "";
+    const response = await fetch(`${keywordManager.apiBase}/slug`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword }),
+    });
+    const payload = (await response.json().catch(() => null)) as { slug?: string } | null;
+    if (!response.ok) return "";
+    return payload?.slug || "";
   }
 
   async function fetchAiConfig() {
@@ -336,6 +349,26 @@ export function WorkflowDashboard({
       window.clearInterval(timer);
     };
   }, [apiBase, keywordManager?.apiBase]);
+
+  useEffect(() => {
+    if (!keywordManager || slugTouched || !keywordForm.keyword.trim()) return;
+
+    let disposed = false;
+    const timer = window.setTimeout(() => {
+      generateKeywordSlug(keywordForm.keyword)
+        .then((slug) => {
+          if (!disposed && slug) {
+            setKeywordForm((current) => (current.keyword === keywordForm.keyword && !slugTouched ? { ...current, slug } : current));
+          }
+        })
+        .catch(() => undefined);
+    }, 250);
+
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [keywordForm.keyword, keywordManager, slugTouched]);
 
   const itemEntries = useMemo(() => {
     const source = status.items || status.articles || {};
@@ -473,6 +506,7 @@ export function WorkflowDashboard({
 
       setKeywordRows(payload.rows || []);
       setKeywordForm(emptyKeywordForm);
+      setSlugTouched(false);
       await fetchStatus();
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "添加关键词失败。");
@@ -812,7 +846,9 @@ export function WorkflowDashboard({
                   form={keywordForm}
                   busy={keywordBusy}
                   optionBusy={keywordOptionBusy}
+                  slugTouched={slugTouched}
                   onFormChange={setKeywordForm}
+                  onSlugTouched={setSlugTouched}
                   onAdd={addKeyword}
                   onAddOption={addKeywordOption}
                   onDeleteOption={deleteKeywordOption}
@@ -1182,7 +1218,9 @@ function KeywordManager({
   form,
   busy,
   optionBusy,
+  slugTouched,
   onFormChange,
+  onSlugTouched,
   onAdd,
   onAddOption,
   onDeleteOption,
@@ -1195,7 +1233,9 @@ function KeywordManager({
   form: KeywordRow;
   busy: string | null;
   optionBusy: string | null;
+  slugTouched: boolean;
   onFormChange: (form: KeywordRow) => void;
+  onSlugTouched: (touched: boolean) => void;
   onAdd: () => void;
   onAddOption: (type: "category" | "intent", value: string) => void;
   onDeleteOption: (type: "category" | "intent", value: string) => void;
@@ -1213,9 +1253,17 @@ function KeywordManager({
         <p className="text-sm text-slate-400">直接管理 local-brain/inputs/keywords.csv，新增后即可进入生成流程。</p>
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_1fr_0.65fr_0.75fr_0.7fr_0.6fr_0.9fr_auto]">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_1fr_0.65fr_0.85fr_0.85fr_0.6fr_0.9fr_auto_auto]">
         <TextInput label="关键词" value={form.keyword} onChange={(keyword) => onFormChange({ ...form, keyword })} />
-        <TextInput label="slug" value={form.slug} onChange={(slug) => onFormChange({ ...form, slug })} placeholder="beijing-translation-price" />
+        <TextInput
+          label={slugTouched ? "slug（手动）" : "slug（自动）"}
+          value={form.slug}
+          onChange={(slug) => {
+            onSlugTouched(true);
+            onFormChange({ ...form, slug });
+          }}
+          placeholder="自动生成"
+        />
         <SelectInput label="语言" value={form.locale} options={["zh", "en", "ja"]} onChange={(locale) => onFormChange({ ...form, locale })} />
         <MultiSelectInput
           label="分类"
@@ -1244,6 +1292,16 @@ function KeywordManager({
           options={["standard", "fact-source"]}
           onChange={(contentMode) => onFormChange({ ...form, contentMode })}
         />
+        <button
+          type="button"
+          onClick={() => {
+            onSlugTouched(false);
+            onFormChange({ ...form, slug: "" });
+          }}
+          className="self-end rounded border border-slate-700 px-3 py-2 text-xs text-slate-300 hover:border-brand-500"
+        >
+          重新自动
+        </button>
         <button
           onClick={onAdd}
           disabled={busy === "add"}

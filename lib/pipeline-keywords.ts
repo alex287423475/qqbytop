@@ -16,6 +16,47 @@ const headers: Array<keyof KeywordRow> = ["keyword", "slug", "locale", "category
 
 export const keywordsPath = path.join(process.cwd(), "local-brain", "inputs", "keywords.csv");
 
+const slugTokenMap: Array<[RegExp, string]> = [
+  [/北京/g, "beijing"],
+  [/全球博译/g, "qqby"],
+  [/翻译公司/g, "translation-company"],
+  [/跨境电商/g, "cross-border-ecommerce"],
+  [/亚马逊/g, "amazon"],
+  [/Listing/gi, "listing"],
+  [/独立站/g, "independent-site"],
+  [/证件/g, "certificate"],
+  [/合同/g, "contract"],
+  [/法律/g, "legal"],
+  [/专利/g, "patent"],
+  [/医学/g, "medical"],
+  [/技术/g, "technical"],
+  [/商务/g, "business"],
+  [/金融/g, "finance"],
+  [/本地化/g, "localization"],
+  [/翻译/g, "translation"],
+  [/报价/g, "price"],
+  [/价格/g, "price"],
+  [/多少钱/g, "cost"],
+  [/费用/g, "cost"],
+  [/需要注意什么/g, "tips"],
+  [/注意事项/g, "tips"],
+  [/怎么选/g, "how-to-choose"],
+  [/怎么做/g, "how-to"],
+  [/为什么/g, "why"],
+  [/不能/g, "cannot"],
+  [/机翻/g, "machine-translation"],
+  [/风险/g, "risks"],
+  [/指南/g, "guide"],
+  [/流程/g, "process"],
+  [/办理/g, "process"],
+  [/公证/g, "notarization"],
+  [/认证/g, "certification"],
+  [/申诉/g, "appeal"],
+  [/拒付/g, "chargeback"],
+  [/证据/g, "evidence"],
+  [/材料/g, "documents"],
+];
+
 export function readKeywordRows(): KeywordRow[] {
   if (!fs.existsSync(keywordsPath)) return [];
 
@@ -33,9 +74,10 @@ export function writeKeywordRows(rows: KeywordRow[]) {
 }
 
 export function normalizeKeywordRow(input: Partial<KeywordRow>): KeywordRow {
+  const keyword = String(input.keyword || "").trim();
   const row = {
-    keyword: String(input.keyword || "").trim(),
-    slug: String(input.slug || "").trim(),
+    keyword,
+    slug: normalizeSlug(String(input.slug || "").trim() || generateSlug(keyword)),
     locale: String(input.locale || "zh").trim(),
     category: String(input.category || "").trim(),
     intent: String(input.intent || "信息").trim(),
@@ -52,6 +94,30 @@ export function normalizeKeywordRow(input: Partial<KeywordRow>): KeywordRow {
   if (!["standard", "fact-source"].includes(row.contentMode)) throw new Error("contentMode 必须是 standard 或 fact-source。");
 
   return row;
+}
+
+export function generateSlug(keyword: string) {
+  let value = keyword.trim();
+  for (const [pattern, replacement] of slugTokenMap) {
+    value = value.replace(pattern, ` ${replacement} `);
+  }
+
+  const slug = normalizeSlug(value);
+  if (slug) return slug;
+
+  const fallback = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `article-${fallback}`;
+}
+
+function normalizeSlug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/-{2,}/g, "-")
+    .slice(0, 80)
+    .replace(/-+$/g, "");
 }
 
 function escapeCsv(value: string) {
