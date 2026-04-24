@@ -18,22 +18,29 @@ function countDirItems(dirPath: string) {
   return fs.readdirSync(dirPath).filter((item) => item.endsWith(".md")).length;
 }
 
+function readJsonFile(filePath: string) {
+  if (!fs.existsSync(filePath)) return null;
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 function getInitialPipelineStatus() {
   const statusPath = path.join(process.cwd(), "local-brain", "status", "pipeline.runtime.json");
   const examplePath = path.join(process.cwd(), "local-brain", "status", "pipeline.example.json");
   const keywordsPath = path.join(process.cwd(), "local-brain", "inputs", "keywords.csv");
-  const status = fs.existsSync(statusPath)
-    ? JSON.parse(fs.readFileSync(statusPath, "utf-8"))
-    : fs.existsSync(examplePath)
-      ? JSON.parse(fs.readFileSync(examplePath, "utf-8"))
-      : {
-          updatedAt: null,
-          isRunning: false,
-          currentStep: null,
-          lock: null,
-          articles: {},
-          log: [],
-        };
+  const status = readJsonFile(statusPath) ||
+    readJsonFile(examplePath) || {
+      updatedAt: null,
+      isRunning: false,
+      currentStep: null,
+      lock: null,
+      articles: {},
+      log: [],
+    };
 
   const keywordCount = fs.existsSync(keywordsPath)
     ? fs
@@ -47,11 +54,18 @@ function getInitialPipelineStatus() {
     counts: {
       keywords: keywordCount,
       drafts: countDirItems(path.join(process.cwd(), "local-brain", "drafts")),
+      reviewed: countJsonItems(path.join(process.cwd(), "local-brain", "reports", "review-agent")),
+      rewritten: countDirItems(path.join(process.cwd(), "local-brain", "rewritten")),
       validated: countDirItems(path.join(process.cwd(), "local-brain", "validated")),
       approved: countDirItems(path.join(process.cwd(), "local-brain", "approved")),
       published: getAllArticleSlugs().length,
     },
   };
+}
+
+function countJsonItems(dirPath: string) {
+  if (!fs.existsSync(dirPath)) return 0;
+  return fs.readdirSync(dirPath).filter((item) => item.endsWith(".json")).length;
 }
 
 export default function PipelinePage() {

@@ -11,11 +11,13 @@ const examplePath = path.join(process.cwd(), "local-brain", "status", "pipeline.
 
 function readStatus() {
   if (fs.existsSync(statusPath)) {
-    return JSON.parse(fs.readFileSync(statusPath, "utf-8"));
+    const status = readJsonFile(statusPath);
+    if (status) return status;
   }
 
   if (fs.existsSync(examplePath)) {
-    return JSON.parse(fs.readFileSync(examplePath, "utf-8"));
+    const status = readJsonFile(examplePath);
+    if (status) return status;
   }
 
   return {
@@ -26,6 +28,14 @@ function readStatus() {
     articles: {},
     log: [],
   };
+}
+
+function readJsonFile(filePath: string) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
 }
 
 function countDirItems(dirPath: string) {

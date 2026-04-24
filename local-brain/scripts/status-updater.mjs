@@ -18,6 +18,18 @@ function ensureStatusDir() {
   fs.mkdirSync(statusDir, { recursive: true });
 }
 
+function parseJsonFile(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+function cloneInitialStatus() {
+  return JSON.parse(JSON.stringify(initialStatus));
+}
+
 export function getRuntimeStatusPath() {
   return runtimePath;
 }
@@ -26,23 +38,33 @@ export function readStatus() {
   ensureStatusDir();
 
   if (fs.existsSync(runtimePath)) {
-    return JSON.parse(fs.readFileSync(runtimePath, "utf-8"));
+    const runtime = parseJsonFile(runtimePath);
+    if (runtime) return runtime;
+
+    const backupPath = path.join(statusDir, `pipeline.runtime.corrupt-${Date.now()}.json`);
+    fs.copyFileSync(runtimePath, backupPath);
   }
 
   if (fs.existsSync(examplePath)) {
-    const template = JSON.parse(fs.readFileSync(examplePath, "utf-8"));
-    fs.writeFileSync(runtimePath, JSON.stringify(template, null, 2));
-    return template;
+    const template = parseJsonFile(examplePath);
+    if (template) {
+      writeStatus(template);
+      return template;
+    }
   }
 
-  fs.writeFileSync(runtimePath, JSON.stringify(initialStatus, null, 2));
-  return structuredClone(initialStatus);
+  const initial = cloneInitialStatus();
+  writeStatus(initial);
+  return initial;
 }
 
 export function writeStatus(status) {
   ensureStatusDir();
   status.updatedAt = new Date().toISOString();
-  fs.writeFileSync(runtimePath, JSON.stringify(status, null, 2));
+  const payload = JSON.stringify(status, null, 2);
+  const tmpPath = `${runtimePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmpPath, payload, "utf-8");
+  fs.renameSync(tmpPath, runtimePath);
 }
 
 export function withStatus(mutator) {
@@ -54,12 +76,12 @@ export function withStatus(mutator) {
 
 export function appendLog(step, message, slug = null) {
   return withStatus((status) => {
-    status.log = status.log.slice(-199);
+    status.log = Array.isArray(status.log) ? status.log.slice(-199) : [];
     status.log.push({
       time: new Date().toISOString(),
-      step,
+      step: String(step || "system"),
       slug,
-      message,
+      message: String(message || ""),
     });
   });
 }
@@ -73,6 +95,7 @@ export function setRunning(step, pid = null) {
       step,
       startedAt: new Date().toISOString(),
     };
+    if (!status.articles || typeof status.articles !== "object") status.articles = {};
   });
 }
 
@@ -81,11 +104,13 @@ export function setIdle() {
     status.isRunning = false;
     status.currentStep = null;
     status.lock = null;
+    if (!status.articles || typeof status.articles !== "object") status.articles = {};
   });
 }
 
 export function updateArticleStage(slug, stage, extra = {}) {
   return withStatus((status) => {
+    if (!status.articles || typeof status.articles !== "object") status.articles = {};
     const current = status.articles[slug] ?? {
       slug,
       stage: "pending",
@@ -100,4 +125,3 @@ export function updateArticleStage(slug, stage, extra = {}) {
     };
   });
 }
-
