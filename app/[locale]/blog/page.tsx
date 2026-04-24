@@ -18,9 +18,9 @@ const blogCopy: Record<Locale, { eyebrow: string; title: string; description: st
   },
   ja: {
     eyebrow: "インサイト",
-    title: "翻訳、コンプライアンス、ローカライズを整理して解説",
+    title: "翻訳・コンプライアンス・ローカライズを整理して解説",
     description: "QQBY による翻訳価格、法務対応、技術ローカライズの実務記事。",
-    empty: "この言語ではまだ記事が公開されていません。",
+    empty: "この言語では、まだ記事が公開されていません。",
   },
 };
 
@@ -74,13 +74,20 @@ export default async function BlogPage({
                   <Link
                     key={facet.value}
                     href={buildBlogHref(normalized, facet.value, 1)}
-                    className={`inline-flex items-center rounded-full border px-5 py-3 text-base font-medium transition ${
+                    className={`inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-medium transition ${
                       active
                         ? "border-brand-600 bg-brand-600 text-white shadow-lg shadow-brand-100"
                         : "border-slate-200 bg-white text-slate-700 shadow-sm hover:border-brand-300 hover:text-brand-700"
                     }`}
                   >
-                    {facet.label}
+                    <span>{facet.label}</span>
+                    <span
+                      className={`inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {facet.count}
+                    </span>
                   </Link>
                 );
               })}
@@ -116,10 +123,17 @@ export default async function BlogPage({
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {listing.articles.map((article) => (
-                    <article key={article.slug} className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg">
+                    <article
+                      key={article.slug}
+                      className="overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:border-brand-600 hover:shadow-lg"
+                    >
                       {article.coverImage && (
                         <Link href={`/${normalized}/blog/${article.slug}`} className="block border-b border-slate-100 bg-slate-50">
-                          <img src={article.coverImage} alt={article.coverAlt || article.title} className="aspect-[1200/630] w-full object-cover" />
+                          <img
+                            src={article.coverImage}
+                            alt={article.coverAlt || article.title}
+                            className="aspect-[1200/630] w-full object-cover"
+                          />
                         </Link>
                       )}
                       <div className="p-6">
@@ -174,7 +188,11 @@ export default async function BlogPage({
                     );
                   })}
                   <Link
-                    href={buildBlogHref(normalized, listing.activeCategory, Math.min(listing.pagination.totalPages, listing.pagination.page + 1))}
+                    href={buildBlogHref(
+                      normalized,
+                      listing.activeCategory,
+                      Math.min(listing.pagination.totalPages, listing.pagination.page + 1),
+                    )}
                     aria-disabled={listing.pagination.page === listing.pagination.totalPages}
                     className={`inline-flex min-w-11 items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium ${
                       listing.pagination.page === listing.pagination.totalPages

@@ -13,6 +13,19 @@ export type ArticleFacet = {
   count: number;
 };
 
+const preferredCategoryOrder = [
+  "翻译价格",
+  "证件翻译",
+  "法律翻译",
+  "专业翻译",
+  "跨境电商",
+  "法律合规",
+  "技术本地化",
+  "技术翻译",
+  "翻译质量",
+  "跨境合规",
+] as const;
+
 export function normalizeArticleCategories(value: unknown) {
   if (Array.isArray(value)) {
     return Array.from(
@@ -55,6 +68,13 @@ export function buildArticleListing<T extends ArticleListingItem>(
     { label: "全部", value: "all", count: articles.length },
     ...Array.from(facetsMap.entries())
       .sort((a, b) => {
+        const aOrder = preferredCategoryOrder.indexOf(a[0] as (typeof preferredCategoryOrder)[number]);
+        const bOrder = preferredCategoryOrder.indexOf(b[0] as (typeof preferredCategoryOrder)[number]);
+        if (aOrder !== -1 || bOrder !== -1) {
+          if (aOrder === -1) return 1;
+          if (bOrder === -1) return -1;
+          return aOrder - bOrder;
+        }
         if (b[1] !== a[1]) return b[1] - a[1];
         return a[0].localeCompare(b[0], "zh-Hans-CN");
       })
