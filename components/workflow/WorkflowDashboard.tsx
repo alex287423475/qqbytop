@@ -210,6 +210,7 @@ export function WorkflowDashboard({
   const [activePromptKey, setActivePromptKey] = useState("generate-system");
   const [promptDraft, setPromptDraft] = useState("");
   const [promptBusy, setPromptBusy] = useState(false);
+  const [activePanel, setActivePanel] = useState("overview");
 
   async function fetchStatus() {
     const response = await fetch(`${apiBase}/status`, { cache: "no-store" });
@@ -565,6 +566,14 @@ export function WorkflowDashboard({
   }
 
   const isBusy = status.isRunning || Boolean(submitting);
+  const panelTabs = [
+    { key: "overview", label: "运行概览", description: "查看当前各阶段数量" },
+    { key: "models", label: "AI模型配置", description: "配置模型A和模型B" },
+    { key: "prompts", label: "Prompt提示词", description: "编辑生成、质检、重写提示词" },
+    { key: "keywords", label: "关键词文件", description: "新增、删除和预览关键词" },
+    { key: "workflow", label: "流程操作", description: "执行生成、校验、审核、发布" },
+    { key: "logs", label: "最近日志", description: "查看脚本运行事件" },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -582,160 +591,202 @@ export function WorkflowDashboard({
 
         {error && <div className="mt-6 rounded border border-rose-500/50 bg-rose-950/40 px-4 py-3 text-sm text-rose-100">{error}</div>}
 
-        <div className="mt-8 grid gap-4 lg:grid-cols-5">
-          {stages.map((stage) => (
-            <StageCard
-              key={stage.key}
-              label={stage.label}
-              value={status.counts?.[stage.key] || 0}
-              accent={stage.accent || "text-brand-400"}
-              active={Boolean(status.currentStep && (stage.activeSteps || [stage.key]).includes(status.currentStep))}
-            />
-          ))}
-        </div>
-
-        {providerOptions && (
-          <>
-            <AiConfigPanel
-              forms={aiForms}
-              providerOptions={providerOptions}
-              busy={aiBusy}
-              testBusy={aiTestBusy}
-              testResult={aiTestResult}
-              onChange={(role, nextForm) => {
-                setAiForms((current) => ({ ...current, [role]: nextForm }));
-                if (role === "modelA") setProvider(nextForm.provider);
-                setAiTestResult((current) => ({ ...current, [role]: null }));
-              }}
-              onSave={saveAiConfig}
-              onTest={testAiConfig}
-            />
-            <PromptManager
-              prompts={promptFiles}
-              activeKey={activePromptKey}
-              draft={promptDraft}
-              busy={promptBusy}
-              onSelect={selectPrompt}
-              onDraftChange={setPromptDraft}
-              onSave={savePrompt}
-            />
-          </>
-        )}
-
-        {keywordManager && (
-          <KeywordManager
-            rows={keywordRows}
-            form={keywordForm}
-            busy={keywordBusy}
-            onFormChange={setKeywordForm}
-            onAdd={addKeyword}
-            onDelete={deleteKeyword}
-            onPreview={previewKeyword}
-          />
-        )}
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1.25fr_0.9fr]">
-          <section className="pipeline-panel p-5">
-            <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
-              <h2 className="text-lg font-bold text-white">操作面板</h2>
-              <p className="text-sm text-slate-400">按流程阶段执行任务，运行时会自动刷新状态与日志。当前提供商：{provider}</p>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {actions.map((action) => (
-                <ActionButton
-                  key={action.key}
-                  label={action.label}
-                  busyLabel={action.busyLabel}
-                  onClick={() => runStep(action.key)}
-                  disabled={isBusy}
-                  busy={submitting === `${action.key}:all`}
-                />
+        <div className="mt-8 grid gap-6 lg:grid-cols-[260px_1fr]">
+          <aside className="pipeline-panel h-fit p-3 lg:sticky lg:top-6">
+            <nav className="space-y-2">
+              {panelTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActivePanel(tab.key)}
+                  className={`w-full rounded px-4 py-3 text-left transition ${
+                    activePanel === tab.key ? "bg-brand-600 text-white shadow-lg shadow-brand-950/30" : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                  }`}
+                >
+                  <span className="block text-sm font-semibold">{tab.label}</span>
+                  <span className={`mt-1 block text-xs ${activePanel === tab.key ? "text-brand-100" : "text-slate-500"}`}>{tab.description}</span>
+                </button>
               ))}
-            </div>
+            </nav>
+          </aside>
 
-            <div className="mt-6 space-y-4">
-              {loading ? (
-                <EmptyState text="正在读取状态..." />
-              ) : itemEntries.length === 0 ? (
-                <EmptyState text={`还没有${itemName}进入流程。`} />
+          <main className="min-w-0">
+            {activePanel === "overview" && (
+              <section className="space-y-6">
+                <div className="grid gap-4 lg:grid-cols-5">
+                  {stages.map((stage) => (
+                    <StageCard
+                      key={stage.key}
+                      label={stage.label}
+                      value={status.counts?.[stage.key] || 0}
+                      accent={stage.accent || "text-brand-400"}
+                      active={Boolean(status.currentStep && (stage.activeSteps || [stage.key]).includes(status.currentStep))}
+                    />
+                  ))}
+                </div>
+                <section className="pipeline-panel p-5">
+                  <h2 className="text-lg font-bold text-white">工作台概览</h2>
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <SummaryCard label="流程文章" value={itemEntries.length} />
+                    <SummaryCard label="关键词数量" value={keywordRows.length} />
+                    <SummaryCard label="日志事件" value={status.log.length} />
+                  </div>
+                </section>
+              </section>
+            )}
+
+            {activePanel === "models" &&
+              (providerOptions ? (
+                <AiConfigPanel
+                  forms={aiForms}
+                  providerOptions={providerOptions}
+                  busy={aiBusy}
+                  testBusy={aiTestBusy}
+                  testResult={aiTestResult}
+                  onChange={(role, nextForm) => {
+                    setAiForms((current) => ({ ...current, [role]: nextForm }));
+                    if (role === "modelA") setProvider(nextForm.provider);
+                    setAiTestResult((current) => ({ ...current, [role]: null }));
+                  }}
+                  onSave={saveAiConfig}
+                  onTest={testAiConfig}
+                />
               ) : (
-                itemEntries.map((item) => {
-                  const itemId = getItemId(item);
+                <EmptyState text="当前工作流没有配置 AI 模型面板。" />
+              ))}
 
-                  return (
-                    <article key={itemId} className="rounded border border-slate-700 bg-slate-900/60 p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <h3 className="font-semibold text-white">{getItemTitle(item)}</h3>
-                          <p className="mt-1 text-xs text-slate-400">{itemId}</p>
-                        </div>
-                        <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{stageLabels[item.stage] || item.stage}</span>
-                      </div>
+            {activePanel === "prompts" && (
+              <PromptManager
+                prompts={promptFiles}
+                activeKey={activePromptKey}
+                draft={promptDraft}
+                busy={promptBusy}
+                onSelect={selectPrompt}
+                onDraftChange={setPromptDraft}
+                onSave={savePrompt}
+              />
+            )}
 
-                      {item.errors && item.errors.length > 0 && (
-                        <ul className="mt-3 space-y-1 text-xs text-rose-300">
-                          {item.errors.map((itemError) => (
-                            <li key={itemError}>- {itemError}</li>
-                          ))}
-                        </ul>
-                      )}
-
-                      {typeof item.reviewScore === "number" && (
-                        <div className="mt-3 rounded border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
-                          AI质检：{item.reviewScore} 分
-                          {typeof item.reviewRecommendation === "string" ? ` / ${item.reviewRecommendation}` : ""}
-                          {typeof item.reviewSummary === "string" ? ` / ${item.reviewSummary}` : ""}
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
-                        {(typeof item.reviewScore === "number" || typeof item.reviewReportPath === "string") && (
-                          <MiniButton label="质检报告" onClick={() => openReviewReport(item)} disabled={isBusy || keywordBusy === `review:${itemId}`} />
-                        )}
-                        {actions.map((action) => (
-                          <MiniButton key={action.key} label={action.label} onClick={() => runStep(action.key, itemId)} disabled={isBusy} />
-                        ))}
-                      </div>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-          </section>
-
-          <section className="pipeline-panel p-5">
-            <div className="flex items-center justify-between border-b border-slate-700 pb-5">
-              <div>
-                <h2 className="text-lg font-bold text-white">最近日志</h2>
-                <p className="mt-2 text-sm text-slate-400">展示流程脚本写入的最新状态事件。</p>
-              </div>
-              <div className="text-xs text-slate-500">{status.updatedAt ? new Date(status.updatedAt).toLocaleString("zh-CN") : "暂无更新时间"}</div>
-            </div>
-
-            <div className="mt-5 space-y-3">
-              {status.log.length === 0 ? (
-                <EmptyState text="还没有运行日志。" />
+            {activePanel === "keywords" &&
+              (keywordManager ? (
+                <KeywordManager
+                  rows={keywordRows}
+                  form={keywordForm}
+                  busy={keywordBusy}
+                  onFormChange={setKeywordForm}
+                  onAdd={addKeyword}
+                  onDelete={deleteKeyword}
+                  onPreview={previewKeyword}
+                />
               ) : (
-                status.log
-                  .slice()
-                  .reverse()
-                  .map((entry, index) => (
-                    <div key={`${entry.time}-${index}`} className="rounded border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-medium text-slate-200">{entry.message}</span>
-                        <span className="text-xs text-slate-500">{new Date(entry.time).toLocaleTimeString("zh-CN")}</span>
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {entry.step}
-                        {entry.slug || entry.id ? ` / ${entry.slug || entry.id}` : ""}
-                      </div>
-                    </div>
-                  ))
-              )}
-            </div>
-          </section>
+                <EmptyState text="当前工作流没有关键词文件面板。" />
+              ))}
+
+            {activePanel === "workflow" && (
+              <section className="pipeline-panel p-5">
+                <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
+                  <h2 className="text-lg font-bold text-white">流程操作</h2>
+                  <p className="text-sm text-slate-400">按流程阶段执行任务，运行时会自动刷新状态与日志。当前提供商：{provider}</p>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {actions.map((action) => (
+                    <ActionButton
+                      key={action.key}
+                      label={action.label}
+                      busyLabel={action.busyLabel}
+                      onClick={() => runStep(action.key)}
+                      disabled={isBusy}
+                      busy={submitting === `${action.key}:all`}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {loading ? (
+                    <EmptyState text="正在读取状态..." />
+                  ) : itemEntries.length === 0 ? (
+                    <EmptyState text={`还没有${itemName}进入流程。`} />
+                  ) : (
+                    itemEntries.map((item) => {
+                      const itemId = getItemId(item);
+
+                      return (
+                        <article key={itemId} className="rounded border border-slate-700 bg-slate-900/60 p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h3 className="font-semibold text-white">{getItemTitle(item)}</h3>
+                              <p className="mt-1 text-xs text-slate-400">{itemId}</p>
+                            </div>
+                            <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">{stageLabels[item.stage] || item.stage}</span>
+                          </div>
+
+                          {item.errors && item.errors.length > 0 && (
+                            <ul className="mt-3 space-y-1 text-xs text-rose-300">
+                              {item.errors.map((itemError) => (
+                                <li key={itemError}>- {itemError}</li>
+                              ))}
+                            </ul>
+                          )}
+
+                          {typeof item.reviewScore === "number" && (
+                            <div className="mt-3 rounded border border-cyan-500/30 bg-cyan-950/20 px-3 py-2 text-xs text-cyan-100">
+                              AI质检：{item.reviewScore} 分
+                              {typeof item.reviewRecommendation === "string" ? ` / ${item.reviewRecommendation}` : ""}
+                              {typeof item.reviewSummary === "string" ? ` / ${item.reviewSummary}` : ""}
+                            </div>
+                          )}
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <MiniButton label="查看/编辑" onClick={() => openArticleEditor(item)} disabled={isBusy || keywordBusy === `edit:${itemId}`} />
+                            {(typeof item.reviewScore === "number" || typeof item.reviewReportPath === "string") && (
+                              <MiniButton label="质检报告" onClick={() => openReviewReport(item)} disabled={isBusy || keywordBusy === `review:${itemId}`} />
+                            )}
+                            {actions.map((action) => (
+                              <MiniButton key={action.key} label={action.label} onClick={() => runStep(action.key, itemId)} disabled={isBusy} />
+                            ))}
+                          </div>
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </section>
+            )}
+
+            {activePanel === "logs" && (
+              <section className="pipeline-panel p-5">
+                <div className="flex items-center justify-between border-b border-slate-700 pb-5">
+                  <div>
+                    <h2 className="text-lg font-bold text-white">最近日志</h2>
+                    <p className="mt-2 text-sm text-slate-400">展示流程脚本写入的最新状态事件。</p>
+                  </div>
+                  <div className="text-xs text-slate-500">{status.updatedAt ? new Date(status.updatedAt).toLocaleString("zh-CN") : "暂无更新时间"}</div>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {status.log.length === 0 ? (
+                    <EmptyState text="还没有运行日志。" />
+                  ) : (
+                    status.log
+                      .slice()
+                      .reverse()
+                      .map((entry, index) => (
+                        <div key={`${entry.time}-${index}`} className="rounded border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-slate-200">{entry.message}</span>
+                            <span className="text-xs text-slate-500">{new Date(entry.time).toLocaleTimeString("zh-CN")}</span>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {entry.step}
+                            {entry.slug || entry.id ? ` / ${entry.slug || entry.id}` : ""}
+                          </div>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </section>
+            )}
+          </main>
         </div>
       </div>
 
@@ -778,7 +829,7 @@ function AiConfigPanel({
   const modelBTestResult = testResult.modelB;
 
   return (
-    <section className="pipeline-panel mt-8 p-5">
+    <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">AI 模型配置</h2>
         <p className="text-sm text-slate-400">模型A用于生成文章；模型B用于AI质检和AI重写。配置只保存在本地 local-brain/.env，API Key 不会提交到 Git。</p>
@@ -926,7 +977,7 @@ function PromptManager({
   const isDirty = Boolean(activePrompt && draft !== activePrompt.content);
 
   return (
-    <section className="pipeline-panel mt-8 p-5">
+    <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">Prompt 提示词</h2>
         <p className="text-sm text-slate-400">查看、修改并保存生成文章、AI质检和AI重写的提示词。保存后下一次运行对应 Agent 会立即使用新版提示词。</p>
@@ -997,7 +1048,7 @@ function KeywordManager({
   onPreview: (slug: string) => void;
 }) {
   return (
-    <section className="pipeline-panel mt-8 p-5">
+    <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">关键词文件</h2>
         <p className="text-sm text-slate-400">直接管理 local-brain/inputs/keywords.csv，新增后即可进入生成流程。</p>
@@ -1266,6 +1317,15 @@ function getItemId(item: WorkflowItem) {
 
 function getItemTitle(item: WorkflowItem) {
   return item.keyword || item.name || item.slug || item.id || "未命名任务";
+}
+
+function SummaryCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded border border-slate-800 bg-slate-900/60 p-4">
+      <p className="text-sm text-slate-400">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-white">{value}</p>
+    </div>
+  );
 }
 
 function StageCard({ label, value, accent, active = false }: { label: string; value: number; accent: string; active?: boolean }) {
