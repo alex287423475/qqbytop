@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { NextRequest, NextResponse } from "next/server";
+import { canEditArticleStage, getArticleEditMessages, shouldDeleteOriginalAfterSave } from "@/lib/pipeline-article-editor";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
@@ -9,8 +10,6 @@ export const runtime = "nodejs";
 type RouteContext = {
   params: Promise<{ slug: string }>;
 };
-
-const editableStages = ["draft", "validated", "approved"] as const;
 
 function assertDevOnly() {
   if (process.env.NODE_ENV === "production") {
@@ -117,7 +116,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     slug,
     locale,
     stage: article.stage,
-    editable: editableStages.includes(article.stage as (typeof editableStages)[number]),
+    editable: canEditArticleStage(article.stage),
     filePath: article.filePath,
     markdown,
     visualAssets: extractVisualAssets(markdown, locale, slug),
@@ -142,7 +141,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   const locale = getLocale(slug);
   const article = findArticleFile(locale, slug);
   if (!article) return NextResponse.json({ message: `没有找到文章文件：${slug}` }, { status: 404 });
-  if (!editableStages.includes(article.stage as (typeof editableStages)[number])) {
+  if (!canEditArticleStage(article.stage)) {
     return NextResponse.json({ message: "已发布文章不能在本地面板直接编辑，请新建修订稿后重新发布。" }, { status: 400 });
   }
 
@@ -150,11 +149,12 @@ export async function PUT(request: NextRequest, context: RouteContext) {
   fs.mkdirSync(path.dirname(draftPath), { recursive: true });
   fs.writeFileSync(draftPath, markdown, "utf-8");
 
-  if (article.filePath !== draftPath && fs.existsSync(article.filePath)) {
+  if (shouldDeleteOriginalAfterSave(article.stage, article.filePath, draftPath) && fs.existsSync(article.filePath)) {
     fs.unlinkSync(article.filePath);
   }
 
-  updateRuntimeStatus(slug, locale);
+  const messages = getArticleEditMessages(article.stage, slug);
+  updateRuntimeStatus(slug, locale, messages.logMessage);
 
   return NextResponse.json({
     success: true,
@@ -164,7 +164,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     filePath: draftPath,
     markdown,
     visualAssets: extractVisualAssets(markdown, locale, slug),
-    message: "已保存为草稿，请重新执行校验草稿。",
+    message: messages.responseMessage,
   });
 }
 
@@ -175,7 +175,7 @@ function looksLikeMojibake(markdown: string) {
   return suspicious.length >= 8 || replacementRuns.length > 0;
 }
 
-function updateRuntimeStatus(slug: string, locale: string) {
+function updateRuntimeStatus(slug: string, locale: string, logMessage: string) {
   const statusPath = path.join(process.cwd(), "local-brain", "status", "pipeline.runtime.json");
   if (!fs.existsSync(statusPath)) return;
 
@@ -195,7 +195,7 @@ function updateRuntimeStatus(slug: string, locale: string) {
     time: new Date().toISOString(),
     step: "edit",
     slug,
-    message: `已手动编辑并退回草稿：${slug}`,
+    message: logMessage,
   });
   fs.writeFileSync(statusPath, JSON.stringify(status, null, 2), "utf-8");
 }

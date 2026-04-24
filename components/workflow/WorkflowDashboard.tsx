@@ -1393,6 +1393,7 @@ function PreviewDialog({
   const [height, setHeight] = useState(72);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const bodyHeight = isFullscreen ? "calc(100vh - 82px)" : `${height}vh`;
+  const isPublishedRevision = preview.stage === "published";
 
   return (
     <div className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 ${isFullscreen ? "px-0" : "px-4"}`}>
@@ -1491,7 +1492,7 @@ function PreviewDialog({
                 disabled={saving}
                 className="mt-3 inline-flex rounded bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-slate-700"
               >
-                {saving ? "保存中" : "保存修改"}
+                {saving ? "保存中" : isPublishedRevision ? "保存为修订草稿" : "保存修改"}
               </button>
             )}
             {preview.editable && (
@@ -1520,7 +1521,13 @@ function PreviewDialog({
                 />
               </label>
             )}
-            {preview.editable && <p className="mt-3 text-xs leading-5 text-slate-500">保存后会退回草稿阶段，请重新执行“校验草稿”。</p>}
+            {preview.editable && (
+              <p className="mt-3 text-xs leading-5 text-slate-500">
+                {isPublishedRevision
+                  ? "保存后会从线上文章复制出一份修订草稿，当前网站内容不会立刻变化；继续执行“校验草稿”“审核通过”“发布网站”后才会替换线上版本。"
+                  : "保存后会退回草稿阶段，请重新执行“校验草稿”。"}
+              </p>
+            )}
             {preview.sourceType === "fact-source" && <p className="mt-3 text-xs leading-5 text-slate-500">资料包会在核心事实源模式生成时注入给模型。请只放脱敏材料和可公开使用的判断标准。</p>}
           </div>
           {preview.editable ? (
