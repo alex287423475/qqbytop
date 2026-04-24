@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { buildArticleListing } from "@/lib/article-listing";
 import { getAllArticles } from "@/lib/articles";
+import { BlogCategoryChips } from "@/components/shared/BlogCategoryChips";
 import { locales, type Locale } from "@/lib/site-data";
 
 const blogCopy: Record<Locale, { eyebrow: string; title: string; description: string; empty: string }> = {
@@ -67,30 +68,12 @@ export default async function BlogPage({
           <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">{blogCopy[normalized].title}</h1>
           <p className="mt-4 max-w-3xl text-base leading-8 text-slate-600">{blogCopy[normalized].description}</p>
           {listing.facets.length > 1 && (
-            <div className="mt-8 flex flex-wrap gap-3">
-              {listing.facets.map((facet) => {
-                const active = facet.value === listing.activeCategory;
-                return (
-                  <Link
-                    key={facet.value}
-                    href={buildBlogHref(normalized, facet.value, 1)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-5 py-3 text-base font-medium transition ${
-                      active
-                        ? "border-brand-600 bg-brand-600 text-white shadow-lg shadow-brand-100"
-                        : "border-slate-200 bg-white text-slate-700 shadow-sm hover:border-brand-300 hover:text-brand-700"
-                    }`}
-                  >
-                    <span>{facet.label}</span>
-                    <span
-                      className={`inline-flex min-w-7 items-center justify-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {facet.count}
-                    </span>
-                  </Link>
-                );
-              })}
+            <div className="mt-8">
+              <BlogCategoryChips
+                facets={listing.facets}
+                activeCategory={listing.activeCategory}
+                hrefFor={(category) => buildBlogHref(normalized, category, 1)}
+              />
             </div>
           )}
         </div>
