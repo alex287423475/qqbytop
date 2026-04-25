@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { CTA } from "@/components/shared/CTA";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { getAllArticles } from "@/lib/articles";
@@ -33,6 +34,21 @@ const scenarioEntries = [
   },
 ];
 
+const audienceEntries = [
+  {
+    title: "个人材料",
+    text: "证件、成绩单、无犯罪证明、银行流水、签证或移民材料，重点确认接收机构格式和是否需要盖章。",
+    href: "/search?q=证件翻译需要注意什么",
+    cta: "先看办理要点",
+  },
+  {
+    title: "企业项目",
+    text: "合同、技术手册、投标文件、跨境电商申诉、专利和合规材料，重点控制术语、格式、风险边界和交付计划。",
+    href: "/quote?source=home-business",
+    cta: "提交项目需求",
+  },
+];
+
 export const metadata = {
   title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
   description: "QQBY 全球博译提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
@@ -46,8 +62,17 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
   return (
     <>
-      <section className="bg-brand-900 text-white">
-        <div className="mx-auto max-w-7xl px-5 py-20 sm:py-28">
+      <section className="relative overflow-hidden bg-brand-900 text-white">
+        <Image
+          src="/skin/image/banner1.jpg"
+          alt="文件盖章与专业翻译交付场景"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover opacity-30"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-900 via-brand-900/92 to-brand-900/66" />
+        <div className="relative mx-auto max-w-7xl px-5 py-20 sm:py-28">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_380px] lg:items-center">
             <div className="max-w-3xl">
               <p className="inline-flex rounded-full border border-brand-500/40 px-4 py-1.5 text-sm text-brand-100">{home.badge}</p>
@@ -77,7 +102,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </div>
           <div className="mt-14 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {home.stats.map(([value, label]) => (
-              <div key={label} className="border border-slate-700 bg-slate-800/50 p-5">
+              <div key={label} className="border border-slate-700 bg-slate-800/70 p-5 backdrop-blur">
                 <div className="text-3xl font-bold">{value}</div>
                 <div className="mt-1 text-sm text-slate-400">{label}</div>
               </div>
@@ -126,6 +151,27 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-slate-200 bg-white py-12">
+        <div className="mx-auto grid max-w-7xl gap-5 px-5 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold text-brand-600">先分清用户类型</p>
+            <h2 className="mt-2 text-2xl font-bold text-brand-900">个人材料和企业项目，判断标准不一样</h2>
+            <p className="mt-3 text-sm leading-7 text-slate-600">
+              个人材料更看重接收机构要求；企业项目更看重术语一致、风险边界和批量交付。入口分开，后续报价也更准确。
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {audienceEntries.map((entry) => (
+              <Link key={entry.title} href={`/${locale}${entry.href}`} className="border border-slate-200 bg-slate-50 p-6 transition hover:border-brand-500 hover:bg-white hover:shadow-md">
+                <h3 className="text-lg font-bold text-brand-900">{entry.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{entry.text}</p>
+                <span className="mt-5 inline-flex text-sm font-semibold text-brand-600">{entry.cta}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>
