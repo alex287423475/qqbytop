@@ -5,6 +5,8 @@ import {
   assessQuoteLead,
   buildQuoteLeadTag,
   getQuoteLeadGroup,
+  getQuoteLeadGroupBadge,
+  getQuotePriorityBadge,
   getQuotePrioritySuggestion,
   getQuoteSourceLabel,
 } from "../lib/quote-lead.ts";
@@ -25,6 +27,8 @@ test("getQuoteLeadGroup separates leads by source", () => {
   assert.equal(getQuoteLeadGroup({ source: "blog", category: "" }), "博客线索");
   assert.equal(getQuoteLeadGroup({ source: "service", category: "" }), "服务页线索");
   assert.equal(getQuoteLeadGroup({ source: "direct", category: "" }), "直接询价线索");
+  assert.equal(getQuoteLeadGroupBadge({ source: "blog", category: "" }), "📝");
+  assert.equal(getQuoteLeadGroupBadge({ source: "pricing", category: "" }), "💰");
 });
 
 test("getQuotePrioritySuggestion upgrades high intent blog categories", () => {
@@ -54,9 +58,17 @@ test("assessQuoteLead returns a full lead operation summary", () => {
   assert.deepEqual(assessment, {
     sourceLabel: "服务页入口",
     leadGroup: "服务页线索",
+    leadGroupBadge: "🧩",
     priorityLabel: "高优先级",
+    priorityBadge: "🔥",
     followUpSuggestion: "建议 10 分钟内首次跟进",
     priorityReason: "来自服务页入口，购买意图明确，通常已在比较交付能力与响应速度。",
     leadTag: "服务页入口 / 技术翻译",
   });
+});
+
+test("getQuotePriorityBadge maps priority labels to visual markers", () => {
+  assert.equal(getQuotePriorityBadge("高优先级"), "🔥");
+  assert.equal(getQuotePriorityBadge("中高优先级"), "🟡");
+  assert.equal(getQuotePriorityBadge("常规优先级"), "⚪");
 });

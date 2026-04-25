@@ -6,7 +6,9 @@ export type QuoteLeadContext = {
 export type QuoteLeadAssessment = {
   sourceLabel: string;
   leadGroup: string;
+  leadGroupBadge: string;
   priorityLabel: string;
+  priorityBadge: string;
   followUpSuggestion: string;
   priorityReason: string;
   leadTag: string;
@@ -74,6 +76,26 @@ export function getQuoteLeadGroup({ source }: QuoteLeadContext) {
   }
 }
 
+export function getQuoteLeadGroupBadge({ source }: QuoteLeadContext) {
+  const normalized = normalizeSource(source);
+
+  switch (normalized) {
+    case "blog":
+      return "📝";
+    case "service":
+      return "🧩";
+    case "pricing":
+      return "💰";
+    case "industry":
+      return "🏭";
+    case "direct":
+    case "":
+      return "📞";
+    default:
+      return "📌";
+  }
+}
+
 export function buildQuoteLeadTag({ source, category }: QuoteLeadContext) {
   const sourceLabel = getQuoteSourceLabel(source);
   const normalizedCategory = normalizeCategory(category);
@@ -138,16 +160,33 @@ export function getQuotePrioritySuggestion({ source, category }: QuoteLeadContex
   }
 }
 
+export function getQuotePriorityBadge(priorityLabel: string) {
+  switch (priorityLabel) {
+    case "高优先级":
+      return "🔥";
+    case "中高优先级":
+      return "🟡";
+    case "常规优先级":
+      return "⚪";
+    default:
+      return "📍";
+  }
+}
+
 export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment {
   const sourceLabel = getQuoteSourceLabel(context.source);
   const leadGroup = getQuoteLeadGroup(context);
+  const leadGroupBadge = getQuoteLeadGroupBadge(context);
   const leadTag = buildQuoteLeadTag(context);
   const { priorityLabel, followUpSuggestion, priorityReason } = getQuotePrioritySuggestion(context);
+  const priorityBadge = getQuotePriorityBadge(priorityLabel);
 
   return {
     sourceLabel,
     leadGroup,
+    leadGroupBadge,
     priorityLabel,
+    priorityBadge,
     followUpSuggestion,
     priorityReason,
     leadTag,
