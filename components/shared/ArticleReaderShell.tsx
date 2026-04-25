@@ -61,6 +61,18 @@ type LightboxState = {
   alt: string;
 };
 
+function getImageTypeLabel(src: string, alt: string) {
+  const target = `${src} ${alt}`.toLowerCase();
+
+  if (target.includes("cover")) return "封面图";
+  if (target.includes("evidence-chain")) return "证据链图";
+  if (target.includes("risk-matrix")) return "风险矩阵图";
+  if (target.includes("workflow-map")) return "流程图";
+  if (target.includes("table") || target.includes("表")) return "对照图";
+
+  return "示意图";
+}
+
 export function ArticleReaderShell({ locale, article, quoteHref, copy, related }: ArticleReaderShellProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [activeSection, setActiveSection] = useState(article.sections[0]?.id ?? "");
@@ -75,24 +87,27 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
     if (!root) return;
 
     const images = Array.from(root.querySelectorAll("img"));
-    for (const image of images) {
+    images.forEach((image, index) => {
       image.classList.add("article-content-image");
       image.setAttribute("role", "button");
       image.setAttribute("tabindex", "0");
       image.setAttribute("aria-label", `${copy.imagePreviewHint}: ${image.alt || article.title}`);
 
-      if (image.dataset.captionReady === "true") continue;
+      if (image.dataset.captionReady === "true") return;
       image.dataset.captionReady = "true";
 
       const altText = image.alt?.trim();
-      if (!altText) continue;
+      if (!altText) return;
 
       const caption = document.createElement("span");
       caption.className = "article-image-caption";
-      caption.textContent = altText;
+      caption.innerHTML = [
+        `<span class="article-image-caption-label">图 ${index + 1} · ${getImageTypeLabel(image.currentSrc || image.src, altText)}</span>`,
+        `<span class="article-image-caption-text">${altText}</span>`,
+      ].join("");
 
       image.insertAdjacentElement("afterend", caption);
-    }
+    });
 
     const handleClick = (event: Event) => {
       const target = event.target;
@@ -397,12 +412,14 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
             <div className="fixed inset-0 z-40 bg-slate-950/45 lg:hidden" onClick={() => setMobileOutlineOpen(false)}>
               <div
                 id="article-mobile-outline"
-                className="absolute inset-x-4 bottom-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl"
+                className="absolute inset-x-0 bottom-0 rounded-t-[1.75rem] border border-slate-200 bg-white px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl"
                 role="dialog"
                 aria-modal="true"
                 aria-label={copy.articleOutline}
                 onClick={(event) => event.stopPropagation()}
               >
+                <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
+
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-brand-600">{copy.currentSectionLabel}</p>
@@ -419,7 +436,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                   </button>
                 </div>
 
-                <nav className="mt-4 max-h-[55vh] overflow-y-auto pr-1">
+                <nav className="mt-4 max-h-[65vh] overflow-y-auto pr-1">
                   <ul className="space-y-2">
                     {outlineItems.map((section) => {
                       const isActive = section.id === activeSection;
