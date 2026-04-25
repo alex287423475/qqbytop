@@ -108,36 +108,50 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
           </div>
 
           {results.length > 0 ? (
-            <div className="grid gap-5">
-              {results.map((result) => (
-                <article key={`${result.type}-${result.href}`} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-300 hover:shadow-md">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
-                      {searchTypeLabels[result.type]}
-                    </span>
-                    <span className="text-xs font-medium text-slate-400">{result.category}</span>
-                  </div>
-                  <h3 className="mt-4 text-2xl font-bold text-brand-900">
-                    <Link href={result.href} className="hover:text-brand-600">
-                      {result.title}
-                    </Link>
-                  </h3>
-                  <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">{result.description}</p>
-                  {result.keywords.length > 0 && (
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      {result.keywords.slice(0, 6).map((keyword) => (
-                        <span key={keyword} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                          {keyword}
-                        </span>
-                      ))}
+            <>
+              <div className="grid gap-5">
+                {results.map((result) => (
+                  <article key={`${result.type}-${result.href}`} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:border-brand-300 hover:shadow-md">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+                        {searchTypeLabels[result.type]}
+                      </span>
+                      <span className="text-xs font-medium text-slate-400">{result.category}</span>
                     </div>
-                  )}
-                  <Link href={result.href} className="mt-5 inline-flex text-sm font-semibold text-brand-600 hover:text-brand-500">
-                    进入页面
-                  </Link>
-                </article>
-              ))}
-            </div>
+                    <h3 className="mt-4 text-2xl font-bold text-brand-900">
+                      <Link href={result.href} className="hover:text-brand-600">
+                        {result.title}
+                      </Link>
+                    </h3>
+                    <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">{result.description}</p>
+                    {result.keywords.length > 0 && (
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {result.keywords.slice(0, 6).map((keyword) => (
+                          <span key={keyword} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                            {keyword}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <Link href={result.href} className="mt-5 inline-flex text-sm font-semibold text-brand-600 hover:text-brand-500">
+                      进入页面
+                    </Link>
+                  </article>
+                ))}
+              </div>
+              <div className="mt-8 rounded-3xl bg-brand-900 px-6 py-8 text-white shadow-sm sm:flex sm:items-center sm:justify-between sm:gap-8">
+                <div>
+                  <p className="text-sm font-semibold text-brand-100">搜索后仍不确定？</p>
+                  <h3 className="mt-2 text-2xl font-bold">把材料用途发来，我们直接判断翻译路径</h3>
+                  <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+                    说明文件类型、目标语种、提交机构和交付时间，我们会按真实项目边界给出报价建议。
+                  </p>
+                </div>
+                <Link href={`/${normalized}/quote?source=search&category=${encodeURIComponent(query)}`} className="mt-6 inline-flex rounded-full bg-white px-5 py-3 text-sm font-semibold text-brand-900 transition hover:bg-brand-50 sm:mt-0">
+                  提交询价
+                </Link>
+              </div>
+            </>
           ) : (
             <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-16 text-center">
               <h3 className="text-xl font-bold text-brand-900">没有找到匹配内容</h3>

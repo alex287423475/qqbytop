@@ -31,6 +31,7 @@ export function SearchAiAnswer({ query, locale, type }: SearchAiAnswerProps) {
   const [loading, setLoading] = useState(Boolean(query));
   const [payload, setPayload] = useState<SearchAiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const quoteHref = `/${locale}/quote?source=search&category=${encodeURIComponent(query)}`;
 
   useEffect(() => {
     if (!query.trim()) return;
@@ -105,6 +106,13 @@ export function SearchAiAnswer({ query, locale, type }: SearchAiAnswerProps) {
                   当前使用站内摘要模式。我们会先根据站内内容为您整理可参考的答案和相关页面。
                 </p>
               )}
+              <div className="mt-6 rounded-2xl border border-brand-100 bg-white p-4">
+                <p className="text-sm font-semibold text-brand-900">需要把这个问题落到具体文件或项目上？</p>
+                <p className="mt-2 text-sm leading-7 text-slate-600">提交材料类型、语种、用途和时限，我们会按实际场景判断服务路径与报价。</p>
+                <Link href={quoteHref} className="mt-4 inline-flex rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand-500">
+                  带着这个问题询价
+                </Link>
+              </div>
             </div>
 
             <aside className="rounded-2xl border border-slate-200 bg-white p-4">
