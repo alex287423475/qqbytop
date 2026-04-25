@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { KeywordResearchPanel } from "@/components/workflow/KeywordResearchPanel";
 
 export type WorkflowStage = {
   key: string;
@@ -878,6 +879,7 @@ export function WorkflowDashboard({
     { key: "overview", label: "运行概览", description: "查看当前各阶段数量" },
     { key: "models", label: "AI模型配置", description: "配置模型A、模型B和模型C" },
     { key: "prompts", label: "Prompt提示词", description: "编辑生成、质检、重写提示词" },
+    { key: "research", label: "关键词挖掘", description: "从种子词扩展候选关键词" },
     { key: "keywords", label: "关键词文件", description: "新增、删除和预览关键词" },
     { key: "baidu", label: "百度 Sitemap", description: "单条提交、批量提交和 sitemap 主动推送" },
     { key: "workflow", label: "流程操作", description: "执行生成、质检、重写、校验、审核、发布" },
@@ -972,6 +974,17 @@ export function WorkflowDashboard({
                 onSelect={selectPrompt}
                 onDraftChange={setPromptDraft}
                 onSave={savePrompt}
+              />
+            )}
+
+            {activePanel === "research" && (
+              <KeywordResearchPanel
+                apiBase={apiBase}
+                keywordApiBase={keywordManager?.apiBase}
+                onKeywordsChanged={() => {
+                  fetchKeywords().catch(() => undefined);
+                  fetchStatus().catch(() => undefined);
+                }}
               />
             )}
 
