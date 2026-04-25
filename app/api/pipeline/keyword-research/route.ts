@@ -20,6 +20,12 @@ type KeywordCandidate = {
   duplicate: boolean;
 };
 
+type DedupeResult = {
+  rows: KeywordCandidate[];
+  semanticGroups: number;
+  semanticRemoved: number;
+};
+
 type AiKeywordCandidate = Partial<Omit<KeywordCandidate, "locale" | "duplicate">> & {
   keyword?: string;
 };
@@ -290,6 +296,7 @@ function buildKeywordResearchSystemPrompt() {
     "你是北京全球博译翻译公司的 SEO 关键词策略师。",
     "你的任务是为翻译服务网站挖掘可转化、可写深度内容的中文关键词。",
     "优先考虑：询价词、比较词、风险词、办理流程词、合规标准词、核心事实源选题。",
+    "同一搜索意图不要重复输出近义词，例如“价格/报价/费用/多少钱”只能保留一个最适合作为主关键词的表达。",
     "不要生成宽泛空洞词，不要把 QQBY 单独作为关键词。",
     "只返回 JSON，不要 Markdown，不要解释。",
   ].join("\n");
@@ -604,6 +611,71 @@ function formatResponse(data: unknown) {
   return JSON.stringify(data).slice(0, 500);
 }
 
+function dedupeSemanticCandidates(rows: KeywordCandidate[], limit: number): DedupeResult {
+  const groups = new Map<string, KeywordCandidate[]>();
+
+  for (const row of rows) {
+    const key = createSemanticKey(row);
+    const group = groups.get(key) || [];
+    group.push(row);
+    groups.set(key, group);
+  }
+
+  const kept: KeywordCandidate[] = [];
+  let semanticRemoved = 0;
+  let semanticGroups = 0;
+
+  for (const group of groups.values()) {
+    const sorted = [...group].sort((a, b) => {
+      if (a.duplicate !== b.duplicate) return Number(a.duplicate) - Number(b.duplicate);
+      return b.score - a.score || a.keyword.length - b.keyword.length;
+    });
+    const winner = sorted[0];
+    const removed = sorted.slice(1);
+    if (removed.length > 0) {
+      semanticGroups += 1;
+      semanticRemoved += removed.length;
+      kept.push({
+        ...winner,
+        reason: `${winner.reason}；已归并相似词：${removed.map((item) => item.keyword).slice(0, 4).join("、")}`,
+      });
+    } else {
+      kept.push(winner);
+    }
+  }
+
+  return {
+    rows: kept
+      .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"))
+      .slice(0, limit),
+    semanticGroups,
+    semanticRemoved,
+  };
+}
+
+function createSemanticKey(row: KeywordCandidate) {
+  return [row.category, row.intent, normalizeKeywordTopic(row.keyword)].join("|");
+}
+
+function normalizeKeywordTopic(keyword: string) {
+  return keyword
+    .toLowerCase()
+    .replace(/[，,。.!！?？\s]/gu, "")
+    .replace(/北京全球博译翻译公司/gu, "翻译公司")
+    .replace(/一般|大概|通常|如何|怎么|怎样|需要|什么/gu, "")
+    .replace(/多少钱|多少费用|价格|报价|费用|收费|价钱|一页多少钱|每页多少钱/gu, "{price}")
+    .replace(/公司怎么选|哪家好|哪家靠谱|怎么选择|如何选择|推荐|对比/gu, "{choose}")
+    .replace(/注意事项|要注意|避坑|风险点|风险|常见错误|错误|问题/gu, "{risk}")
+    .replace(/流程|办理流程|怎么办理|多久能出|周期|交付时间/gu, "{process}")
+    .replace(/标准|交付标准|质量标准|合规标准|规范|要求/gu, "{standard}")
+    .replace(/常见问题|faq|问答/gu, "{faq}")
+    .replace(/公证认证|认证公证/gu, "{notarization}")
+    .replace(/盖章|翻译章|公司章/gu, "{stamp}")
+    .replace(/机器翻译|机翻|自动翻译/gu, "{mt}")
+    .replace(/翻译服务|专业翻译服务/gu, "翻译")
+    .replace(/(.)\1{2,}/gu, "$1$1");
+}
+
 export async function POST(request: NextRequest) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
@@ -620,13 +692,18 @@ export async function POST(request: NextRequest) {
   const limit = Math.max(1, Math.min(100, Number(body.limit) || 40));
 
   let rows: KeywordCandidate[] = [];
+  let semanticGroups = 0;
+  let semanticRemoved = 0;
   try {
     const aiRows = await createAiCandidates(seeds, limit, existingRows);
-    rows = aiRows
+    const normalizedRows = aiRows
       .map((row) => normalizeAiCandidate(row, existingSlugs, existingKeywords))
       .filter((row): row is KeywordCandidate => row !== null)
-      .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"))
-      .slice(0, limit);
+      .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"));
+    const deduped = dedupeSemanticCandidates(normalizedRows, limit);
+    rows = deduped.rows;
+    semanticGroups = deduped.semanticGroups;
+    semanticRemoved = deduped.semanticRemoved;
   } catch (error) {
     const message = error instanceof Error ? error.message : "未知错误";
     const status = message.includes("超过") || message.toLowerCase().includes("timeout") ? 504 : 400;
@@ -648,6 +725,8 @@ export async function POST(request: NextRequest) {
       duplicates: rows.filter((row) => row.duplicate).length,
       ai: rows.filter((row) => row.source === "模型C语义挖掘").length,
       local: 0,
+      semanticGroups,
+      semanticRemoved,
     },
   });
 }

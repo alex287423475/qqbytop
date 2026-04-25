@@ -81,7 +81,9 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       setProgress({ value: 100, label: "关键词挖掘完成。" });
       const engineLabel = payload?.engine === "modelC" ? "模型C语义挖掘" : "未知来源";
       const warning = payload?.warning ? ` ${payload.warning}` : "";
-      setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。来源：${engineLabel}。${warning}`);
+      const semanticRemoved = Number(payload?.summary?.semanticRemoved || 0);
+      const semanticText = semanticRemoved > 0 ? ` 已归并 ${semanticRemoved} 个相似候选词。` : "";
+      setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。来源：${engineLabel}。${semanticText}${warning}`);
     } catch (nextError) {
       const message = nextError instanceof Error && nextError.name === "AbortError" ? "关键词挖掘请求超过 60 秒未响应，请检查模型C连接，或稍后重试。" : nextError instanceof Error ? nextError.message : "关键词挖掘失败。";
       setProgress({ value: 0, label: "" });
