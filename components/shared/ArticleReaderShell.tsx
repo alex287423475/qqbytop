@@ -61,6 +61,13 @@ type LightboxState = {
   alt: string;
 };
 
+type OutlineHeading = {
+  id: string;
+  title: string;
+  index: number;
+  element: HTMLElement;
+};
+
 function getImageTypeLabel(src: string, alt: string) {
   const target = `${src} ${alt}`.toLowerCase();
 
@@ -81,12 +88,30 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
 
   const outlineItems = useMemo(() => article.sections.filter((section) => section.level === 2), [article.sections]);
   const hasOutline = outlineItems.length > 1;
+  const activeOutlineTitle = outlineItems.find((section) => section.id === activeSection)?.title ?? "";
 
   useEffect(() => {
     const root = contentRef.current;
     if (!root) return;
 
+    const headings = outlineItems
+      .map((section, index) => {
+        const selector = typeof CSS !== "undefined" && CSS.escape ? `#${CSS.escape(section.id)}` : `#${section.id}`;
+        const element = root.querySelector<HTMLElement>(selector);
+        if (!element) return null;
+
+        return {
+          id: section.id,
+          title: section.title,
+          index: index + 1,
+          element,
+        } satisfies OutlineHeading;
+      })
+      .filter((item): item is OutlineHeading => item !== null);
+
+    const figureCounts = new Map<number, number>();
     const images = Array.from(root.querySelectorAll("img"));
+
     images.forEach((image, index) => {
       image.classList.add("article-content-image");
       image.setAttribute("role", "button");
@@ -99,13 +124,27 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
       const altText = image.alt?.trim();
       if (!altText) return;
 
+      const nearestHeading = headings
+        .filter((item) => Boolean(item.element.compareDocumentPosition(image) & Node.DOCUMENT_POSITION_FOLLOWING))
+        .at(-1);
+
+      const sectionNumber = nearestHeading?.index ?? 0;
+      const sectionFigureNumber = (figureCounts.get(sectionNumber) ?? 0) + 1;
+      figureCounts.set(sectionNumber, sectionFigureNumber);
+
+      const figureCode = sectionNumber > 0 ? `${sectionNumber}-${sectionFigureNumber}` : `${index + 1}`;
       const caption = document.createElement("span");
       caption.className = "article-image-caption";
-      caption.innerHTML = [
-        `<span class="article-image-caption-label">图 ${index + 1} · ${getImageTypeLabel(image.currentSrc || image.src, altText)}</span>`,
-        `<span class="article-image-caption-text">${altText}</span>`,
-      ].join("");
 
+      const label = document.createElement("span");
+      label.className = "article-image-caption-label";
+      label.textContent = `图 ${figureCode} · ${getImageTypeLabel(image.currentSrc || image.src, altText)}`;
+
+      const text = document.createElement("span");
+      text.className = "article-image-caption-text";
+      text.textContent = altText;
+
+      caption.append(label, text);
       image.insertAdjacentElement("afterend", caption);
     });
 
@@ -140,7 +179,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
       root.removeEventListener("click", handleClick);
       root.removeEventListener("keydown", handleKeyDown);
     };
-  }, [article.title, copy.imagePreviewHint]);
+  }, [article.title, copy.imagePreviewHint, outlineItems]);
 
   useEffect(() => {
     if (!hasOutline) return;
@@ -217,7 +256,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                 <div>
                   <p className="text-sm font-semibold text-brand-600">{copy.quickOverview}</p>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {hasOutline ? `共 ${outlineItems.length} 个主要章节，可在右侧目录中快速定位。` : copy.imagePreviewHint}
+                    {hasOutline ? `${copy.articleOutline}: ${outlineItems.length}` : copy.imagePreviewHint}
                   </p>
                 </div>
               </div>
@@ -301,6 +340,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                     <ul className="space-y-2">
                       {outlineItems.map((section) => {
                         const isActive = section.id === activeSection;
+
                         return (
                           <li key={section.id}>
                             <a
@@ -309,7 +349,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                                 isActive
                                   ? "border-brand-200 bg-brand-50 font-semibold text-brand-700"
                                   : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-brand-600"
-                              } ${section.level === 3 ? "ml-4" : ""}`}
+                              }`}
                             >
                               {section.title}
                             </a>
@@ -323,9 +363,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
 
               <section className="rounded-3xl border border-brand-100 bg-brand-50/60 p-6 shadow-sm">
                 <p className="text-sm font-semibold text-brand-600">{copy.jumpToQuote}</p>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  继续沿着这篇文章的主题推进，我们会按当前分类预填询价上下文，减少来回沟通。
-                </p>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{copy.quoteCardText}</p>
                 <div className="mt-5 flex flex-col gap-3">
                   <Link
                     href={quoteHref}
@@ -403,7 +441,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
             <span>{copy.openOutline}</span>
             {activeSection && (
               <span className="max-w-[10rem] truncate rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-brand-100">
-                {outlineItems.find((section) => section.id === activeSection)?.title ?? activeSection}
+                {activeOutlineTitle || activeSection}
               </span>
             )}
           </button>
@@ -423,9 +461,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold text-brand-600">{copy.currentSectionLabel}</p>
-                    <h2 className="mt-1 text-lg font-bold text-brand-900">
-                      {outlineItems.find((section) => section.id === activeSection)?.title ?? copy.articleOutline}
-                    </h2>
+                    <h2 className="mt-1 text-lg font-bold text-brand-900">{activeOutlineTitle || copy.articleOutline}</h2>
                   </div>
                   <button
                     type="button"
@@ -440,6 +476,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                   <ul className="space-y-2">
                     {outlineItems.map((section) => {
                       const isActive = section.id === activeSection;
+
                       return (
                         <li key={section.id}>
                           <a
@@ -448,7 +485,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
                               isActive
                                 ? "border-brand-200 bg-brand-50 font-semibold text-brand-700"
                                 : "border-slate-200 text-slate-600 hover:border-brand-100 hover:bg-slate-50 hover:text-brand-600"
-                            } ${section.level === 3 ? "ml-4" : ""}`}
+                            }`}
                             onClick={() => setMobileOutlineOpen(false)}
                           >
                             {section.title}
