@@ -57,6 +57,25 @@ const quoteChecklist = [
   ["交付时间", "明确希望交付的日期和是否分批交付，便于评估加急通道和项目安排。"],
 ];
 
+const homeFaq = [
+  {
+    q: "没有整理好文件，可以先询价吗？",
+    a: "可以。先说明文件类型、用途、语种和大致页数，我们可以先给出范围判断；正式报价会以实际文件和交付要求为准。",
+  },
+  {
+    q: "个人证件翻译和企业文件翻译有什么区别？",
+    a: "个人材料通常更关注接收机构、盖章和格式要求；企业文件更关注术语一致、保密、批量交付和法律或技术风险边界。",
+  },
+  {
+    q: "能处理 PDF、扫描件或 SDLXLIFF 这类复杂格式吗？",
+    a: "可以。常见 Office、PDF、扫描件和 SDLXLIFF 等文件会先评估格式处理难度，再确认是否需要排版、标签保护或双语交付。",
+  },
+  {
+    q: "提交询价后多久会回复？",
+    a: "工作时间内通常会尽快响应。紧急项目建议同时说明最晚交付时间，便于我们判断是否能开启加急通道。",
+  },
+];
+
 export const metadata = {
   title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
   description: "QQBY 全球博译提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
@@ -96,6 +115,18 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           target: `${siteUrl}/search?q={search_term_string}`,
           "query-input": "required name=search_term_string",
         },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${siteUrl}/#homepage-faq`,
+        mainEntity: homeFaq.map((item) => ({
+          "@type": "Question",
+          name: item.q,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.a,
+          },
+        })),
       },
     ],
   };
@@ -313,6 +344,29 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       )}
 
       <section className="py-20">
+        <div className="mx-auto max-w-7xl px-5">
+          <SectionHeader title="提交前常见问题" subtitle="把这些问题提前说清楚，项目经理能更快判断报价、交付方式和风险边界。" />
+          <div className="mt-10 grid gap-5 md:grid-cols-2">
+            {homeFaq.map((item) => (
+              <div key={item.q} className="border border-slate-200 bg-white p-6">
+                <h3 className="text-lg font-bold text-brand-900">{item.q}</h3>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{item.a}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-8 rounded-3xl border border-brand-100 bg-brand-50 p-6 sm:flex sm:items-center sm:justify-between sm:gap-8">
+            <div>
+              <p className="text-sm font-semibold text-brand-700">还有不确定的地方？</p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">直接把问题和材料用途发来，我们会先判断是否需要翻译、盖章、排版或专业审校。</p>
+            </div>
+            <Link href={`/${locale}/quote?source=home-faq`} className="mt-5 inline-flex rounded-full bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-500 sm:mt-0">
+              带着问题询价
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-5">
           <SectionHeader title="客户评价" subtitle="来自长期合作客户的真实反馈。" />
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
