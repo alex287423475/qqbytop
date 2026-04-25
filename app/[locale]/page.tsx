@@ -4,7 +4,7 @@ import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { getAllArticles } from "@/lib/articles";
-import { home, services, type Locale } from "@/lib/site-data";
+import { home, industries, services, type Locale } from "@/lib/site-data";
 
 const searchSuggestions = ["证件翻译", "合同翻译报价", "跨境电商 POA", "SDLXLIFF", "专利翻译", "电气设备手册"];
 
@@ -324,20 +324,48 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           <SectionHeader title="翻译服务" subtitle="不同类型的文件需要不同的翻译策略。我们把服务拆成可评估、可交付、可复用的专业模块。" />
           <div className="mt-12 grid gap-6 md:grid-cols-2">
             {services.map((service) => (
-              <Link key={service.slug} href={`/${locale}/services/${service.slug}`} className="border border-slate-200 bg-white p-7 transition hover:border-brand-600 hover:shadow-lg">
+              <Link key={service.slug} href={`/${locale}/services/${service.slug}`} className="group border border-slate-200 bg-white p-7 transition hover:border-brand-600 hover:shadow-lg">
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-xl font-bold text-brand-900">{service.title}</h3>
                   <span className="shrink-0 bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-600">{service.badge}</span>
                 </div>
                 <p className="mt-4 leading-7 text-slate-600">{service.summary}</p>
-                <span className="mt-6 inline-flex text-sm font-semibold text-brand-600">了解详情</span>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {service.scenarios.slice(0, 2).map((item) => (
+                    <span key={item} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+                <span className="mt-6 inline-flex text-sm font-semibold text-brand-600 group-hover:text-brand-500">了解详情</span>
+              </Link>
+            ))}
+          </div>
+          <div className="mt-8 text-center">
+            <Link href={`/${locale}/services`} className="inline-flex rounded border border-brand-200 px-5 py-3 text-sm font-semibold text-brand-700 hover:border-brand-500 hover:bg-brand-50">
+              查看全部翻译服务
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20">
+        <div className="mx-auto max-w-7xl px-5">
+          <SectionHeader title="行业方案" subtitle="法律、跨境电商、科技和制造业的文件链路不同，方案页会说明行业痛点、材料场景和关联服务。" />
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {industries.map((industry) => (
+              <Link key={industry.slug} href={`/${locale}/industries/${industry.slug}`} className="group border border-slate-200 bg-white p-6 transition hover:border-brand-600 hover:shadow-lg">
+                <p className="text-sm font-semibold text-brand-600">{industry.badge}</p>
+                <h3 className="mt-4 text-xl font-bold leading-8 text-brand-900">{industry.title}</h3>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{industry.summary}</p>
+                <span className="mt-5 inline-flex text-sm font-semibold text-brand-600 group-hover:text-brand-500">查看行业方案</span>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-20">
+      <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-5">
           <SectionHeader eyebrow="技术引擎" title="让每一份文件经过工业级处理流程" subtitle="把复杂文件从接收、保护、翻译、审校到导出拆成可检查的步骤，降低格式损坏和术语漂移风险。" />
           <div className="mt-12 grid gap-5 lg:grid-cols-4">
