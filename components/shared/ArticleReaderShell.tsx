@@ -67,8 +67,8 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false);
 
-  const hasOutline = article.sections.length > 1;
-  const outlineItems = useMemo(() => article.sections.filter((section) => section.level <= 3), [article.sections]);
+  const outlineItems = useMemo(() => article.sections.filter((section) => section.level === 2), [article.sections]);
+  const hasOutline = outlineItems.length > 1;
 
   useEffect(() => {
     const root = contentRef.current;
