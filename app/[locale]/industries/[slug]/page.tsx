@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CTA } from "@/components/shared/CTA";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { getIndustry, getService, industries, type Locale } from "@/lib/site-data";
 
@@ -31,9 +32,64 @@ export default async function IndustryDetailPage({ params }: { params: Promise<{
   if (!industry) notFound();
 
   const operatingModel = industryOperatingModels[industry.slug] ?? industryOperatingModels.technology;
+  const pageUrl = `https://qqbytop.com/${locale}/industries/${industry.slug}`;
+  const industryJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Service",
+        "@id": `${pageUrl}#industry-service`,
+        name: industry.title,
+        description: industry.summary,
+        serviceType: "行业翻译方案",
+        provider: {
+          "@type": "Organization",
+          name: "北京全球博译翻译公司",
+          url: "https://qqbytop.com",
+        },
+        hasOfferCatalog: {
+          "@type": "OfferCatalog",
+          name: `${industry.title}关联服务`,
+          itemListElement: industry.relatedServices.map((serviceSlug) => {
+            const service = getService(serviceSlug);
+            return {
+              "@type": "Offer",
+              itemOffered: {
+                "@type": "Service",
+                name: service?.title ?? serviceSlug,
+                url: `https://qqbytop.com/${locale}/services/${serviceSlug}`,
+              },
+            };
+          }),
+        },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${pageUrl}#faq`,
+        mainEntity: industry.faq.map((item) => ({
+          "@type": "Question",
+          name: item.q,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.a,
+          },
+        })),
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${pageUrl}#breadcrumb`,
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "首页", item: `https://qqbytop.com/${locale}` },
+          { "@type": "ListItem", position: 2, name: "行业方案", item: `https://qqbytop.com/${locale}/industries` },
+          { "@type": "ListItem", position: 3, name: industry.title, item: pageUrl },
+        ],
+      },
+    ],
+  };
 
   return (
     <>
+      <JsonLd data={industryJsonLd} />
       <section className="bg-brand-900 py-16 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[minmax(0,0.95fr)_360px] lg:items-end">
           <div>

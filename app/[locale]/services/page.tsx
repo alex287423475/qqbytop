@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { services, type Locale } from "@/lib/site-data";
 
@@ -23,9 +24,24 @@ const serviceAssurances = [
 
 export default async function ServicesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  const pageUrl = `https://qqbytop.com/${locale}/services`;
+  const serviceListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${pageUrl}#service-list`,
+    name: "北京全球博译翻译服务",
+    itemListElement: services.map((service, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: `${pageUrl}/${service.slug}`,
+      name: service.title,
+      description: service.summary,
+    })),
+  };
 
   return (
     <>
+      <JsonLd data={serviceListJsonLd} />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">
           <p className="text-sm font-semibold text-brand-600">翻译服务</p>

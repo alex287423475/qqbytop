@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { industries, type Locale } from "@/lib/site-data";
 
@@ -16,9 +17,24 @@ const industryMethod = [
 
 export default async function IndustriesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  const pageUrl = `https://qqbytop.com/${locale}/industries`;
+  const industryListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "@id": `${pageUrl}#industry-list`,
+    name: "北京全球博译行业翻译方案",
+    itemListElement: industries.map((industry, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: `${pageUrl}/${industry.slug}`,
+      name: industry.title,
+      description: industry.summary,
+    })),
+  };
 
   return (
     <>
+      <JsonLd data={industryListJsonLd} />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">
           <p className="text-sm font-semibold text-brand-600">行业方案</p>

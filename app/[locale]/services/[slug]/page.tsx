@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CTA } from "@/components/shared/CTA";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
-import { getService, services, type Locale } from "@/lib/site-data";
+import { getService, industries, services, type Locale } from "@/lib/site-data";
 
 export function generateStaticParams() {
   return services.flatMap((service) => ["zh", "en", "ja"].map((locale) => ({ locale, slug: service.slug })));
@@ -46,9 +47,58 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
   if (!service) notFound();
 
   const enhancement = serviceEnhancements[service.slug] ?? serviceEnhancements["document-translation"];
+  const relatedIndustries = industries.filter((industry) => industry.relatedServices.includes(service.slug));
+  const pageUrl = `https://qqbytop.com/${locale}/services/${service.slug}`;
+  const serviceJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Service",
+        "@id": `${pageUrl}#service`,
+        name: service.title,
+        description: service.summary,
+        serviceType: service.shortTitle,
+        provider: {
+          "@type": "Organization",
+          name: "北京全球博译翻译公司",
+          url: "https://qqbytop.com",
+        },
+        areaServed: ["CN", "Global"],
+        offers: {
+          "@type": "Offer",
+          priceSpecification: {
+            "@type": "PriceSpecification",
+            description: service.price,
+          },
+        },
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${pageUrl}#faq`,
+        mainEntity: service.faq.map((item) => ({
+          "@type": "Question",
+          name: item.q,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.a,
+          },
+        })),
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${pageUrl}#breadcrumb`,
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "首页", item: `https://qqbytop.com/${locale}` },
+          { "@type": "ListItem", position: 2, name: "翻译服务", item: `https://qqbytop.com/${locale}/services` },
+          { "@type": "ListItem", position: 3, name: service.title, item: pageUrl },
+        ],
+      },
+    ],
+  };
 
   return (
     <>
+      <JsonLd data={serviceJsonLd} />
       <section className="bg-brand-900 py-16 text-white">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[minmax(0,0.9fr)_360px] lg:items-end">
           <div>
@@ -96,6 +146,23 @@ export default async function ServiceDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
       </section>
+
+      {relatedIndustries.length > 0 && (
+        <section className="py-16">
+          <div className="mx-auto max-w-7xl px-5">
+            <SectionHeader title="适用行业方案" subtitle="如果你的文件属于特定行业，可以从行业页继续查看风险点和材料链路。" />
+            <div className="mt-10 grid gap-6 md:grid-cols-2">
+              {relatedIndustries.map((industry) => (
+                <Link key={industry.slug} href={`/${locale}/industries/${industry.slug}`} className="border border-slate-200 bg-white p-6 hover:border-brand-600 hover:shadow-lg">
+                  <p className="text-sm font-semibold text-brand-600">{industry.badge}</p>
+                  <h3 className="mt-3 text-xl font-bold text-brand-900">{industry.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">{industry.summary}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="py-16">
         <div className="mx-auto grid max-w-7xl gap-8 px-5 lg:grid-cols-2">
