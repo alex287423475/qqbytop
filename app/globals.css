@@ -171,6 +171,17 @@ body {
   background: #f8fafc;
 }
 
+.prose-content img.article-content-image {
+  cursor: zoom-in;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.prose-content img.article-content-image:hover {
+  transform: translateY(-1px);
+  border-color: #93c5fd;
+  box-shadow: 0 14px 30px rgb(15 23 42 / 0.08);
+}
+
 .prose-content details {
   margin-top: 1rem;
   border-radius: 0.75rem;
