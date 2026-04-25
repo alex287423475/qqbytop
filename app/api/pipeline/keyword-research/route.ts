@@ -676,6 +676,31 @@ function normalizeKeywordTopic(keyword: string) {
     .replace(/(.)\1{2,}/gu, "$1$1");
 }
 
+function uniquifyCandidateSlugs(rows: KeywordCandidate[], existingSlugs: Set<string>, existingKeywords: Set<string>) {
+  const used = new Set(existingSlugs);
+
+  return rows.map((row) => {
+    const keywordExists = existingKeywords.has(row.keyword);
+    if (keywordExists) return { ...row, duplicate: true, score: Math.min(row.score, 45) };
+
+    const baseSlug = row.slug || generateResearchSlug(row.keyword);
+    let slug = baseSlug;
+    let index = 2;
+    while (used.has(slug)) {
+      slug = `${baseSlug}-${index}`;
+      index += 1;
+    }
+    used.add(slug);
+
+    return {
+      ...row,
+      slug,
+      duplicate: false,
+      reason: slug === row.slug ? row.reason : `${row.reason}；slug 已自动避让重复：${slug}`,
+    };
+  });
+}
+
 export async function POST(request: NextRequest) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
@@ -701,7 +726,7 @@ export async function POST(request: NextRequest) {
       .filter((row): row is KeywordCandidate => row !== null)
       .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"));
     const deduped = dedupeSemanticCandidates(normalizedRows, limit);
-    rows = deduped.rows;
+    rows = uniquifyCandidateSlugs(deduped.rows, existingSlugs, existingKeywords);
     semanticGroups = deduped.semanticGroups;
     semanticRemoved = deduped.semanticRemoved;
   } catch (error) {

@@ -22,6 +22,10 @@ type KeywordResearchPanelProps = {
   onKeywordsChanged?: () => void;
 };
 
+function getCandidateKey(candidate: KeywordCandidate, index: number) {
+  return `${candidate.slug || candidate.keyword}:${index}`;
+}
+
 export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChanged }: KeywordResearchPanelProps) {
   const [seeds, setSeeds] = useState("证件翻译\n合同翻译\n设备说明书翻译");
   const [limit, setLimit] = useState("40");
@@ -32,7 +36,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState({ value: 0, label: "" });
 
-  const selectedRows = useMemo(() => candidates.filter((candidate) => selected[candidate.slug] && !candidate.duplicate), [candidates, selected]);
+  const selectedRows = useMemo(() => candidates.filter((candidate, index) => selected[getCandidateKey(candidate, index)] && !candidate.duplicate), [candidates, selected]);
 
   useEffect(() => {
     if (busy !== "research") return;
@@ -77,7 +81,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
 
       const rows = (payload?.candidates || []) as KeywordCandidate[];
       setCandidates(rows);
-      setSelected(Object.fromEntries(rows.filter((row) => !row.duplicate && row.score >= 70).map((row) => [row.slug, true])));
+      setSelected(Object.fromEntries(rows.map((row, index) => [getCandidateKey(row, index), !row.duplicate && row.score >= 70])));
       setProgress({ value: 100, label: "关键词挖掘完成。" });
       const engineLabel = payload?.engine === "modelC" ? "模型C语义挖掘" : "未知来源";
       const warning = payload?.warning ? ` ${payload.warning}` : "";
@@ -118,7 +122,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       }
     }
 
-    setCandidates((current) => current.map((candidate) => (selected[candidate.slug] ? { ...candidate, duplicate: true, reason: "已加入关键词文件" } : candidate)));
+    setCandidates((current) => current.map((candidate, index) => (selected[getCandidateKey(candidate, index)] ? { ...candidate, duplicate: true, reason: "已加入关键词文件" } : candidate)));
     setSelected({});
     setLastMessage(`已加入 ${success} 个关键词。${failed.length ? `失败 ${failed.length} 个。` : ""}`);
     if (failed.length > 0) setError(failed.slice(0, 3).join("\n"));
@@ -128,8 +132,8 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
 
   function toggleAllAvailable() {
     const available = candidates.filter((candidate) => !candidate.duplicate);
-    const allSelected = available.length > 0 && available.every((candidate) => selected[candidate.slug]);
-    setSelected(Object.fromEntries(available.map((candidate) => [candidate.slug, !allSelected])));
+    const allSelected = available.length > 0 && candidates.every((candidate, index) => candidate.duplicate || selected[getCandidateKey(candidate, index)]);
+    setSelected(Object.fromEntries(candidates.map((candidate, index) => [getCandidateKey(candidate, index), !candidate.duplicate && !allSelected])));
   }
 
   return (
@@ -228,14 +232,14 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {candidates.map((candidate) => (
-              <tr key={candidate.slug} className={candidate.duplicate ? "text-slate-600" : "text-slate-200"}>
+            {candidates.map((candidate, index) => (
+              <tr key={getCandidateKey(candidate, index)} className={candidate.duplicate ? "text-slate-600" : "text-slate-200"}>
                 <td className="px-3 py-3">
                   <input
                     type="checkbox"
                     disabled={candidate.duplicate}
-                    checked={Boolean(selected[candidate.slug])}
-                    onChange={(event) => setSelected((current) => ({ ...current, [candidate.slug]: event.target.checked }))}
+                    checked={Boolean(selected[getCandidateKey(candidate, index)])}
+                    onChange={(event) => setSelected((current) => ({ ...current, [getCandidateKey(candidate, index)]: event.target.checked }))}
                     className="h-4 w-4 accent-brand-500"
                   />
                 </td>
