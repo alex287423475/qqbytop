@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type KeywordCandidate = {
   keyword: string;
@@ -30,19 +30,47 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
   const [candidates, setCandidates] = useState<KeywordCandidate[]>([]);
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState({ value: 0, label: "" });
 
   const selectedRows = useMemo(() => candidates.filter((candidate) => selected[candidate.slug] && !candidate.duplicate), [candidates, selected]);
+
+  useEffect(() => {
+    if (busy !== "research") return;
+
+    const timer = window.setInterval(() => {
+      setProgress((current) => {
+        if (current.value >= 90) return current;
+        const nextValue = Math.min(90, current.value + (current.value < 45 ? 8 : 3));
+        const nextLabel =
+          nextValue < 35
+            ? "正在整理种子词和已有关键词..."
+            : nextValue < 70
+              ? "正在调用模型C进行语义挖掘..."
+              : "正在等待模型C返回，超时会自动切换本地规则...";
+        return { value: nextValue, label: nextLabel };
+      });
+    }, 700);
+
+    return () => window.clearInterval(timer);
+  }, [busy]);
 
   async function researchKeywords() {
     setBusy("research");
     setError(null);
     setLastMessage(null);
+    setCandidates([]);
+    setSelected({});
+    setProgress({ value: 10, label: "正在整理种子词..." });
 
+    let timeout: number | undefined;
     try {
+      const controller = new AbortController();
+      timeout = window.setTimeout(() => controller.abort(), 22000);
       const response = await fetch(`${apiBase}/keyword-research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ seeds, limit: Number.parseInt(limit, 10) || 40 }),
+        signal: controller.signal,
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.message || "关键词挖掘失败。");
@@ -50,13 +78,17 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       const rows = (payload?.candidates || []) as KeywordCandidate[];
       setCandidates(rows);
       setSelected(Object.fromEntries(rows.filter((row) => !row.duplicate && row.score >= 70).map((row) => [row.slug, true])));
+      setProgress({ value: 100, label: "关键词挖掘完成。" });
       const engineLabel =
         payload?.engine === "modelC+local-rules" ? "模型C语义挖掘 + 本地规则补全" : payload?.engine === "modelC" ? "模型C语义挖掘" : "本地规则兜底";
       const warning = payload?.warning ? ` ${payload.warning}` : "";
       setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。来源：${engineLabel}。${warning}`);
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "关键词挖掘失败。");
+      const message = nextError instanceof Error && nextError.name === "AbortError" ? "关键词挖掘请求超过 22 秒未响应，请检查模型C连接，或稍后重试。" : nextError instanceof Error ? nextError.message : "关键词挖掘失败。";
+      setProgress({ value: 0, label: "" });
+      setError(message);
     } finally {
+      if (timeout !== undefined) window.clearTimeout(timeout);
       setBusy(null);
     }
   }
@@ -110,6 +142,18 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
 
       {error && <pre className="mt-5 whitespace-pre-wrap rounded border border-rose-500/40 bg-rose-950/30 px-4 py-3 text-sm text-rose-100">{error}</pre>}
       {lastMessage && <div className="mt-5 rounded border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm text-emerald-100">{lastMessage}</div>}
+      {busy === "research" && (
+        <div className="mt-5 rounded border border-brand-500/30 bg-brand-950/20 px-4 py-3">
+          <div className="flex items-center justify-between gap-4 text-sm text-brand-100">
+            <span>{progress.label || "正在准备关键词挖掘..."}</span>
+            <span className="font-mono">{progress.value}%</span>
+          </div>
+          <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div className="h-full rounded-full bg-brand-500 transition-all duration-500" style={{ width: `${progress.value}%` }} />
+          </div>
+          <p className="mt-2 text-xs text-slate-400">模型C最长等待约 15 秒；无响应时会自动使用本地规则返回候选词。</p>
+        </div>
+      )}
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_160px_auto]">
         <label className="flex flex-col gap-2 text-sm text-slate-300">

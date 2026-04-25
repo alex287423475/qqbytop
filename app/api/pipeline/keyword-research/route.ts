@@ -4,6 +4,8 @@ import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
 
+const MODEL_C_KEYWORD_TIMEOUT_MS = 15000;
+
 type KeywordCandidate = {
   keyword: string;
   slug: string;
@@ -373,18 +375,18 @@ async function callModelC(
   if (config.provider === "openai" || config.provider === "deepseek") {
     const endpoint = resolveOpenAICompatibleEndpoint(config.baseUrl || defaultBaseUrl(config.provider));
     const body = buildOpenAICompatibleBody(endpoint.type, config.model, systemPrompt, userPrompt, 0.25, 3000);
-    const response = await fetch(endpoint.url, {
+    const response = await fetchWithTimeout(endpoint.url, {
       method: "POST",
       headers: buildOpenAICompatibleHeaders(config.apiKey, endpoint.type),
       body: JSON.stringify(body),
-    });
+    }, MODEL_C_KEYWORD_TIMEOUT_MS);
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`${config.provider} request failed: ${response.status} ${formatResponse(data)}`);
     return requireModelText(config.provider, data);
   }
 
   if (config.provider === "gemini") {
-    const response = await fetch(resolveGeminiUrl(config.baseUrl, config.model, config.apiKey), {
+    const response = await fetchWithTimeout(resolveGeminiUrl(config.baseUrl, config.model, config.apiKey), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -392,14 +394,14 @@ async function callModelC(
         contents: [{ role: "user", parts: [{ text: userPrompt }] }],
         generationConfig: { temperature: 0.25, maxOutputTokens: 3000 },
       }),
-    });
+    }, MODEL_C_KEYWORD_TIMEOUT_MS);
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`gemini request failed: ${response.status} ${formatResponse(data)}`);
     return requireModelText("gemini", data);
   }
 
   if (config.provider === "claude") {
-    const response = await fetch(resolveClaudeUrl(config.baseUrl || "https://api.anthropic.com/v1/messages"), {
+    const response = await fetchWithTimeout(resolveClaudeUrl(config.baseUrl || "https://api.anthropic.com/v1/messages"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -413,13 +415,29 @@ async function callModelC(
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
       }),
-    });
+    }, MODEL_C_KEYWORD_TIMEOUT_MS);
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`claude request failed: ${response.status} ${formatResponse(data)}`);
     return requireModelText("claude", data);
   }
 
   throw new Error(`Unsupported modelC provider: ${config.provider}`);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`模型C请求超过 ${Math.round(timeoutMs / 1000)} 秒未响应`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function resolveOpenAICompatibleEndpoint(url: string) {
