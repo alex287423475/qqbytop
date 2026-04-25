@@ -15,6 +15,7 @@
     "brain:approve": "node local-brain/scripts/approve-article.mjs",
     "brain:publish": "node local-brain/scripts/publish-article.mjs",
     "brain:check-content": "node local-brain/scripts/check-content.mjs",
+    "brain:baidu-submit": "node local-brain/scripts/baidu-submit.mjs",
     "brain:deploy": "npm run brain:publish && npm run brain:check-content && npm run typecheck && npm run build"
   },
   "dependencies": {

@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getAllArticles, getAllArticleSlugs } from "@/lib/articles";
 import { industries, services } from "@/lib/site-data";
 
-const baseUrl = "https://qqbytop.com";
+const baseUrl = "https://www.qqbytop.com";
 const indexedLocales = ["zh"] as const;
 
 function parseLastModified(date: string | undefined) {
