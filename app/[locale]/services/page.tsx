@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
-import { buildSeoMetadata } from "@/lib/seo";
+import { buildBreadcrumbJsonLd, buildSeoMetadata, buildWebPageJsonLd } from "@/lib/seo";
 import { services, type Locale } from "@/lib/site-data";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -33,6 +33,19 @@ const serviceAssurances = [
 export default async function ServicesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const pageUrl = `https://qqbytop.com/${locale}/services`;
+  const pageTitle = "北京全球博译翻译服务";
+  const pageDescription = "专业文档翻译、法律合规翻译、跨境电商合规翻译、技术文档本地化与证件翻译服务总览。";
+  const pageJsonLd = buildWebPageJsonLd({
+    locale,
+    path: "/services",
+    name: pageTitle,
+    description: pageDescription,
+    type: "CollectionPage",
+  });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd({
+    locale,
+    items: [{ name: "翻译服务", path: "/services" }],
+  });
   const serviceListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -49,6 +62,8 @@ export default async function ServicesPage({ params }: { params: Promise<{ local
 
   return (
     <>
+      <JsonLd data={pageJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={serviceListJsonLd} />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">

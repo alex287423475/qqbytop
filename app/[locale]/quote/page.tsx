@@ -1,6 +1,7 @@
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SmartQuoteForm } from "@/components/quote/SmartQuoteForm";
 import { buildQuotePrefill } from "@/lib/quote-page";
-import { buildSeoMetadata } from "@/lib/seo";
+import { buildBreadcrumbJsonLd, buildSeoMetadata, buildWebPageJsonLd } from "@/lib/seo";
 import { locales, type Locale } from "@/lib/site-data";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -30,9 +31,22 @@ export default async function QuotePage({
     source: query.source,
     category: query.category,
   });
+  const pageJsonLd = buildWebPageJsonLd({
+    locale: normalized,
+    path: "/quote",
+    name: "获取翻译报价",
+    description: "在线提交翻译需求，获取北京全球博译项目经理的报价建议。",
+    type: "ContactPage",
+  });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd({
+    locale: normalized,
+    items: [{ name: "获取翻译报价", path: "/quote" }],
+  });
 
   return (
     <>
+      <JsonLd data={pageJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <section className="bg-brand-900 py-16 text-white">
         <div className="mx-auto max-w-5xl px-5">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:items-start">

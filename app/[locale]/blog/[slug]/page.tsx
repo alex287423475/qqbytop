@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ArticleReaderShell } from "@/components/shared/ArticleReaderShell";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { getArticle, getAllArticleSlugs, getAllArticles } from "@/lib/articles";
+import { defaultOgImage } from "@/lib/seo";
 import { locales, type Locale } from "@/lib/site-data";
 
 type BlogPostPageProps = {
@@ -122,6 +123,7 @@ function getBaseUrl() {
 
 function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof getArticle>>) {
   if (!article) return null;
+  const images = article.images.length > 0 ? article.images.map((image) => `${getBaseUrl()}${image}`) : [`${getBaseUrl()}${defaultOgImage}`];
 
   return {
     "@context": "https://schema.org",
@@ -132,7 +134,7 @@ function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof g
     dateModified: article.date,
     inLanguage: locale,
     keywords: article.keywords.join(", "),
-    image: article.images.map((image) => `${getBaseUrl()}${image}`),
+    image: images,
     mainEntityOfPage: `${getBaseUrl()}/${locale}/blog/${article.slug}`,
     author: {
       "@type": "Organization",
@@ -146,6 +148,10 @@ function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof g
     publisher: {
       "@type": "Organization",
       name: "北京全球博译翻译公司",
+      logo: {
+        "@type": "ImageObject",
+        url: `${getBaseUrl()}/brand/qqby-logo-pro.svg`,
+      },
     },
   };
 }
@@ -213,7 +219,7 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
   }
 
   const canonical = `${getBaseUrl()}/${normalized}/blog/${article.slug}`;
-  const ogImages = article.images.length > 0 ? article.images.map((image) => `${getBaseUrl()}${image}`) : undefined;
+  const ogImages = article.images.length > 0 ? article.images.map((image) => `${getBaseUrl()}${image}`) : [`${getBaseUrl()}${defaultOgImage}`];
 
   return {
     title: article.title,

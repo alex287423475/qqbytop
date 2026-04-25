@@ -111,3 +111,64 @@ export function buildSeoMetadata({
         },
   };
 }
+
+export function buildBreadcrumbJsonLd({
+  locale,
+  items,
+}: {
+  locale: string;
+  items: Array<{ name: string; path: string }>;
+}) {
+  const normalized = normalizeLocale(locale);
+  const entries = [{ name: "首页", path: "" }, ...items];
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: entries.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: absoluteUrl(buildLocalizedPath(normalized, item.path)),
+    })),
+  };
+}
+
+export function buildWebPageJsonLd({
+  locale,
+  path,
+  name,
+  description,
+  type = "WebPage",
+}: {
+  locale: string;
+  path: string;
+  name: string;
+  description: string;
+  type?: "WebPage" | "CollectionPage" | "ContactPage" | "AboutPage";
+}) {
+  const normalized = normalizeLocale(locale);
+  const url = absoluteUrl(buildLocalizedPath(normalized, path));
+
+  return {
+    "@context": "https://schema.org",
+    "@type": type,
+    "@id": `${url}#webpage`,
+    url,
+    name,
+    description,
+    isPartOf: {
+      "@type": "WebSite",
+      "@id": `${siteBaseUrl}/#website`,
+      name: siteName,
+      url: siteBaseUrl,
+    },
+    publisher: {
+      "@type": "Organization",
+      "@id": `${siteBaseUrl}/#organization`,
+      name: siteName,
+      url: siteBaseUrl,
+      logo: absoluteUrl("/brand/qqby-logo-pro.svg"),
+    },
+  };
+}

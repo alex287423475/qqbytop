@@ -2,7 +2,7 @@ import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
-import { buildSeoMetadata } from "@/lib/seo";
+import { buildBreadcrumbJsonLd, buildSeoMetadata, buildWebPageJsonLd } from "@/lib/seo";
 import { industries, type Locale } from "@/lib/site-data";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
@@ -26,6 +26,19 @@ const industryMethod = [
 export default async function IndustriesPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const pageUrl = `https://qqbytop.com/${locale}/industries`;
+  const pageTitle = "北京全球博译行业翻译方案";
+  const pageDescription = "法律、跨境电商、科技、制造业等行业的专业翻译、本地化与合规交付方案。";
+  const pageJsonLd = buildWebPageJsonLd({
+    locale,
+    path: "/industries",
+    name: pageTitle,
+    description: pageDescription,
+    type: "CollectionPage",
+  });
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd({
+    locale,
+    items: [{ name: "行业方案", path: "/industries" }],
+  });
   const industryListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -42,6 +55,8 @@ export default async function IndustriesPage({ params }: { params: Promise<{ loc
 
   return (
     <>
+      <JsonLd data={pageJsonLd} />
+      <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={industryListJsonLd} />
       <section className="bg-slate-50 py-16">
         <div className="mx-auto max-w-7xl px-5">
