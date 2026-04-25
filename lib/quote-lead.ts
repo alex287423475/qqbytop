@@ -13,6 +13,8 @@ export type QuoteLeadAssessment = {
   priorityReason: string;
   recommendedOpening: string;
   followUpFocus: string;
+  recommendedOwner: string;
+  ownerReason: string;
   leadTag: string;
 };
 
@@ -24,6 +26,18 @@ const HIGH_INTENT_BLOG_CATEGORIES = new Set([
   "技术本地化",
   "跨境合规",
   "跨境电商",
+]);
+
+const COMPLIANCE_CATEGORIES = new Set([
+  "法律翻译",
+  "法律合规",
+  "跨境合规",
+]);
+
+const DELIVERY_HEAVY_CATEGORIES = new Set([
+  "技术翻译",
+  "技术本地化",
+  "专业翻译",
 ]);
 
 function clean(value: string) {
@@ -234,6 +248,55 @@ export function getQuoteFollowUpGuide({ source, category }: QuoteLeadContext) {
   }
 }
 
+export function getQuoteOwnerRecommendation({ source, category }: QuoteLeadContext) {
+  const normalizedSource = normalizeSource(source);
+  const normalizedCategory = normalizeCategory(category);
+
+  if (COMPLIANCE_CATEGORIES.has(normalizedCategory)) {
+    return {
+      recommendedOwner: "合规顾问优先",
+      ownerReason: "当前分类涉及合规、法律或风险判断，先由合规顾问介入更容易快速识别边界和关键风险。",
+    };
+  }
+
+  if (DELIVERY_HEAVY_CATEGORIES.has(normalizedCategory)) {
+    return {
+      recommendedOwner: "项目经理优先",
+      ownerReason: "当前分类更依赖术语、流程和交付管理，先由项目经理确认范围和资源安排更稳妥。",
+    };
+  }
+
+  switch (normalizedSource) {
+    case "pricing":
+    case "service":
+      return {
+        recommendedOwner: "销售顾问优先",
+        ownerReason: "线索已接近报价或成交环节，先由销售顾问快速确认预算、时效和成交条件更合适。",
+      };
+    case "industry":
+      return {
+        recommendedOwner: "项目经理优先",
+        ownerReason: "行业方案线索通常需要先判断场景、术语和交付要求，由项目经理承接更容易切入。",
+      };
+    case "direct":
+    case "":
+      return {
+        recommendedOwner: "销售顾问优先",
+        ownerReason: "直接询价通常购买意图更强，先由销售顾问接住线索，必要时再转项目经理或合规顾问。",
+      };
+    case "blog":
+      return {
+        recommendedOwner: "销售顾问优先",
+        ownerReason: "博客线索需要先判断客户所处阶段和真实需求，先由销售顾问做初筛最有效率。",
+      };
+    default:
+      return {
+        recommendedOwner: "销售顾问优先",
+        ownerReason: "来源未标准化，先由销售顾问完成初筛，再根据需求深度转交更合适的角色。",
+      };
+  }
+}
+
 export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment {
   const sourceLabel = getQuoteSourceLabel(context.source);
   const leadGroup = getQuoteLeadGroup(context);
@@ -242,6 +305,7 @@ export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment 
   const { priorityLabel, followUpSuggestion, priorityReason } = getQuotePrioritySuggestion(context);
   const priorityBadge = getQuotePriorityBadge(priorityLabel);
   const { recommendedOpening, followUpFocus } = getQuoteFollowUpGuide(context);
+  const { recommendedOwner, ownerReason } = getQuoteOwnerRecommendation(context);
 
   return {
     sourceLabel,
@@ -253,6 +317,8 @@ export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment 
     priorityReason,
     recommendedOpening,
     followUpFocus,
+    recommendedOwner,
+    ownerReason,
     leadTag,
   };
 }
