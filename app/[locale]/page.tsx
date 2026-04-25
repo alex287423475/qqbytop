@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { CTA } from "@/components/shared/CTA";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { getAllArticles } from "@/lib/articles";
 import { home, services, type Locale } from "@/lib/site-data";
@@ -49,6 +50,13 @@ const audienceEntries = [
   },
 ];
 
+const quoteChecklist = [
+  ["文件用途", "签证、投标、法务审阅、平台申诉、技术交付等用途会影响翻译深度和交付格式。"],
+  ["目标语种", "说明源语言、目标语言，以及是否需要母语润色或目标市场本地化。"],
+  ["接收要求", "如是否需要盖章、双语对照、译员声明、固定模板、PDF排版或原格式还原。"],
+  ["交付时间", "明确希望交付的日期和是否分批交付，便于评估加急通道和项目安排。"],
+];
+
 export const metadata = {
   title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
   description: "QQBY 全球博译提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
@@ -59,9 +67,42 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
   const articles = getAllArticles(locale);
   const factSourceArticles = articles.filter((article) => article.contentMode === "fact-source").slice(0, 3);
   const featuredArticles = factSourceArticles.length ? factSourceArticles : articles.slice(0, 3);
+  const siteUrl = `https://qqbytop.com/${locale}`;
+  const homepageJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://qqbytop.com/#organization",
+        name: "北京全球博译翻译公司",
+        url: "https://qqbytop.com",
+        logo: "https://qqbytop.com/favicon.ico",
+        contactPoint: [
+          {
+            "@type": "ContactPoint",
+            contactType: "customer service",
+            availableLanguage: ["zh", "en", "ja"],
+          },
+        ],
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://qqbytop.com/#website",
+        name: "北京全球博译翻译公司",
+        url: "https://qqbytop.com",
+        publisher: { "@id": "https://qqbytop.com/#organization" },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: `${siteUrl}/search?q={search_term_string}`,
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
 
   return (
     <>
+      <JsonLd data={homepageJsonLd} />
       <section className="relative overflow-hidden bg-brand-900 text-white">
         <Image
           src="/skin/image/banner1.jpg"
@@ -186,6 +227,32 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <p className="mt-3 text-sm leading-7 text-slate-600">{entry.text}</p>
                 <span className="mt-5 inline-flex text-sm font-semibold text-brand-600">{entry.label}</span>
               </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-brand-900 py-16 text-white">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
+          <div>
+            <p className="text-sm font-semibold text-brand-100">询价前准备</p>
+            <h2 className="mt-3 text-3xl font-bold">发来这四类信息，报价会更准确</h2>
+            <p className="mt-4 text-sm leading-7 text-slate-300">
+              不需要先整理成正式需求书。只要把用途、语种、接收要求和时间说清楚，我们就能快速判断服务路径、风险点和交付方式。
+            </p>
+            <Link href={`/${locale}/quote?source=home-checklist`} className="mt-6 inline-flex rounded bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-500">
+              按清单提交询价
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {quoteChecklist.map(([title, text], index) => (
+              <div key={title} className="border border-slate-700 bg-slate-800/70 p-5">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-brand-900">{index + 1}</span>
+                  <h3 className="font-bold">{title}</h3>
+                </div>
+                <p className="mt-4 text-sm leading-7 text-slate-300">{text}</p>
+              </div>
             ))}
           </div>
         </div>
