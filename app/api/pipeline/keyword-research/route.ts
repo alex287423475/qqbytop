@@ -340,6 +340,10 @@ async function callModelC(
   systemPrompt: string,
   userPrompt: string,
 ) {
+  if (config.provider === "deepseek" && /api\.deepseek\.cc/iu.test(config.baseUrl || "")) {
+    throw new Error("DeepSeek 官方接口地址是 https://api.deepseek.com/v1；当前配置的 api.deepseek.cc 无法稳定连接，请先修正模型C Base URL。");
+  }
+
   if (config.provider === "openai" || config.provider === "deepseek") {
     const endpoint = resolveOpenAICompatibleEndpoint(config.baseUrl || defaultBaseUrl(config.provider));
     const body = buildOpenAICompatibleBody(endpoint.type, config.model, systemPrompt, userPrompt, 0.25, 3000);

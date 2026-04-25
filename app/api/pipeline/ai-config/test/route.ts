@@ -45,6 +45,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, provider, model, message: "API Key is required for this provider." }, { status: 400 });
   }
 
+  if (provider === "deepseek" && /api\.deepseek\.cc/iu.test(baseUrl)) {
+    return NextResponse.json(
+      {
+        success: false,
+        role,
+        provider,
+        model,
+        latencyMs: Date.now() - startedAt,
+        message: "DeepSeek 官方接口地址是 https://api.deepseek.com/v1；当前填写的 api.deepseek.cc 无法稳定连接，请改成官方地址后再测试。",
+      },
+      { status: 400 },
+    );
+  }
+
   try {
     const result = await testProvider({ provider, baseUrl, model, apiKey });
     return NextResponse.json({
