@@ -1,28 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 180" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1570 535" role="img" aria-labelledby="title desc">
   <title id="title">全球博译 Pro Compliance</title>
   <desc id="desc">北京全球博译翻译公司网站标识浅色版</desc>
   <defs>
-    <linearGradient id="brandBlue" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#60a5fa"/>
-      <stop offset="100%" stop-color="#dbeafe"/>
+    <linearGradient id="blue" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#60a5fa"/>
+      <stop offset="1" stop-color="#dbeafe"/>
     </linearGradient>
-    <linearGradient id="brandCyan" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#22d3ee"/>
-      <stop offset="100%" stop-color="#06b6d4"/>
+    <linearGradient id="cyan" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#06b6d4"/>
     </linearGradient>
   </defs>
 
-  <g transform="translate(24 18)">
-    <path d="M78 2c41 0 75 21 94 52-20-18-47-29-78-29-56 0-101 43-101 96 0 10 2 20 5 30-23-16-38-42-38-72C-40 36 13 2 78 2Z" fill="url(#brandBlue)" transform="translate(40 0)"/>
-    <path d="M2 112c25 35 68 56 116 56 42 0 80-16 106-42-16 42-57 71-106 71-55 0-103-37-116-85Z" fill="url(#brandCyan)" transform="translate(0 -28)"/>
-    <circle cx="118" cy="82" r="58" fill="none" stroke="#dbeafe" stroke-width="7"/>
-    <path d="M60 82h116M118 24c16 16 25 36 25 58s-9 42-25 58M118 24c-16 16-25 36-25 58s9 42 25 58M76 50c22 12 62 12 84 0M76 114c22-12 62-12 84 0" fill="none" stroke="#bfdbfe" stroke-linecap="round" stroke-width="5"/>
-    <path d="M121 83c22 0 42-8 58-22v44c0 34-21 58-58 75-37-17-58-41-58-75V61c16 14 36 22 58 22Z" fill="#0f172a" stroke="#dbeafe" stroke-width="7"/>
-    <path d="m98 117 22 23 47-55" fill="none" stroke="#22d3ee" stroke-linecap="round" stroke-linejoin="round" stroke-width="12"/>
+  <g transform="translate(0 18) scale(.92)">
+    <path d="M272 0c111 0 207 48 268 125-57-45-130-72-209-72-158 0-286 122-286 273 0 29 5 58 14 84C22 368 0 313 0 253 0 113 121 0 272 0Z" fill="url(#blue)"/>
+    <path d="M27 340c68 86 174 141 294 141 104 0 197-41 266-107-48 96-151 161-269 161-136 0-255-82-291-195Z" fill="url(#cyan)"/>
+
+    <g transform="translate(150 75)">
+      <circle cx="208" cy="176" r="151" fill="none" stroke="#dbeafe" stroke-width="16"/>
+      <path d="M57 176h302M208 25c42 42 66 94 66 151s-24 109-66 151M208 25c-42 42-66 94-66 151s24 109 66 151M96 91c56 31 168 31 224 0M96 261c56-31 168-31 224 0" fill="none" stroke="#bfdbfe" stroke-linecap="round" stroke-width="12"/>
+    </g>
+
+    <path d="M405 292c38 0 73-13 102-38v83c0 69-40 118-102 150-62-32-102-81-102-150v-83c29 25 64 38 102 38Z" fill="#0f172a" stroke="#dbeafe" stroke-linejoin="round" stroke-width="14"/>
+    <path d="m363 367 39 42 83-98" fill="none" stroke="#22d3ee" stroke-linecap="round" stroke-linejoin="round" stroke-width="24"/>
   </g>
 
   <g fill="#f8fafc">
-    <text x="270" y="96" font-family="Microsoft YaHei, PingFang SC, Noto Sans SC, Arial, sans-serif" font-size="76" font-weight="800" letter-spacing="4">全球博译</text>
-    <text x="276" y="148" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" letter-spacing="14">PRO COMPLIANCE</text>
+    <text x="635" y="255" font-family="Microsoft YaHei, PingFang SC, Noto Sans SC, Arial, sans-serif" font-size="195" font-weight="900" letter-spacing="8" textLength="895" lengthAdjust="spacingAndGlyphs">全球博译</text>
+    <text x="650" y="405" font-family="Arial, Helvetica, sans-serif" font-size="78" font-weight="700" letter-spacing="13" textLength="860" lengthAdjust="spacingAndGlyphs">PRO COMPLIANCE</text>
   </g>
 </svg>

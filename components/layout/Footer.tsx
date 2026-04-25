@@ -14,8 +14,8 @@ export function Footer({ locale }: { locale: Locale }) {
           <Image
             src="/brand/qqby-logo-light.svg"
             alt="全球博译 Pro Compliance"
-            width={220}
-            height={52}
+            width={176}
+            height={60}
             className="h-12 w-auto"
           />
           <p className="mt-4 text-sm leading-7 text-slate-300">

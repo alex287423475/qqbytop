@@ -31,8 +31,8 @@ export function Header({ locale }: { locale: Locale }) {
           <Image
             src="/brand/qqby-logo.svg"
             alt="全球博译 Pro Compliance"
-            width={228}
-            height={54}
+            width={176}
+            height={60}
             priority
             className="h-10 w-auto sm:h-12"
           />
