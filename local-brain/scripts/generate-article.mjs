@@ -14,8 +14,17 @@ const factSourcesDir = path.resolve("local-brain/inputs/fact-sources");
 
 function parseArgs() {
   const slugIndex = process.argv.indexOf("--slug");
+  const slugsIndex = process.argv.indexOf("--slugs");
+  const slugs =
+    slugsIndex >= 0
+      ? String(process.argv[slugsIndex + 1] || "")
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : [];
   return {
     slug: slugIndex >= 0 ? process.argv[slugIndex + 1] : null,
+    slugs,
   };
 }
 
@@ -181,14 +190,17 @@ function validateGeneratedMarkdown(markdown) {
 }
 
 async function main() {
-  const { slug } = parseArgs();
+  const { slug, slugs } = parseArgs();
   const keywords = readCsv(path.join(inputsDir, "keywords.csv"));
   const redLines = readCsv(path.join(inputsDir, "red-lines.csv")).map((item) => item.word);
   const provider = process.env.AI_PROVIDER || "mock";
   const systemPrompt = readPromptFile("article-system.md");
   const standardUserPromptTemplate = readPromptFile("article-user.md");
   const factSourceUserPromptTemplate = readPromptFile("article-fact-source-user.md", standardUserPromptTemplate);
-  const rows = slug ? keywords.filter((item) => item.slug === slug) : keywords.filter((item) => !hasGeneratedArtifact(item));
+  const selectedSlugs = new Set(slugs.length > 0 ? slugs : slug ? [slug] : []);
+  const rows = selectedSlugs.size > 0
+    ? keywords.filter((item) => selectedSlugs.has(item.slug))
+    : keywords.filter((item) => !hasGeneratedArtifact(item));
 
   if (rows.length === 0) {
     appendLog("generate", "没有待生成的关键词。若要重写已有文章，请在文章卡片上单独点击生成。");

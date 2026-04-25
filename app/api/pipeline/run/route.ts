@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Pipeline console is disabled in production." }, { status: 403 });
   }
 
-  const body = (await request.json().catch(() => ({}))) as { step?: string; slug?: string; provider?: string };
+  const body = (await request.json().catch(() => ({}))) as { step?: string; slug?: string; slugs?: string[]; provider?: string };
   const step = body.step || "";
   const script = scriptMap[step];
 
@@ -55,7 +55,10 @@ export async function POST(request: NextRequest) {
   }
 
   const args = [path.join(process.cwd(), "local-brain", "scripts", script)];
-  if (body.slug) {
+  const slugs = Array.isArray(body.slugs) ? body.slugs.map((slug) => String(slug || "").trim()).filter(Boolean) : [];
+  if (slugs.length > 0) {
+    args.push("--slugs", slugs.join(","));
+  } else if (body.slug) {
     args.push("--slug", body.slug);
   }
 

@@ -51,6 +51,10 @@ type KeywordRow = {
   intent: string;
   priority: string;
   contentMode?: string;
+  articleStatus?: string;
+  articleStatusLabel?: string;
+  articleUrl?: string | null;
+  generated?: boolean;
 };
 
 type KeywordOptions = {
@@ -319,6 +323,7 @@ export function WorkflowDashboard({
   const [baiduSitemapLimit, setBaiduSitemapLimit] = useState("10");
   const [baiduBusy, setBaiduBusy] = useState<"single" | "batch" | "sitemap" | null>(null);
   const [baiduResult, setBaiduResult] = useState<BaiduSubmitResult | null>(null);
+  const [selectedKeywordSlugs, setSelectedKeywordSlugs] = useState<Record<string, boolean>>({});
 
   async function fetchStatus() {
     const response = await fetch(`${apiBase}/status`, { cache: "no-store" });
@@ -451,6 +456,10 @@ export function WorkflowDashboard({
     const source = status.items || status.articles || {};
     return Object.values(source).sort((a, b) => getItemTitle(a).localeCompare(getItemTitle(b), "zh-Hans-CN"));
   }, [status.items, status.articles]);
+  const selectedKeywordRows = useMemo(
+    () => keywordRows.filter((row) => selectedKeywordSlugs[row.slug]),
+    [keywordRows, selectedKeywordSlugs],
+  );
 
   async function saveAiConfig(role: AiRole) {
     if (aiTestBusy === role) return;
@@ -569,6 +578,42 @@ export function WorkflowDashboard({
     } finally {
       setSubmitting(null);
     }
+  }
+
+  async function runGenerateForSelectedKeywords() {
+    const slugs = selectedKeywordRows.map((row) => row.slug);
+    if (slugs.length === 0) return;
+    setSubmitting("generate:selected");
+
+    try {
+      const response = await fetch(`${apiBase}/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "generate", slugs }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.message || "选中关键词生成失败。");
+      }
+
+      setSelectedKeywordSlugs({});
+      await Promise.all([fetchStatus(), fetchKeywords()]);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "选中关键词生成失败。");
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  function toggleKeywordSlug(slug: string, checked: boolean) {
+    setSelectedKeywordSlugs((current) => ({ ...current, [slug]: checked }));
+  }
+
+  function toggleAllKeywordSlugs() {
+    const selectable = keywordRows.filter((row) => row.slug);
+    const allSelected = selectable.length > 0 && selectable.every((row) => selectedKeywordSlugs[row.slug]);
+    setSelectedKeywordSlugs(Object.fromEntries(selectable.map((row) => [row.slug, !allSelected])));
   }
 
   async function submitBaidu(mode: "single" | "batch" | "sitemap") {
@@ -1016,11 +1061,15 @@ export function WorkflowDashboard({
                   rows={keywordRows}
                   options={keywordOptions}
                   form={keywordForm}
+                  selectedSlugs={selectedKeywordSlugs}
                   busy={keywordBusy}
                   optionBusy={keywordOptionBusy}
                   slugTouched={slugTouched}
                   onFormChange={setKeywordForm}
                   onSlugTouched={setSlugTouched}
+                  onToggleSlug={toggleKeywordSlug}
+                  onToggleAll={toggleAllKeywordSlugs}
+                  onGenerateSelected={runGenerateForSelectedKeywords}
                   onAdd={addKeyword}
                   onAddOption={addKeywordOption}
                   onDeleteOption={deleteKeywordOption}
@@ -1055,6 +1104,45 @@ export function WorkflowDashboard({
                   <p className="text-sm text-slate-400">
                     主流程是生成文章、AI质检、AI重写、校验、审核、发布。生成文章会自动生成封面和正文配图；“刷新配图”只用于旧文章补图或手动编辑后重建图片。当前提供商：{provider}
                   </p>
+                </div>
+
+                <div className="mt-5 rounded border border-slate-700 bg-slate-950/50 p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">按关键词选择生成范围</h3>
+                      <p className="mt-1 text-xs text-slate-400">
+                        当前已选 {selectedKeywordRows.length} 个关键词。点击“生成选中关键词文章”后，只会处理这些关键词，不会全量生成。
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={toggleAllKeywordSlugs}
+                        disabled={keywordRows.length === 0 || isBusy}
+                        className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:border-brand-500 disabled:text-slate-600"
+                      >
+                        全选/取消关键词
+                      </button>
+                      <button
+                        type="button"
+                        onClick={runGenerateForSelectedKeywords}
+                        disabled={selectedKeywordRows.length === 0 || isBusy}
+                        className="rounded bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:bg-slate-700"
+                      >
+                        {submitting === "generate:selected" ? "生成中..." : "生成选中关键词文章"}
+                      </button>
+                    </div>
+                  </div>
+                  {selectedKeywordRows.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedKeywordRows.slice(0, 12).map((row) => (
+                        <span key={row.slug} className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">
+                          {row.keyword}
+                        </span>
+                      ))}
+                      {selectedKeywordRows.length > 12 && <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">+{selectedKeywordRows.length - 12}</span>}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -1584,11 +1672,15 @@ function KeywordManager({
   rows,
   options,
   form,
+  selectedSlugs,
   busy,
   optionBusy,
   slugTouched,
   onFormChange,
   onSlugTouched,
+  onToggleSlug,
+  onToggleAll,
+  onGenerateSelected,
   onAdd,
   onAddOption,
   onDeleteOption,
@@ -1599,11 +1691,15 @@ function KeywordManager({
   rows: KeywordRow[];
   options: KeywordOptions;
   form: KeywordRow;
+  selectedSlugs: Record<string, boolean>;
   busy: string | null;
   optionBusy: string | null;
   slugTouched: boolean;
   onFormChange: (form: KeywordRow) => void;
   onSlugTouched: (touched: boolean) => void;
+  onToggleSlug: (slug: string, checked: boolean) => void;
+  onToggleAll: () => void;
+  onGenerateSelected: () => void;
   onAdd: () => void;
   onAddOption: (type: "category" | "intent", value: string) => void;
   onDeleteOption: (type: "category" | "intent", value: string) => void;
@@ -1613,12 +1709,33 @@ function KeywordManager({
 }) {
   const categoryOptions = mergeSelectOptions([...options.category, ...rows.flatMap((row) => splitMultiValue(row.category)), ...splitMultiValue(form.category)]);
   const intentOptions = mergeSelectOptions([...options.intent, ...rows.flatMap((row) => splitMultiValue(row.intent)), ...splitMultiValue(form.intent)]);
+  const selectedCount = rows.filter((row) => selectedSlugs[row.slug]).length;
 
   return (
     <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">关键词文件</h2>
         <p className="text-sm text-slate-400">直接管理 local-brain/inputs/keywords.csv，新增后即可进入生成流程。</p>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 rounded border border-slate-700 bg-slate-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-white">文章生成状态与批量选择</p>
+          <p className="mt-1 text-xs text-slate-400">已选择 {selectedCount} 个关键词。可在这里勾选，也可到“流程操作”里启动生成。</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={onToggleAll} className="rounded border border-slate-700 px-3 py-2 text-xs text-slate-200 hover:border-brand-500">
+            全选/取消
+          </button>
+          <button
+            type="button"
+            onClick={onGenerateSelected}
+            disabled={selectedCount === 0}
+            className="rounded bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:bg-slate-700"
+          >
+            生成选中关键词文章
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_1fr_0.65fr_0.85fr_0.85fr_0.6fr_0.9fr_auto_auto]">
@@ -1684,7 +1801,9 @@ function KeywordManager({
           <thead className="border-b border-slate-700 text-xs uppercase text-slate-500">
             <tr>
               <th className="px-3 py-3">关键词</th>
+              <th className="px-3 py-3">选择</th>
               <th className="px-3 py-3">slug</th>
+              <th className="px-3 py-3">文章状态</th>
               <th className="px-3 py-3">语言</th>
               <th className="px-3 py-3">分类</th>
               <th className="px-3 py-3">意图</th>
@@ -1697,7 +1816,20 @@ function KeywordManager({
             {rows.map((row) => (
               <tr key={row.slug} className="text-slate-200">
                 <td className="max-w-xs px-3 py-3 font-medium">{row.keyword}</td>
+                <td className="px-3 py-3">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(selectedSlugs[row.slug])}
+                    onChange={(event) => onToggleSlug(row.slug, event.target.checked)}
+                    className="h-4 w-4 accent-brand-500"
+                  />
+                </td>
                 <td className="px-3 py-3 text-slate-400">{row.slug}</td>
+                <td className="px-3 py-3">
+                  <span className={`rounded-full px-2 py-1 text-xs ${row.generated ? "bg-emerald-500/15 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
+                    {row.articleStatusLabel || "未生成"}
+                  </span>
+                </td>
                 <td className="px-3 py-3 text-slate-400">{row.locale}</td>
                 <td className="px-3 py-3 text-slate-400">{row.category}</td>
                 <td className="px-3 py-3 text-slate-400">{row.intent}</td>
@@ -1716,7 +1848,7 @@ function KeywordManager({
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-slate-500">
+                <td colSpan={10} className="px-3 py-8 text-center text-slate-500">
                   关键词文件为空。
                 </td>
               </tr>
