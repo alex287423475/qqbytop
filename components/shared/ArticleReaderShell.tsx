@@ -83,10 +83,12 @@ function getImageTypeLabel(src: string, alt: string) {
 
 export function ArticleReaderShell({ locale, article, quoteHref, copy, related }: ArticleReaderShellProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const quoteCtaRef = useRef<HTMLElement | null>(null);
   const [activeSection, setActiveSection] = useState(article.sections[0]?.id ?? "");
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [quoteCtaVisible, setQuoteCtaVisible] = useState(false);
 
   const outlineItems = useMemo(() => article.sections.filter((section) => section.level === 2), [article.sections]);
   const numberedOutlineItems = useMemo(
@@ -263,6 +265,24 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  useEffect(() => {
+    const element = quoteCtaRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setQuoteCtaVisible(Boolean(entry?.isIntersecting));
+      },
+      {
+        rootMargin: "0px 0px -20% 0px",
+        threshold: 0.25,
+      },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <>
       <section className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
@@ -310,7 +330,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
               </section>
             )}
 
-            <section className="mt-8 rounded-3xl bg-brand-900 p-6 text-white shadow-sm sm:p-8">
+            <section ref={quoteCtaRef} className="mt-8 rounded-3xl bg-brand-900 p-6 text-white shadow-sm sm:p-8">
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">
                   <p className="text-sm font-semibold text-brand-100">{copy.jumpToQuote}</p>
@@ -458,12 +478,14 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
       )}
 
       <div className="fixed bottom-5 right-5 z-30 flex flex-col items-end gap-2">
-        <Link
-          href={quoteHref}
-          className="inline-flex items-center justify-center rounded-full bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:bg-brand-500"
-        >
-          {copy.jumpToQuote}
-        </Link>
+        {!quoteCtaVisible && (
+          <Link
+            href={quoteHref}
+            className="inline-flex items-center justify-center rounded-full bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:bg-brand-500"
+          >
+            {copy.jumpToQuote}
+          </Link>
+        )}
 
         {showBackToTop && (
           <button
