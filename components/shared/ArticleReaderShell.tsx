@@ -88,6 +88,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [readingProgress, setReadingProgress] = useState(0);
   const [quoteCtaVisible, setQuoteCtaVisible] = useState(false);
 
   const outlineItems = useMemo(() => article.sections.filter((section) => section.level === 2), [article.sections]);
@@ -254,6 +255,18 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
   useEffect(() => {
     const handleScroll = () => {
       setShowBackToTop(window.scrollY > 720);
+
+      const root = contentRef.current;
+      if (!root) {
+        setReadingProgress(0);
+        return;
+      }
+
+      const rect = root.getBoundingClientRect();
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const readableDistance = Math.max(1, rect.height - viewportHeight * 0.45);
+      const progress = Math.min(1, Math.max(0, (viewportHeight * 0.2 - rect.top) / readableDistance));
+      setReadingProgress(progress);
     };
 
     handleScroll();
@@ -285,6 +298,13 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
 
   return (
     <>
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-50 h-1 bg-transparent">
+        <div
+          className="h-full bg-brand-600 transition-[width] duration-150 ease-out"
+          style={{ width: `${Math.round(readingProgress * 100)}%` }}
+        />
+      </div>
+
       <section className="mx-auto max-w-7xl px-5 py-10 sm:py-14">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
           <div className="min-w-0">
