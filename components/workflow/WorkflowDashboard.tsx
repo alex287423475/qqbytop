@@ -677,6 +677,30 @@ export function WorkflowDashboard({
     }
   }
 
+  async function updateKeyword(row: KeywordRow, patch: Partial<KeywordRow>) {
+    if (!keywordManager) return;
+    setKeywordBusy(`update:${row.slug}`);
+
+    try {
+      const response = await fetch(keywordManager.apiBase, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...row, ...patch, originalSlug: row.slug }),
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "更新关键词失败。");
+
+      setKeywordRows(payload.rows || []);
+      setError(null);
+      await fetchStatus();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "更新关键词失败。");
+    } finally {
+      setKeywordBusy(null);
+    }
+  }
+
   async function addKeywordOption(type: "category" | "intent", value: string) {
     if (!keywordManager) return;
     const clean = value.trim();
@@ -1071,6 +1095,7 @@ export function WorkflowDashboard({
                   onToggleAll={toggleAllKeywordSlugs}
                   onGenerateSelected={runGenerateForSelectedKeywords}
                   onAdd={addKeyword}
+                  onUpdate={updateKeyword}
                   onAddOption={addKeywordOption}
                   onDeleteOption={deleteKeywordOption}
                   onDelete={deleteKeyword}
@@ -1682,6 +1707,7 @@ function KeywordManager({
   onToggleAll,
   onGenerateSelected,
   onAdd,
+  onUpdate,
   onAddOption,
   onDeleteOption,
   onDelete,
@@ -1701,6 +1727,7 @@ function KeywordManager({
   onToggleAll: () => void;
   onGenerateSelected: () => void;
   onAdd: () => void;
+  onUpdate: (row: KeywordRow, patch: Partial<KeywordRow>) => void;
   onAddOption: (type: "category" | "intent", value: string) => void;
   onDeleteOption: (type: "category" | "intent", value: string) => void;
   onDelete: (slug: string) => void;
@@ -1836,7 +1863,16 @@ function KeywordManager({
                 <td className="px-3 py-3 text-slate-400">{row.priority}</td>
                 <td className="px-3 py-3 text-slate-400">{row.contentMode === "fact-source" ? "核心事实源" : "普通文章"}</td>
                 <td className="px-3 py-3">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <select
+                      value={row.contentMode || "standard"}
+                      onChange={(event) => onUpdate(row, { contentMode: event.target.value })}
+                      disabled={busy === `update:${row.slug}`}
+                      className="rounded border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-brand-500 disabled:text-slate-500"
+                    >
+                      <option value="standard">普通文章</option>
+                      <option value="fact-source">核心事实源</option>
+                    </select>
                     <MiniButton label="预览" onClick={() => onPreview(row.slug)} disabled={busy === `preview:${row.slug}`} />
                     {row.contentMode === "fact-source" && (
                       <MiniButton label="资料包" onClick={() => onFactSource(row)} disabled={busy === `fact-source:${row.slug}`} />

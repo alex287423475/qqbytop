@@ -79,6 +79,37 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  const blocked = assertDevOnly();
+  if (blocked) return blocked;
+
+  try {
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const originalSlug = String(body.originalSlug || body.slug || "").trim();
+    if (!originalSlug) return NextResponse.json({ message: "slug 不能为空。" }, { status: 400 });
+
+    const rows = readKeywordRows();
+    const index = rows.findIndex((row) => row.slug === originalSlug);
+    if (index < 0) return NextResponse.json({ message: `没有找到 slug：${originalSlug}` }, { status: 404 });
+
+    const nextRow = normalizeKeywordRow({
+      ...rows[index],
+      ...body,
+      slug: String(body.slug || rows[index].slug),
+    });
+
+    if (nextRow.slug !== originalSlug && rows.some((row) => row.slug === nextRow.slug)) {
+      return NextResponse.json({ message: `slug 已存在：${nextRow.slug}` }, { status: 409 });
+    }
+
+    const nextRows = rows.map((row, rowIndex) => (rowIndex === index ? nextRow : row));
+    writeKeywordRows(nextRows);
+    return NextResponse.json({ success: true, row: nextRow, rows: getKeywordRowsWithArticleStatus() });
+  } catch (error) {
+    return NextResponse.json({ message: error instanceof Error ? error.message : "更新关键词失败。" }, { status: 400 });
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
