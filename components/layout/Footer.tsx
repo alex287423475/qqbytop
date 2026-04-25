@@ -11,9 +11,13 @@ export function Footer({ locale }: { locale: Locale }) {
     <footer className="bg-brand-900 text-white">
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <div className="text-xl font-bold">
-            QQBY<span className="text-brand-500">.</span>
-          </div>
+          <Image
+            src="/brand/qqby-logo-light.svg"
+            alt="全球博译 Pro Compliance"
+            width={220}
+            height={52}
+            className="h-12 w-auto"
+          />
           <p className="mt-4 text-sm leading-7 text-slate-300">
             北京全球博译翻译服务有限公司，为企业客户提供专业翻译、本地化和跨境合规语言服务。
           </p>

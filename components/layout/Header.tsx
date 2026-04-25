@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -26,11 +27,15 @@ export function Header({ locale }: { locale: Locale }) {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4">
-        <Link href={`/${locale}`} className="flex items-center gap-3">
-          <span className="text-xl font-bold text-brand-900">
-            QQBY<span className="text-brand-600">.</span>
-          </span>
-          <span className="hidden text-sm text-slate-500 sm:inline">全球博译翻译</span>
+        <Link href={`/${locale}`} className="flex shrink-0 items-center" aria-label="全球博译首页">
+          <Image
+            src="/brand/qqby-logo.svg"
+            alt="全球博译 Pro Compliance"
+            width={228}
+            height={54}
+            priority
+            className="h-10 w-auto sm:h-12"
+          />
         </Link>
 
         <nav className="hidden items-center gap-7 lg:flex">
