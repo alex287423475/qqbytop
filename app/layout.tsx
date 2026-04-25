@@ -11,8 +11,8 @@ export const metadata = {
   description:
     "北京全球博译翻译服务有限公司提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
+    icon: "/favicon.ico?v=20260425",
+    shortcut: "/favicon.ico?v=20260425",
     apple: "/brand/qqby-icon.svg",
   },
 };
