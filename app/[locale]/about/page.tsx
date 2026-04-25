@@ -32,6 +32,32 @@ const riskControls = [
   ["售后修订", "接收机构或客户提出合理修改意见后，可继续协助修订和说明。"],
 ];
 
+const clientTypes = [
+  ["企业法务与律所", "合同、章程、授权书、诉讼仲裁材料、专利和合规说明，重点控制权责边界和提交格式。"],
+  ["跨境电商团队", "POA 申诉、Listing、认证报告、说明书、包装标签和售后内容，重点兼顾平台审核和目标市场表达。"],
+  ["技术与制造企业", "设备手册、SOP、API 文档、质量体系和工程资料，重点保护术语、变量、编号和版式。"],
+  ["个人与家庭用户", "证件、成绩单、无犯罪证明、银行流水、签证或移民材料，重点确认接收机构和盖章要求。"],
+];
+
+const aboutFaq = [
+  {
+    q: "北京全球博译主要服务企业客户还是个人客户？",
+    a: "两类客户都服务。企业项目通常关注术语一致、保密、批量交付和行业风险；个人材料更关注接收机构要求、盖章、格式和交期。",
+  },
+  {
+    q: "是否可以签署保密协议？",
+    a: "可以。涉及合同、专利、诉讼、技术资料或未公开产品信息的项目，可在开始前签署 NDA，并限定项目成员访问权限。",
+  },
+  {
+    q: "复杂格式文件可以处理吗？",
+    a: "可以先评估。常见 Office、PDF、扫描件、SDLXLIFF、Markdown、IDML 等文件会根据格式复杂度确认是否需要排版、标签保护或导回验证。",
+  },
+  {
+    q: "翻译后还能继续修改吗？",
+    a: "可以。交付后如接收机构、平台或客户提出合理修改意见，我们会根据原项目范围继续协助修订和说明。",
+  },
+];
+
 export default async function AboutPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const typedLocale = locale as Locale;
@@ -68,6 +94,18 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
           { "@type": "ListItem", position: 1, name: "首页", item: `https://qqbytop.com/${locale}` },
           { "@type": "ListItem", position: 2, name: "关于我们", item: pageUrl },
         ],
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${pageUrl}#faq`,
+        mainEntity: aboutFaq.map((item) => ({
+          "@type": "Question",
+          name: item.q,
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: item.a,
+          },
+        })),
       },
     ],
   };
@@ -152,6 +190,34 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
                 <strong className="text-2xl text-brand-600">{year}</strong>
                 <p className="mt-3 text-sm leading-7 text-slate-600">{event}</p>
               </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16">
+        <div className="mx-auto max-w-7xl px-5">
+          <SectionHeader title="适合哪些客户" subtitle="不同客户的决策重点不一样，我们会先按用途和风险把项目路径分清楚。" />
+          <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {clientTypes.map(([title, text]) => (
+              <div key={title} className="border border-slate-200 bg-white p-6">
+                <h2 className="font-bold text-brand-900">{title}</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 py-16">
+        <div className="mx-auto max-w-4xl px-5">
+          <SectionHeader title="关于合作的常见问题" />
+          <div className="mt-10 divide-y divide-slate-200 border-y border-slate-200">
+            {aboutFaq.map((item) => (
+              <details key={item.q} className="group py-5">
+                <summary className="cursor-pointer list-none font-semibold text-brand-900">{item.q}</summary>
+                <p className="mt-3 leading-7 text-slate-600">{item.a}</p>
+              </details>
             ))}
           </div>
         </div>
