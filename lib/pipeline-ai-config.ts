@@ -50,7 +50,7 @@ const defaultModels: Record<AiProvider, string> = {
 const roleMeta: Record<AiRole, { label: string; purpose: string; prefix: string }> = {
   modelA: { label: "模型A", purpose: "生成文章", prefix: "MODEL_A" },
   modelB: { label: "模型B", purpose: "AI质检与AI重写", prefix: "MODEL_B" },
-  modelC: { label: "模型C", purpose: "站内AI搜索回答", prefix: "MODEL_C" },
+  modelC: { label: "模型C", purpose: "关键词挖掘与站内AI搜索回答", prefix: "MODEL_C" },
 };
 
 export function readLocalEnv() {

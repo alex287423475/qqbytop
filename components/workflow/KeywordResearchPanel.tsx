@@ -50,7 +50,10 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       const rows = (payload?.candidates || []) as KeywordCandidate[];
       setCandidates(rows);
       setSelected(Object.fromEntries(rows.filter((row) => !row.duplicate && row.score >= 70).map((row) => [row.slug, true])));
-      setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。`);
+      const engineLabel =
+        payload?.engine === "modelC+local-rules" ? "模型C语义挖掘 + 本地规则补全" : payload?.engine === "modelC" ? "模型C语义挖掘" : "本地规则兜底";
+      const warning = payload?.warning ? ` ${payload.warning}` : "";
+      setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。来源：${engineLabel}。${warning}`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "关键词挖掘失败。");
     } finally {
@@ -101,7 +104,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">关键词挖掘工具</h2>
         <p className="max-w-3xl text-sm leading-6 text-slate-400">
-          输入一个或多个种子词，系统会按翻译业务场景扩展价格词、问题词、风险词、合规词和核心事实源词。候选词可以勾选后直接加入关键词文件。
+          输入一个或多个种子词，系统会优先调用模型C做语义挖掘，再用本地规则补全价格词、问题词、风险词、合规词和核心事实源词。候选词可以勾选后直接加入关键词文件。
         </p>
       </div>
 
@@ -174,6 +177,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
               <th className="px-3 py-3">意图</th>
               <th className="px-3 py-3">优先级</th>
               <th className="px-3 py-3">模式</th>
+              <th className="px-3 py-3">来源</th>
               <th className="px-3 py-3">评分</th>
               <th className="px-3 py-3">说明</th>
             </tr>
@@ -196,6 +200,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
                 <td className="px-3 py-3">{candidate.intent}</td>
                 <td className="px-3 py-3">{candidate.priority}</td>
                 <td className="px-3 py-3">{candidate.contentMode === "fact-source" ? "核心事实源" : "普通文章"}</td>
+                <td className="min-w-32 px-3 py-3 text-xs text-slate-400">{candidate.source}</td>
                 <td className="px-3 py-3">
                   <span className={`rounded-full px-2 py-1 text-xs ${candidate.score >= 80 ? "bg-emerald-500/20 text-emerald-200" : "bg-slate-800 text-slate-300"}`}>
                     {candidate.score}
@@ -206,7 +211,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
             ))}
             {candidates.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-10 text-center text-slate-500">
+                <td colSpan={10} className="px-3 py-10 text-center text-slate-500">
                   先输入种子词并点击“开始挖掘”。
                 </td>
               </tr>

@@ -235,7 +235,7 @@ function createEmptyAiForm(provider: string): AiConfigForm {
 
 function createAiForm(role: AiRole, provider: string): AiConfigForm {
   if (role === "modelB") return { ...createEmptyAiForm(provider), role, label: "模型B", purpose: "AI质检与AI重写" };
-  if (role === "modelC") return { ...createEmptyAiForm(provider), role, label: "模型C", purpose: "站内AI搜索回答" };
+  if (role === "modelC") return { ...createEmptyAiForm(provider), role, label: "模型C", purpose: "关键词挖掘与站内AI搜索回答" };
   return createEmptyAiForm(provider);
 }
 
@@ -1355,7 +1355,7 @@ function AiConfigPanel({
   const roleCards: Array<{ role: AiRole; badge: string; note: string; wrap?: boolean }> = [
     { role: "modelA", badge: "生成", note: "用于生成文章草稿。" },
     { role: "modelB", badge: "质检/重写", note: "用于AI质检和AI重写，建议选择更擅长审校、结构化输出和改写的模型。", wrap: true },
-    { role: "modelC", badge: "站内搜索", note: "用于首页和搜索页的AI推荐答案，建议选择响应快、中文问答稳定、成本可控的模型。", wrap: true },
+    { role: "modelC", badge: "挖词/搜索", note: "用于关键词挖掘、首页和搜索页的AI推荐答案，建议选择响应快、中文问答稳定、成本可控的模型。", wrap: true },
   ];
 
   return (
@@ -1363,7 +1363,7 @@ function AiConfigPanel({
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">AI 模型配置</h2>
         <p className="text-sm text-slate-400">
-          模型A用于生成文章；模型B用于AI质检和AI重写；模型C用于站内AI搜索回答。配置只保存在本地 local-brain/.env，API Key 不会提交到 Git。
+          模型A用于生成文章；模型B用于AI质检和AI重写；模型C用于关键词挖掘与站内AI搜索回答。配置只保存在本地 local-brain/.env，API Key 不会提交到 Git。
         </p>
       </div>
 
