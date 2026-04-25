@@ -41,6 +41,7 @@ body {
 
 .prose-content h2 {
   margin-top: 2rem;
+  scroll-margin-top: 7rem;
   font-size: 1.5rem;
   font-weight: 700;
   color: #0f172a;
@@ -48,6 +49,7 @@ body {
 
 .prose-content h3 {
   margin-top: 1.5rem;
+  scroll-margin-top: 7rem;
   font-size: 1.125rem;
   font-weight: 700;
   color: #1e293b;
@@ -65,6 +67,10 @@ body {
   margin-top: 0.875rem;
   line-height: 1.8;
   color: #475569;
+}
+
+.prose-content > :first-child {
+  margin-top: 0;
 }
 
 .prose-content ul,
@@ -177,6 +183,10 @@ body {
   cursor: pointer;
   font-weight: 700;
   color: #0f172a;
+}
+
+.prose-content summary::-webkit-details-marker {
+  display: none;
 }
 
 .pipeline-panel {

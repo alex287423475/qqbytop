@@ -16,6 +16,12 @@ export type ArticleFaq = {
   a: string;
 };
 
+export type ArticleSection = {
+  id: string;
+  title: string;
+  level: 2 | 3;
+};
+
 export type ArticleMeta = {
   title: string;
   slug: string;
@@ -31,6 +37,7 @@ export type ArticleMeta = {
   images: string[];
   coverImage: string | null;
   coverAlt: string;
+  sections: ArticleSection[];
 };
 
 export type Article = ArticleMeta & {
@@ -92,6 +99,39 @@ function extractImageUrls(content: string) {
     .filter((src): src is string => Boolean(src && src.startsWith("/")));
 }
 
+function stripHtml(input: string) {
+  return input
+    .replace(/<code[^>]*>.*?<\/code>/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+function attachHeadingAnchors(contentHtml: string) {
+  const sections: ArticleSection[] = [];
+
+  const html = contentHtml.replace(/<h([23])>([\s\S]*?)<\/h\1>/g, (match, level, inner) => {
+    const title = stripHtml(inner);
+    if (!title) return match;
+
+    const numericLevel = Number(level) as 2 | 3;
+    const id = `section-${sections.length + 1}`;
+    sections.push({
+      id,
+      title,
+      level: numericLevel,
+    });
+
+    return `<h${level} id="${id}">${inner}</h${level}>`;
+  });
+
+  return { contentHtml: html, sections };
+}
+
 function parseArticleFile(filePath: string, locale: string) {
   const raw = fs.readFileSync(filePath, "utf-8");
   const { data, content } = matter(raw);
@@ -115,6 +155,7 @@ function parseArticleFile(filePath: string, locale: string) {
     faq: normalizeFaq(data.faq),
     coverImage: typeof data.coverImage === "string" && data.coverImage.startsWith("/") ? data.coverImage : null,
     coverAlt: typeof data.coverAlt === "string" ? data.coverAlt : "",
+    sections: [],
     images: Array.from(
       new Set([
         ...(typeof data.coverImage === "string" && data.coverImage.startsWith("/") ? [data.coverImage] : []),
@@ -155,10 +196,12 @@ export async function getArticle(locale: string, slug: string): Promise<Article 
       .use(rehypeStringify)
       .process(content),
   );
+  const withAnchors = attachHeadingAnchors(contentHtml);
 
   return {
     ...meta,
-    contentHtml,
+    contentHtml: withAnchors.contentHtml,
+    sections: withAnchors.sections,
   };
 }
 
