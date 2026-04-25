@@ -33,6 +33,9 @@ type ReaderCopy = {
   relatedDescription: string;
   closePreview: string;
   imagePreviewHint: string;
+  openOutline: string;
+  closeOutline: string;
+  currentSectionLabel: string;
 };
 
 type ArticleReaderShellProps = {
@@ -62,6 +65,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
   const contentRef = useRef<HTMLDivElement | null>(null);
   const [activeSection, setActiveSection] = useState(article.sections[0]?.id ?? "");
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
+  const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false);
 
   const hasOutline = article.sections.length > 1;
   const outlineItems = useMemo(() => article.sections.filter((section) => section.level <= 3), [article.sections]);
@@ -76,6 +80,18 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
       image.setAttribute("role", "button");
       image.setAttribute("tabindex", "0");
       image.setAttribute("aria-label", `${copy.imagePreviewHint}: ${image.alt || article.title}`);
+
+      if (image.dataset.captionReady === "true") continue;
+      image.dataset.captionReady = "true";
+
+      const altText = image.alt?.trim();
+      if (!altText) continue;
+
+      const caption = document.createElement("span");
+      caption.className = "article-image-caption";
+      caption.textContent = altText;
+
+      image.insertAdjacentElement("afterend", caption);
     }
 
     const handleClick = (event: Event) => {
@@ -138,6 +154,19 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
 
     return () => observer.disconnect();
   }, [article.sections, hasOutline]);
+
+  useEffect(() => {
+    if (!mobileOutlineOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobileOutlineOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [mobileOutlineOpen]);
 
   useEffect(() => {
     if (!lightbox) return;
@@ -345,6 +374,77 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
             </div>
           </div>
         </section>
+      )}
+
+      {hasOutline && (
+        <>
+          <button
+            type="button"
+            className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-brand-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-brand-800 lg:hidden"
+            aria-expanded={mobileOutlineOpen}
+            aria-controls="article-mobile-outline"
+            onClick={() => setMobileOutlineOpen(true)}
+          >
+            <span>{copy.openOutline}</span>
+            {activeSection && (
+              <span className="max-w-[10rem] truncate rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-brand-100">
+                {outlineItems.find((section) => section.id === activeSection)?.title ?? activeSection}
+              </span>
+            )}
+          </button>
+
+          {mobileOutlineOpen && (
+            <div className="fixed inset-0 z-40 bg-slate-950/45 lg:hidden" onClick={() => setMobileOutlineOpen(false)}>
+              <div
+                id="article-mobile-outline"
+                className="absolute inset-x-4 bottom-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl"
+                role="dialog"
+                aria-modal="true"
+                aria-label={copy.articleOutline}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-brand-600">{copy.currentSectionLabel}</p>
+                    <h2 className="mt-1 text-lg font-bold text-brand-900">
+                      {outlineItems.find((section) => section.id === activeSection)?.title ?? copy.articleOutline}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-brand-700"
+                    onClick={() => setMobileOutlineOpen(false)}
+                  >
+                    {copy.closeOutline}
+                  </button>
+                </div>
+
+                <nav className="mt-4 max-h-[55vh] overflow-y-auto pr-1">
+                  <ul className="space-y-2">
+                    {outlineItems.map((section) => {
+                      const isActive = section.id === activeSection;
+                      return (
+                        <li key={section.id}>
+                          <a
+                            href={`#${section.id}`}
+                            className={`block rounded-2xl border px-4 py-3 text-sm leading-6 transition ${
+                              isActive
+                                ? "border-brand-200 bg-brand-50 font-semibold text-brand-700"
+                                : "border-slate-200 text-slate-600 hover:border-brand-100 hover:bg-slate-50 hover:text-brand-600"
+                            } ${section.level === 3 ? "ml-4" : ""}`}
+                            onClick={() => setMobileOutlineOpen(false)}
+                          >
+                            {section.title}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </nav>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {lightbox && (

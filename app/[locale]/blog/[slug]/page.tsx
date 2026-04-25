@@ -33,6 +33,9 @@ const copy = {
     descriptionLabel: "摘要",
     closePreview: "关闭预览",
     imagePreviewHint: "点击图片可放大查看",
+    openOutline: "打开目录",
+    closeOutline: "关闭",
+    currentSectionLabel: "当前阅读",
   },
   en: {
     blogLabel: "Insights",
@@ -56,6 +59,9 @@ const copy = {
     descriptionLabel: "Summary",
     closePreview: "Close preview",
     imagePreviewHint: "Click an image to enlarge it",
+    openOutline: "Outline",
+    closeOutline: "Close",
+    currentSectionLabel: "Current section",
   },
   ja: {
     blogLabel: "専門情報",
@@ -79,6 +85,9 @@ const copy = {
     descriptionLabel: "概要",
     closePreview: "プレビューを閉じる",
     imagePreviewHint: "画像をクリックすると拡大表示されます",
+    openOutline: "目次を開く",
+    closeOutline: "閉じる",
+    currentSectionLabel: "現在の章",
   },
 } as const;
 
@@ -347,6 +356,9 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           relatedDescription: ui.relatedDescription,
           closePreview: ui.closePreview,
           imagePreviewHint: ui.imagePreviewHint,
+          openOutline: ui.openOutline,
+          closeOutline: ui.closeOutline,
+          currentSectionLabel: ui.currentSectionLabel,
         }}
         related={related.map((item) => ({
           slug: item.slug,
