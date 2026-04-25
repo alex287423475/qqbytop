@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAiRoleConfig, normalizeRole, readLocalEnv } from "@/lib/pipeline-ai-config";
 
 export const runtime = "nodejs";
+const AI_TEST_TIMEOUT_MS = 15000;
 
 type TestInput = {
   role?: "modelA" | "modelB" | "modelC";
@@ -75,11 +76,11 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
     const body = buildOpenAICompatibleBody(endpoint.type, model, "You are a connection test endpoint. Reply with OK.", "ping", 80);
 
     if (endpoint.type === "chat") {
-      const streamResponse = await fetch(endpoint.url, {
+      const streamResponse = await fetchWithTimeout(endpoint.url, {
         method: "POST",
         headers: buildOpenAICompatibleHeaders(apiKey, endpoint.type),
         body: JSON.stringify({ ...body, stream: true }),
-      });
+      }, AI_TEST_TIMEOUT_MS);
 
       const streamData = await streamResponse.text();
       if (!streamResponse.ok) throw new Error(`${provider} request failed: ${streamResponse.status} ${streamData.slice(0, 500)}`);
@@ -87,11 +88,11 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
       if (streamedText) return streamedText;
     }
 
-    const response = await fetch(endpoint.url, {
+    const response = await fetchWithTimeout(endpoint.url, {
       method: "POST",
       headers: buildOpenAICompatibleHeaders(apiKey, endpoint.type),
       body: JSON.stringify(body),
-    });
+    }, AI_TEST_TIMEOUT_MS);
 
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`${provider} request failed: ${response.status} ${formatResponse(data)}`);
@@ -99,14 +100,14 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
   }
 
   if (provider === "gemini") {
-    const response = await fetch(resolveGeminiUrl(baseUrl, model, apiKey), {
+    const response = await fetchWithTimeout(resolveGeminiUrl(baseUrl, model, apiKey), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: "Reply with OK." }] }],
         generationConfig: { temperature: 0, maxOutputTokens: 8 },
       }),
-    });
+    }, AI_TEST_TIMEOUT_MS);
 
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`gemini request failed: ${response.status} ${formatResponse(data)}`);
@@ -114,7 +115,7 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
   }
 
   if (provider === "claude") {
-    const response = await fetch(resolveClaudeUrl(baseUrl || "https://api.anthropic.com/v1/messages"), {
+    const response = await fetchWithTimeout(resolveClaudeUrl(baseUrl || "https://api.anthropic.com/v1/messages"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -127,7 +128,7 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
         temperature: 0,
         messages: [{ role: "user", content: "Reply with OK." }],
       }),
-    });
+    }, AI_TEST_TIMEOUT_MS);
 
     const data = await readJsonOrText(response);
     if (!response.ok) throw new Error(`claude request failed: ${response.status} ${formatResponse(data)}`);
@@ -135,6 +136,22 @@ async function testProvider({ provider, baseUrl, model, apiKey }: { provider: st
   }
 
   throw new Error(`Unsupported provider: ${provider}`);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`连接测试超过 ${Math.round(timeoutMs / 1000)} 秒未响应，请检查 Base URL、模型名或网络连接。`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function resolveOpenAICompatibleEndpoint(url: string) {

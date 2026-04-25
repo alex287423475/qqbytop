@@ -153,6 +153,9 @@ type KeywordManagerConfig = {
   apiBase: string;
 };
 
+const AI_CONFIG_SAVE_TIMEOUT_MS = 8000;
+const AI_CONFIG_TEST_TIMEOUT_MS = 20000;
+
 type WorkflowDashboardProps = {
   title: string;
   eyebrow?: string;
@@ -237,6 +240,22 @@ function createAiForm(role: AiRole, provider: string): AiConfigForm {
   if (role === "modelB") return { ...createEmptyAiForm(provider), role, label: "模型B", purpose: "AI质检与AI重写" };
   if (role === "modelC") return { ...createEmptyAiForm(provider), role, label: "模型C", purpose: "关键词挖掘与站内AI搜索回答" };
   return createEmptyAiForm(provider);
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`请求超过 ${Math.round(timeoutMs / 1000)} 秒未响应，请检查接口或稍后重试。`);
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 function toAiForm(config: AiConfig): AiConfigForm {
@@ -434,11 +453,13 @@ export function WorkflowDashboard({
   }, [status.items, status.articles]);
 
   async function saveAiConfig(role: AiRole) {
+    if (aiTestBusy === role) return;
     const form = aiForms[role];
     setAiBusy(role);
+    setAiTestBusy(null);
 
     try {
-      const response = await fetch(`${apiBase}/ai-config`, {
+      const response = await fetchWithTimeout(`${apiBase}/ai-config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -448,7 +469,7 @@ export function WorkflowDashboard({
           model: form.model,
           apiKey: form.apiKey || undefined,
         }),
-      });
+      }, AI_CONFIG_SAVE_TIMEOUT_MS);
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.message || "保存 AI 配置失败。");
 
@@ -469,11 +490,12 @@ export function WorkflowDashboard({
 
   async function testAiConfig(role: AiRole) {
     const form = aiForms[role];
+    if (aiBusy === role) return;
     setAiTestBusy(role);
     setAiTestResult((current) => ({ ...current, [role]: null }));
 
     try {
-      const response = await fetch(`${apiBase}/ai-config/test`, {
+      const response = await fetchWithTimeout(`${apiBase}/ai-config/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -483,7 +505,7 @@ export function WorkflowDashboard({
           model: form.model,
           apiKey: form.apiKey || undefined,
         }),
-      });
+      }, AI_CONFIG_TEST_TIMEOUT_MS);
       const payload = (await response.json().catch(() => null)) as AiTestResult | null;
       if (!response.ok) throw new Error(payload?.message || "测试连接失败。");
       setAiTestResult((current) => ({ ...current, [role]: payload || { success: true, message: "测试连接成功。" } }));
@@ -1452,14 +1474,14 @@ function AiRoleConfigCard({
         />
         <button
           onClick={() => onSave(role)}
-          disabled={busy === role}
+          disabled={busy === role || testBusy === role}
           className="self-end rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:bg-slate-700"
         >
           {busy === role ? "保存中" : `保存${form.label}`}
         </button>
         <button
           onClick={() => onTest(role)}
-          disabled={testBusy === role}
+          disabled={busy === role || testBusy === role}
           className="self-end rounded border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-brand-500 disabled:text-slate-500"
         >
           {testBusy === role ? "测试中" : `测试${form.label}`}
