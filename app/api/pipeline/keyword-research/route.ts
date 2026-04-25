@@ -193,31 +193,6 @@ function scoreKeyword(keyword: string, duplicate: boolean, source = "local") {
   return Math.max(0, Math.min(100, score));
 }
 
-function makeCandidate(seed: string, modifier: string, existingSlugs: Set<string>, existingKeywords: Set<string>): KeywordCandidate {
-  const scenario = inferScenario(seed);
-  const normalizedModifier = seed.endsWith("翻译") && modifier.startsWith("翻译") ? modifier.slice("翻译".length) : modifier;
-  const keyword = normalizedModifier ? `${seed}${normalizedModifier.startsWith(seed) ? normalizedModifier.slice(seed.length) : normalizedModifier}` : seed;
-  const slug = generateResearchSlug(keyword);
-  const duplicate = existingSlugs.has(slug) || existingKeywords.has(keyword);
-  const intent = inferIntent(keyword);
-  const priority = inferPriority(keyword);
-  const contentMode = inferContentMode(keyword, scenario.category);
-
-  return {
-    keyword,
-    slug,
-    locale: "zh",
-    category: scenario.category,
-    intent,
-    priority,
-    contentMode,
-    source: "本地规则扩展",
-    reason: duplicate ? "关键词文件中已存在或 slug 重复" : `围绕“${seed}”扩展${intent}型长尾词`,
-    score: scoreKeyword(keyword, duplicate),
-    duplicate,
-  };
-}
-
 function normalizeAiCandidate(
   row: AiKeywordCandidate,
   existingSlugs: Set<string>,
@@ -287,25 +262,10 @@ function generateResearchSlug(keyword: string) {
   return slug || `keyword-${Date.now().toString(36)}`;
 }
 
-function createLocalCandidates(seeds: string[], existingSlugs: Set<string>, existingKeywords: Set<string>) {
-  const candidates = new Map<string, KeywordCandidate>();
-
-  for (const seed of seeds) {
-    const scenario = inferScenario(seed);
-    const modifiers = Array.from(new Set([...scenario.modifiers, ...universalModifiers]));
-    for (const modifier of modifiers) {
-      const candidate = makeCandidate(seed, modifier, existingSlugs, existingKeywords);
-      candidates.set(candidate.slug, candidate);
-    }
-  }
-
-  return Array.from(candidates.values());
-}
-
 async function createAiCandidates(seeds: string[], limit: number, existingRows: Array<{ keyword: string; slug: string }>) {
   const config = getAiRoleConfig("modelC");
-  if (config.provider === "mock") return { rows: [], warning: "模型C当前为 Mock，本次使用本地规则兜底。" };
-  if (!config.apiKeySet) return { rows: [], warning: "模型C未配置 API Key，本次使用本地规则兜底。" };
+  if (config.provider === "mock") throw new Error("模型C当前为 Mock，请先在 AI 模型配置中设置可用模型C。");
+  if (!config.apiKeySet) throw new Error("模型C未配置 API Key。");
 
   const env = getAiEnvForChild("modelC");
   const text = await callModelC(
@@ -321,7 +281,8 @@ async function createAiCandidates(seeds: string[], limit: number, existingRows: 
 
   const parsed = parseJsonPayload(text);
   const rawRows = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.candidates) ? parsed.candidates : [];
-  return { rows: rawRows as AiKeywordCandidate[], warning: "" };
+  if (rawRows.length === 0) throw new Error("模型C没有返回任何候选关键词。");
+  return rawRows as AiKeywordCandidate[];
 }
 
 function buildKeywordResearchSystemPrompt() {
@@ -643,20 +604,6 @@ function formatResponse(data: unknown) {
   return JSON.stringify(data).slice(0, 500);
 }
 
-function mergeCandidates(aiRows: KeywordCandidate[], localRows: KeywordCandidate[], limit: number) {
-  const merged = new Map<string, KeywordCandidate>();
-  for (const row of [...aiRows, ...localRows]) {
-    const previous = merged.get(row.slug);
-    if (!previous || row.score > previous.score || (previous.source !== "模型C语义挖掘" && row.source === "模型C语义挖掘")) {
-      merged.set(row.slug, row);
-    }
-  }
-
-  return Array.from(merged.values())
-    .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"))
-    .slice(0, limit);
-}
-
 export async function POST(request: NextRequest) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
@@ -671,34 +618,36 @@ export async function POST(request: NextRequest) {
   const existingSlugs = new Set(existingRows.map((row) => row.slug));
   const existingKeywords = new Set(existingRows.map((row) => row.keyword));
   const limit = Math.max(1, Math.min(100, Number(body.limit) || 40));
-  const localCandidates = createLocalCandidates(seeds, existingSlugs, existingKeywords);
 
-  let aiCandidates: KeywordCandidate[] = [];
-  let warning = "";
-  let engine: "modelC" | "local-rules" | "modelC+local-rules" = "local-rules";
-
+  let rows: KeywordCandidate[] = [];
   try {
-    const ai = await createAiCandidates(seeds, limit, existingRows);
-    warning = ai.warning;
-    aiCandidates = ai.rows.map((row) => normalizeAiCandidate(row, existingSlugs, existingKeywords)).filter((row): row is KeywordCandidate => row !== null);
-    if (aiCandidates.length > 0) engine = "modelC+local-rules";
+    const aiRows = await createAiCandidates(seeds, limit, existingRows);
+    rows = aiRows
+      .map((row) => normalizeAiCandidate(row, existingSlugs, existingKeywords))
+      .filter((row): row is KeywordCandidate => row !== null)
+      .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"))
+      .slice(0, limit);
   } catch (error) {
-    warning = `模型C调用失败，已使用本地规则兜底：${error instanceof Error ? error.message : "未知错误"}`;
+    const message = error instanceof Error ? error.message : "未知错误";
+    const status = message.includes("超过") || message.toLowerCase().includes("timeout") ? 504 : 400;
+    return NextResponse.json({ message: `模型C调用失败：${message}`, seeds }, { status });
   }
 
-  const rows = mergeCandidates(aiCandidates, localCandidates, limit);
+  if (rows.length === 0) {
+    return NextResponse.json({ message: "模型C返回内容无法转换为有效候选关键词。", seeds }, { status: 400 });
+  }
 
   return NextResponse.json({
     seeds,
-    engine,
-    warning,
+    engine: "modelC",
+    warning: "",
     candidates: rows,
     summary: {
       total: rows.length,
       available: rows.filter((row) => !row.duplicate).length,
       duplicates: rows.filter((row) => row.duplicate).length,
       ai: rows.filter((row) => row.source === "模型C语义挖掘").length,
-      local: rows.filter((row) => row.source === "本地规则扩展").length,
+      local: 0,
     },
   });
 }

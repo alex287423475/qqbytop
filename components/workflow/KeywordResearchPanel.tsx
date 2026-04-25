@@ -46,7 +46,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
             ? "正在整理种子词和已有关键词..."
             : nextValue < 70
               ? "正在调用模型C进行语义挖掘..."
-              : "正在等待模型C返回，超时会自动切换本地规则...";
+              : "正在等待模型C返回，超时会显示失败原因...";
         return { value: nextValue, label: nextLabel };
       });
     }, 700);
@@ -79,8 +79,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       setCandidates(rows);
       setSelected(Object.fromEntries(rows.filter((row) => !row.duplicate && row.score >= 70).map((row) => [row.slug, true])));
       setProgress({ value: 100, label: "关键词挖掘完成。" });
-      const engineLabel =
-        payload?.engine === "modelC+local-rules" ? "模型C语义挖掘 + 本地规则补全" : payload?.engine === "modelC" ? "模型C语义挖掘" : "本地规则兜底";
+      const engineLabel = payload?.engine === "modelC" ? "模型C语义挖掘" : "未知来源";
       const warning = payload?.warning ? ` ${payload.warning}` : "";
       setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。来源：${engineLabel}。${warning}`);
     } catch (nextError) {
@@ -136,7 +135,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">关键词挖掘工具</h2>
         <p className="max-w-3xl text-sm leading-6 text-slate-400">
-          输入一个或多个种子词，系统会优先调用模型C做语义挖掘，再用本地规则补全价格词、问题词、风险词、合规词和核心事实源词。候选词可以勾选后直接加入关键词文件。
+          输入一个或多个种子词，系统只调用模型C做语义挖掘，不使用本地规则补充。候选词可以勾选后直接加入关键词文件。
         </p>
       </div>
 
@@ -151,7 +150,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
             <div className="h-full rounded-full bg-brand-500 transition-all duration-500" style={{ width: `${progress.value}%` }} />
           </div>
-          <p className="mt-2 text-xs text-slate-400">模型C最长等待约 30 秒；无响应时会自动使用本地规则返回候选词。</p>
+          <p className="mt-2 text-xs text-slate-400">模型C最长等待约 30 秒；无响应或返回格式异常时会显示失败原因，不生成本地规则候选词。</p>
         </div>
       )}
 
