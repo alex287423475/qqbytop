@@ -39,6 +39,7 @@ const copy = {
     backToTop: "返回顶部",
     trustTitle: "内容可信度",
     trustReviewer: "北京全球博译翻译公司内容与项目团队审核",
+    trustReviewerLink: "查看审核与质量承诺",
     trustScope: "适用范围",
     trustUpdated: "最近更新",
     trustHumanNote: "本文用于项目判断和准备沟通，不替代具体文件、用途和交付要求的人工确认。",
@@ -71,6 +72,7 @@ const copy = {
     backToTop: "Back to top",
     trustTitle: "Content trust",
     trustReviewer: "Reviewed by QQBY content and project team",
+    trustReviewerLink: "View review and quality commitment",
     trustScope: "Applies to",
     trustUpdated: "Last updated",
     trustHumanNote: "This article supports project scoping and preparation, but does not replace human review of the actual files, use case, and deadline.",
@@ -103,6 +105,7 @@ const copy = {
     backToTop: "ページ上部へ",
     trustTitle: "信頼性情報",
     trustReviewer: "QQBY コンテンツ・プロジェクトチーム確認済み",
+    trustReviewerLink: "確認体制と品質方針を見る",
     trustScope: "適用範囲",
     trustUpdated: "最終更新",
     trustHumanNote: "この記事は案件判断と準備の参考情報であり、実際のファイル、用途、納期に基づく個別確認に代わるものではありません。",
@@ -138,6 +141,7 @@ function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof g
     reviewedBy: {
       "@type": "Organization",
       name: "北京全球博译翻译公司",
+      url: `${getBaseUrl()}/${locale}/about#quality-commitment`,
     },
     publisher: {
       "@type": "Organization",
@@ -336,7 +340,12 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
                     </dd>
                   </div>
                 </dl>
-                <p className="mt-4 text-xs leading-6 text-slate-500">{ui.trustReviewer}</p>
+                <p className="mt-4 text-xs leading-6 text-slate-500">
+                  {ui.trustReviewer}
+                  <Link href={`/${normalized}/about#quality-commitment`} className="ml-2 font-semibold text-brand-600 hover:text-brand-500">
+                    {ui.trustReviewerLink}
+                  </Link>
+                </p>
                 <p className="mt-2 text-xs leading-6 text-slate-500">{ui.trustHumanNote}</p>
               </div>
               <div className="mt-6 flex flex-col gap-3">

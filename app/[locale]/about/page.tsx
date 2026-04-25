@@ -97,7 +97,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
             </div>
           </div>
 
-          <div className="bg-slate-50 p-8">
+          <div id="quality-commitment" className="scroll-mt-24 bg-slate-50 p-8">
             <h2 className="text-2xl font-bold text-brand-900">资质与承诺</h2>
             <ul className="mt-6 space-y-3 text-slate-600">
               <li>ISO 质量管理流程</li>
