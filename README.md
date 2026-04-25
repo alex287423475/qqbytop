@@ -42,7 +42,7 @@ components/
 旧站 URL 兼容跳转逻辑位于：
 
 ```text
-middleware.ts
+proxy.ts
 ```
 
 ## 多语言收录策略
