@@ -124,6 +124,29 @@ type PromptFile = {
   content: string;
 };
 
+type BaiduStatus = {
+  site: string;
+  endpoint: string;
+  configured: boolean;
+  sitemapUrl: string;
+  sitemapPreview: string[];
+};
+
+type BaiduSubmitResult = {
+  site: string;
+  endpoint: string;
+  submittedUrls: string[];
+  result: {
+    success?: number;
+    remain?: number;
+    not_same_site?: string[];
+    not_valid?: string[];
+    error?: number;
+    message?: string;
+    raw?: string;
+  };
+};
+
 type KeywordManagerConfig = {
   enabled: true;
   apiBase: string;
@@ -270,6 +293,12 @@ export function WorkflowDashboard({
   const [promptDraft, setPromptDraft] = useState("");
   const [promptBusy, setPromptBusy] = useState(false);
   const [activePanel, setActivePanel] = useState("overview");
+  const [baiduStatus, setBaiduStatus] = useState<BaiduStatus | null>(null);
+  const [baiduSingleUrl, setBaiduSingleUrl] = useState("https://www.qqbytop.com/zh/blog/power-translation");
+  const [baiduBatchUrls, setBaiduBatchUrls] = useState("https://www.qqbytop.com/zh\nhttps://www.qqbytop.com/zh/blog");
+  const [baiduSitemapLimit, setBaiduSitemapLimit] = useState("10");
+  const [baiduBusy, setBaiduBusy] = useState<"single" | "batch" | "sitemap" | null>(null);
+  const [baiduResult, setBaiduResult] = useState<BaiduSubmitResult | null>(null);
 
   async function fetchStatus() {
     const response = await fetch(`${apiBase}/status`, { cache: "no-store" });
@@ -341,12 +370,19 @@ export function WorkflowDashboard({
     }
   }
 
+  async function fetchBaiduStatus() {
+    const response = await fetch(`${apiBase}/baidu`, { cache: "no-store" });
+    if (!response.ok) return;
+    const payload = (await response.json()) as BaiduStatus;
+    setBaiduStatus(payload);
+  }
+
   useEffect(() => {
     let disposed = false;
 
     async function load() {
       try {
-        await Promise.all([fetchStatus(), fetchKeywords(), fetchKeywordOptions(), fetchAiConfig(), fetchPromptFiles()]);
+        await Promise.all([fetchStatus(), fetchKeywords(), fetchKeywordOptions(), fetchAiConfig(), fetchPromptFiles(), fetchBaiduStatus()]);
       } catch (nextError) {
         if (!disposed) setError(nextError instanceof Error ? nextError.message : "状态读取失败。");
       } finally {
@@ -362,6 +398,7 @@ export function WorkflowDashboard({
       });
       fetchKeywords().catch(() => undefined);
       fetchKeywordOptions().catch(() => undefined);
+      fetchBaiduStatus().catch(() => undefined);
     }, 1200);
 
     return () => {
@@ -508,6 +545,42 @@ export function WorkflowDashboard({
       setError(nextError instanceof Error ? nextError.message : "流程执行失败。");
     } finally {
       setSubmitting(null);
+    }
+  }
+
+  async function submitBaidu(mode: "single" | "batch" | "sitemap") {
+    setBaiduBusy(mode);
+    setBaiduResult(null);
+
+    const limit = Number.parseInt(baiduSitemapLimit, 10);
+    const body =
+      mode === "single"
+        ? { mode, url: baiduSingleUrl }
+        : mode === "batch"
+          ? {
+              mode,
+              urls: baiduBatchUrls
+                .split(/\r?\n/u)
+                .map((line) => line.trim())
+                .filter(Boolean),
+            }
+          : { mode, limit: Number.isFinite(limit) && limit > 0 ? limit : undefined };
+
+    try {
+      const response = await fetch(`${apiBase}/baidu`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || payload?.result?.message || "百度推送失败。");
+      setBaiduResult(payload as BaiduSubmitResult);
+      setError(null);
+      await fetchBaiduStatus();
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "百度推送失败。");
+    } finally {
+      setBaiduBusy(null);
     }
   }
 
@@ -806,6 +879,7 @@ export function WorkflowDashboard({
     { key: "models", label: "AI模型配置", description: "配置模型A、模型B和模型C" },
     { key: "prompts", label: "Prompt提示词", description: "编辑生成、质检、重写提示词" },
     { key: "keywords", label: "关键词文件", description: "新增、删除和预览关键词" },
+    { key: "baidu", label: "百度 Sitemap", description: "单条提交、批量提交和 sitemap 主动推送" },
     { key: "workflow", label: "流程操作", description: "执行生成、质检、重写、校验、审核、发布" },
     { key: "logs", label: "最近日志", description: "查看脚本运行事件" },
   ];
@@ -922,6 +996,22 @@ export function WorkflowDashboard({
               ) : (
                 <EmptyState text="当前工作流没有关键词文件面板。" />
               ))}
+
+            {activePanel === "baidu" && (
+              <BaiduSubmitPanel
+                status={baiduStatus}
+                singleUrl={baiduSingleUrl}
+                batchUrls={baiduBatchUrls}
+                sitemapLimit={baiduSitemapLimit}
+                busy={baiduBusy}
+                result={baiduResult}
+                onSingleUrlChange={setBaiduSingleUrl}
+                onBatchUrlsChange={setBaiduBatchUrls}
+                onSitemapLimitChange={setBaiduSitemapLimit}
+                onSubmit={submitBaidu}
+                onRefresh={fetchBaiduStatus}
+              />
+            )}
 
             {activePanel === "workflow" && (
               <section className="pipeline-panel p-5">
@@ -1055,6 +1145,178 @@ export function WorkflowDashboard({
         />
       )}
     </div>
+  );
+}
+
+function BaiduSubmitPanel({
+  status,
+  singleUrl,
+  batchUrls,
+  sitemapLimit,
+  busy,
+  result,
+  onSingleUrlChange,
+  onBatchUrlsChange,
+  onSitemapLimitChange,
+  onSubmit,
+  onRefresh,
+}: {
+  status: BaiduStatus | null;
+  singleUrl: string;
+  batchUrls: string;
+  sitemapLimit: string;
+  busy: "single" | "batch" | "sitemap" | null;
+  result: BaiduSubmitResult | null;
+  onSingleUrlChange: (value: string) => void;
+  onBatchUrlsChange: (value: string) => void;
+  onSitemapLimitChange: (value: string) => void;
+  onSubmit: (mode: "single" | "batch" | "sitemap") => void;
+  onRefresh: () => void;
+}) {
+  const batchCount = batchUrls.split(/\r?\n/u).map((line) => line.trim()).filter(Boolean).length;
+  const sitemapLimitNumber = Number.parseInt(sitemapLimit, 10);
+
+  return (
+    <section className="pipeline-panel p-5">
+      <div className="flex flex-col gap-4 border-b border-slate-700 pb-5 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-white">百度 Sitemap 主动推送</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            用于把新文章、服务页或整站 sitemap URL 主动提交给百度搜索资源平台。接口 token 只从本地
+            <span className="mx-1 rounded bg-slate-950 px-1.5 py-0.5 font-mono text-xs text-slate-200">local-brain/.env</span>
+            读取，不会出现在前端代码或 Git 仓库里。
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="w-fit rounded border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-brand-500"
+        >
+          刷新状态
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        <div className="rounded border border-slate-800 bg-slate-950/50 p-4">
+          <p className="text-xs text-slate-500">站点</p>
+          <p className="mt-2 break-all font-mono text-sm text-slate-100">{status?.site || "未读取"}</p>
+        </div>
+        <div className="rounded border border-slate-800 bg-slate-950/50 p-4">
+          <p className="text-xs text-slate-500">接口</p>
+          <p className="mt-2 break-all font-mono text-sm text-slate-100">{status?.endpoint || "未配置"}</p>
+        </div>
+        <div className="rounded border border-slate-800 bg-slate-950/50 p-4">
+          <p className="text-xs text-slate-500">配置状态</p>
+          <p className={`mt-2 text-sm font-semibold ${status?.configured ? "text-emerald-300" : "text-rose-300"}`}>
+            {status?.configured ? "已配置，可提交" : "未配置 BAIDU_PUSH_ENDPOINT 或 BAIDU_PUSH_TOKEN"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-5 xl:grid-cols-2">
+        <div className="rounded border border-slate-800 bg-slate-900/60 p-4">
+          <h3 className="font-semibold text-white">单条提交</h3>
+          <p className="mt-1 text-xs text-slate-500">适合发布新文章后立刻推送一条 URL。</p>
+          <input
+            value={singleUrl}
+            onChange={(event) => onSingleUrlChange(event.target.value)}
+            className="mt-4 w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-brand-500"
+            placeholder="https://www.qqbytop.com/zh/blog/xxx"
+          />
+          <button
+            type="button"
+            onClick={() => onSubmit("single")}
+            disabled={Boolean(busy) || !status?.configured || !singleUrl.trim()}
+            className="mt-4 rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+          >
+            {busy === "single" ? "提交中..." : "提交单条 URL"}
+          </button>
+        </div>
+
+        <div className="rounded border border-slate-800 bg-slate-900/60 p-4">
+          <h3 className="font-semibold text-white">从 sitemap 批量提交</h3>
+          <p className="mt-1 text-xs text-slate-500">自动读取线上 sitemap，并按百度当前额度限制提交前 N 条。</p>
+          <div className="mt-4 flex gap-3">
+            <input
+              value={sitemapLimit}
+              onChange={(event) => onSitemapLimitChange(event.target.value)}
+              className="w-32 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+              placeholder="10"
+              inputMode="numeric"
+            />
+            <button
+              type="button"
+              onClick={() => onSubmit("sitemap")}
+              disabled={Boolean(busy) || !status?.configured || !Number.isFinite(sitemapLimitNumber) || sitemapLimitNumber <= 0}
+              className="rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+            >
+              {busy === "sitemap" ? "提交中..." : "提交 sitemap URL"}
+            </button>
+          </div>
+          <p className="mt-3 break-all text-xs text-slate-500">{status?.sitemapUrl || "https://www.qqbytop.com/sitemap.xml"}</p>
+        </div>
+      </div>
+
+      <div className="mt-5 rounded border border-slate-800 bg-slate-900/60 p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-semibold text-white">批量提交</h3>
+            <p className="mt-1 text-xs text-slate-500">一行一个 URL，脚本会自动去重，并把 qqbytop.com 统一到 www.qqbytop.com。</p>
+          </div>
+          <span className="text-xs text-slate-500">当前 {batchCount} 条</span>
+        </div>
+        <textarea
+          value={batchUrls}
+          onChange={(event) => onBatchUrlsChange(event.target.value)}
+          className="mt-4 min-h-44 w-full resize-y rounded border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-sm leading-6 text-slate-100 outline-none focus:border-brand-500"
+          placeholder={"https://www.qqbytop.com/zh\nhttps://www.qqbytop.com/zh/blog/power-translation"}
+        />
+        <button
+          type="button"
+          onClick={() => onSubmit("batch")}
+          disabled={Boolean(busy) || !status?.configured || batchCount === 0}
+          className="mt-4 rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+        >
+          {busy === "batch" ? "提交中..." : "批量提交 URL"}
+        </button>
+      </div>
+
+      {status?.sitemapPreview && status.sitemapPreview.length > 0 && (
+        <div className="mt-5 rounded border border-slate-800 bg-slate-950/50 p-4">
+          <h3 className="text-sm font-semibold text-white">sitemap 预览</h3>
+          <div className="mt-3 grid gap-2">
+            {status.sitemapPreview.map((url) => (
+              <code key={url} className="break-all rounded bg-slate-900 px-3 py-2 text-xs text-slate-300">
+                {url}
+              </code>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {result && (
+        <div className="mt-5 rounded border border-emerald-500/30 bg-emerald-950/20 p-4">
+          <h3 className="font-semibold text-emerald-100">提交结果</h3>
+          <div className="mt-3 grid gap-3 md:grid-cols-3">
+            <SummaryCard label="成功提交" value={result.result.success || 0} />
+            <SummaryCard label="剩余额度" value={result.result.remain || 0} />
+            <SummaryCard label="本次 URL" value={result.submittedUrls.length} />
+          </div>
+          {(result.result.not_same_site?.length || result.result.not_valid?.length || result.result.message) && (
+            <pre className="mt-4 max-h-52 overflow-auto rounded bg-slate-950 p-3 text-xs leading-6 text-amber-100">
+              {JSON.stringify(result.result, null, 2)}
+            </pre>
+          )}
+          <div className="mt-4 grid gap-2">
+            {result.submittedUrls.map((url) => (
+              <code key={url} className="break-all rounded bg-slate-950 px-3 py-2 text-xs text-slate-300">
+                {url}
+              </code>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 
