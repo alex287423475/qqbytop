@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   assessQuoteLead,
   buildQuoteLeadTag,
+  getQuoteFollowUpGuide,
   getQuoteLeadGroup,
   getQuoteLeadGroupBadge,
   getQuotePriorityBadge,
@@ -49,6 +50,23 @@ test("getQuotePrioritySuggestion upgrades high intent blog categories", () => {
   assert.equal(standard.followUpSuggestion, "建议 2 小时内首次跟进");
 });
 
+test("getQuoteFollowUpGuide returns a usable opener and focus", () => {
+  const serviceGuide = getQuoteFollowUpGuide({
+    source: "service",
+    category: "技术翻译",
+  });
+  const blogGuide = getQuoteFollowUpGuide({
+    source: "blog",
+    category: "法律合规",
+  });
+
+  assert.match(serviceGuide.recommendedOpening, /服务页提交需求/);
+  assert.match(serviceGuide.followUpFocus, /文件类型/);
+
+  assert.match(blogGuide.recommendedOpening, /法律合规/);
+  assert.match(blogGuide.followUpFocus, /风险点/);
+});
+
 test("assessQuoteLead returns a full lead operation summary", () => {
   const assessment = assessQuoteLead({
     source: "service",
@@ -63,6 +81,10 @@ test("assessQuoteLead returns a full lead operation summary", () => {
     priorityBadge: "🔥",
     followUpSuggestion: "建议 10 分钟内首次跟进",
     priorityReason: "来自服务页入口，购买意图明确，通常已在比较交付能力与响应速度。",
+    recommendedOpening:
+      "您好，看到您是从服务页提交需求的，我先帮您确认一下文件类型、语种方向和交付时间，这样可以尽快给您准确报价。",
+    followUpFocus:
+      "优先确认文件类型、目标语种、用途、是否加急，以及客户最在意的是质量、时效还是保密要求。",
     leadTag: "服务页入口 / 技术翻译",
   });
 });

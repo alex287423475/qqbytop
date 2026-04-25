@@ -11,6 +11,8 @@ export type QuoteLeadAssessment = {
   priorityBadge: string;
   followUpSuggestion: string;
   priorityReason: string;
+  recommendedOpening: string;
+  followUpFocus: string;
   leadTag: string;
 };
 
@@ -173,6 +175,65 @@ export function getQuotePriorityBadge(priorityLabel: string) {
   }
 }
 
+function getBlogOpening(category: string, isHighIntent: boolean) {
+  if (category) {
+    if (isHighIntent) {
+      return `您好，看到您是从“${category}”相关文章进入询价页的，我先帮您确认文件类型、用途和交付时间，方便尽快给您更准确的建议和报价。`;
+    }
+
+    return `您好，看到您刚浏览了“${category}”相关内容，我这边先帮您快速判断一下是否需要专业翻译，以及大概的交付方式和报价区间。`;
+  }
+
+  return "您好，看到您是从博客内容进入询价页的，我先帮您确认一下文件类型、目标语种和使用场景，方便尽快给您建议。";
+}
+
+export function getQuoteFollowUpGuide({ source, category }: QuoteLeadContext) {
+  const normalizedSource = normalizeSource(source);
+  const normalizedCategory = normalizeCategory(category);
+  const isHighIntentBlog = normalizedSource === "blog" && HIGH_INTENT_BLOG_CATEGORIES.has(normalizedCategory);
+
+  switch (normalizedSource) {
+    case "service":
+      return {
+        recommendedOpening:
+          "您好，看到您是从服务页提交需求的，我先帮您确认一下文件类型、语种方向和交付时间，这样可以尽快给您准确报价。",
+        followUpFocus: "优先确认文件类型、目标语种、用途、是否加急，以及客户最在意的是质量、时效还是保密要求。",
+      };
+    case "pricing":
+      return {
+        recommendedOpening:
+          "您好，看到您在价格页提交了需求，我先帮您快速确认字数、文件格式和用途，这样可以更快给您对应的报价区间。",
+        followUpFocus: "优先确认预算敏感度、稿件字数、是否需要盖章/认证、是否有历史参考译文，以及对交付周期的要求。",
+      };
+    case "industry":
+      return {
+        recommendedOpening:
+          "您好，看到您是从行业方案页进入的，我先了解一下您的行业背景和文件场景，再给您匹配更合适的处理方式。",
+        followUpFocus: "优先确认所属行业、文件应用场景、术语要求、是否涉及法规或合规审查，以及是否需要长期协作。",
+      };
+    case "direct":
+    case "":
+      return {
+        recommendedOpening:
+          "您好，已收到您的询价需求。我先帮您确认一下文件类型、语种和使用用途，方便尽快给您安排报价和交付建议。",
+        followUpFocus: "优先确认项目范围、文件类型、使用国家/地区、时间要求，以及客户当前最急需解决的点。",
+      };
+    case "blog":
+      return {
+        recommendedOpening: getBlogOpening(normalizedCategory, isHighIntentBlog),
+        followUpFocus: isHighIntentBlog
+          ? "优先确认客户当前遇到的风险点、文件用途、是否已有现成材料，以及希望先解决报价、质量还是交付边界。"
+          : "优先确认客户是在前期了解，还是已经准备提交文件；再确认文件类型、使用场景和是否需要先做样稿或初步判断。",
+      };
+    default:
+      return {
+        recommendedOpening:
+          "您好，已收到您的询价信息。我先帮您确认一下文件类型、用途和交付时间，这样我们可以更快给到合适建议。",
+        followUpFocus: "优先确认来源背景、文件类型、使用场景和时间要求，再决定由哪类顾问继续跟进。",
+      };
+  }
+}
+
 export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment {
   const sourceLabel = getQuoteSourceLabel(context.source);
   const leadGroup = getQuoteLeadGroup(context);
@@ -180,6 +241,7 @@ export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment 
   const leadTag = buildQuoteLeadTag(context);
   const { priorityLabel, followUpSuggestion, priorityReason } = getQuotePrioritySuggestion(context);
   const priorityBadge = getQuotePriorityBadge(priorityLabel);
+  const { recommendedOpening, followUpFocus } = getQuoteFollowUpGuide(context);
 
   return {
     sourceLabel,
@@ -189,6 +251,8 @@ export function assessQuoteLead(context: QuoteLeadContext): QuoteLeadAssessment 
     priorityBadge,
     followUpSuggestion,
     priorityReason,
+    recommendedOpening,
+    followUpFocus,
     leadTag,
   };
 }

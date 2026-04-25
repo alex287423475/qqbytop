@@ -52,6 +52,8 @@ function buildFeishuText(submission: QuoteSubmission) {
     `来源说明：${assessment.sourceLabel}`,
     `优先级建议：${assessment.priorityBadge} ${assessment.priorityLabel} / ${assessment.followUpSuggestion}`,
     `建议理由：${assessment.priorityReason}`,
+    `推荐开场：${assessment.recommendedOpening}`,
+    `跟进重点：${assessment.followUpFocus}`,
     `姓名：${submission.name}`,
     `联系方式：${submission.contact}`,
     `服务级别：${submission.service_type || "未选择"}`,
@@ -130,6 +132,8 @@ async function sendGenericWebhook(submission: QuoteSubmission) {
       priority_badge: assessment.priorityBadge,
       follow_up_suggestion: assessment.followUpSuggestion,
       priority_reason: assessment.priorityReason,
+      recommended_opening: assessment.recommendedOpening,
+      follow_up_focus: assessment.followUpFocus,
     }),
   });
 
@@ -177,6 +181,8 @@ export async function POST(request: NextRequest) {
         priority_badge: assessment.priorityBadge,
         follow_up_suggestion: assessment.followUpSuggestion,
         priority_reason: assessment.priorityReason,
+        recommended_opening: assessment.recommendedOpening,
+        follow_up_focus: assessment.followUpFocus,
       }),
     );
   }
