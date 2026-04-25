@@ -3,6 +3,8 @@ import { CTA } from "@/components/shared/CTA";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { home, services, type Locale } from "@/lib/site-data";
 
+const searchSuggestions = ["证件翻译", "合同翻译报价", "跨境电商 POA", "SDLXLIFF", "专利翻译", "电气设备手册"];
+
 export const metadata = {
   title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
   description: "QQBY 全球博译提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
@@ -31,6 +33,50 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 <div className="mt-1 text-sm text-slate-400">{label}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 -mt-10 px-5">
+        <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/70 sm:p-7">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.35fr)] lg:items-center">
+            <div>
+              <p className="text-sm font-semibold text-brand-600">不知道该看哪个页面？</p>
+              <h2 className="mt-2 text-2xl font-bold text-brand-900">直接搜索你的文件、场景或问题</h2>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                输入关键词后，系统会同时检索服务、行业方案和专业文章，帮你快速找到解决方案或答案。
+              </p>
+            </div>
+
+            <div>
+              <form action={`/${locale}/search`} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_128px]">
+                <label className="sr-only" htmlFor="home-search-query">
+                  搜索关键词
+                </label>
+                <input
+                  id="home-search-query"
+                  name="q"
+                  type="search"
+                  placeholder="例如：证件翻译需要注意什么"
+                  className="min-h-14 rounded-2xl border border-slate-200 px-5 text-base text-brand-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-100"
+                />
+                <button type="submit" className="min-h-14 rounded-2xl bg-brand-600 px-6 text-base font-semibold text-white transition hover:bg-brand-500">
+                  搜索答案
+                </button>
+              </form>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {searchSuggestions.map((suggestion) => (
+                  <Link
+                    key={suggestion}
+                    href={`/${locale}/search?q=${encodeURIComponent(suggestion)}`}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                  >
+                    {suggestion}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
