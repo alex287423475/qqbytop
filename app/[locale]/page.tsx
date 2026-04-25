@@ -76,6 +76,36 @@ const homeFaq = [
   },
 ];
 
+const testimonialCases = [
+  {
+    client: "芯片设计企业知识产权负责人",
+    industry: "半导体 / 专利文件",
+    project: "12 项海外专利说明书、权利要求书与审查意见答复材料翻译",
+    result: "按专利代理人意见统一术语和权利要求层级，交付后未因翻译表述触发形式补正。",
+    quote:
+      "这类文件最怕译文把技术特征说偏。全球博译会先确认术语表，再处理权利要求的从属关系，审校意见也能逐条回应。",
+    metrics: ["12 项专利", "术语表先行", "权利要求重点审校"],
+  },
+  {
+    client: "跨境家居品牌运营负责人",
+    industry: "跨境电商 / 平台申诉",
+    project: "亚马逊 POA 申诉信、采购凭证、客服沟通记录与合规说明翻译",
+    result: "重新梳理根因、纠正措施和预防机制，译文避免模板化表达，申诉材料一次提交通过。",
+    quote:
+      "之前我们只做直译，平台看不出整改动作。全球博译把中文说明重构成平台审核员能理解的逻辑，交付速度也很稳。",
+    metrics: ["8 小时急件", "POA 逻辑重构", "证据链同步翻译"],
+  },
+  {
+    client: "德资汽车零部件企业质量部",
+    industry: "制造业 / 质量体系",
+    project: "IATF 16949 体系文件、SOP、检验规范和培训材料批量翻译",
+    result: "256 份文件按同一术语库交付，编号、表格、警示语和质量术语保持一致，海外总部审阅顺利。",
+    quote:
+      "批量文件最难的是前后一致。项目经理把术语、格式和交付批次拆得很清楚，我们内部质量团队复核压力小很多。",
+    metrics: ["256 份文件", "批次交付", "格式与编号保留"],
+  },
+];
+
 export const metadata = {
   title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
   description: "QQBY 全球博译提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
@@ -368,16 +398,42 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
 
       <section className="bg-slate-50 py-20">
         <div className="mx-auto max-w-7xl px-5">
-          <SectionHeader title="客户评价" subtitle="来自长期合作客户的真实反馈。" />
+          <SectionHeader title="客户怎么评价一次交付" subtitle="评价不只看译文是否通顺，更看项目边界、术语一致、格式还原和提交后的可用性。" />
           <div className="mt-12 grid gap-6 lg:grid-cols-3">
-            {home.testimonials.map(([name, title, quote]) => (
-              <figure key={name} className="border border-slate-200 p-7">
-                <blockquote className="leading-8 text-slate-700">“{quote}”</blockquote>
-                <figcaption className="mt-6 text-sm text-slate-500">
-                  <strong className="block text-brand-900">{name}</strong>
-                  {title}
+            {testimonialCases.map((item) => (
+              <figure key={item.client} className="flex h-full flex-col border border-slate-200 bg-white p-7 shadow-sm">
+                <div>
+                  <p className="text-sm font-semibold text-brand-600">{item.industry}</p>
+                  <h3 className="mt-3 text-xl font-bold leading-8 text-brand-900">{item.project}</h3>
+                  <p className="mt-4 text-sm leading-7 text-slate-600">{item.result}</p>
+                </div>
+                <blockquote className="mt-6 border-l-4 border-brand-500 bg-brand-50 px-4 py-3 text-sm leading-7 text-slate-700">
+                  “{item.quote}”
+                </blockquote>
+                <div className="mt-6 flex flex-wrap gap-2">
+                  {item.metrics.map((metric) => (
+                    <span key={metric} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {metric}
+                    </span>
+                  ))}
+                </div>
+                <figcaption className="mt-6 border-t border-slate-100 pt-4 text-sm text-slate-500">
+                  <strong className="block text-brand-900">{item.client}</strong>
+                  已脱敏项目反馈
                 </figcaption>
               </figure>
+            ))}
+          </div>
+          <div className="mt-10 grid gap-4 border border-slate-200 bg-white p-6 md:grid-cols-3">
+            {[
+              ["先确认边界", "用途、提交机构、格式、盖章和审校深度先确认，再安排译员。"],
+              ["过程可追踪", "术语表、批次交付、QA问题和修改意见都能留痕。"],
+              ["交付能使用", "目标不是看起来像翻译，而是能被平台、机构或内部团队接收。"],
+            ].map(([title, text]) => (
+              <div key={title}>
+                <h3 className="font-bold text-brand-900">{title}</h3>
+                <p className="mt-2 text-sm leading-7 text-slate-600">{text}</p>
+              </div>
             ))}
           </div>
         </div>
