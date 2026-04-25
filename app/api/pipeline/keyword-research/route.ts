@@ -4,7 +4,7 @@ import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
 
-const MODEL_C_KEYWORD_TIMEOUT_MS = 15000;
+const MODEL_C_KEYWORD_TIMEOUT_MS = 30000;
 
 type KeywordCandidate = {
   keyword: string;
@@ -375,6 +375,18 @@ async function callModelC(
   if (config.provider === "openai" || config.provider === "deepseek") {
     const endpoint = resolveOpenAICompatibleEndpoint(config.baseUrl || defaultBaseUrl(config.provider));
     const body = buildOpenAICompatibleBody(endpoint.type, config.model, systemPrompt, userPrompt, 0.25, 3000);
+    if (endpoint.type === "chat") {
+      const streamResponse = await fetchWithTimeout(endpoint.url, {
+        method: "POST",
+        headers: buildOpenAICompatibleHeaders(config.apiKey, endpoint.type),
+        body: JSON.stringify({ ...body, stream: true }),
+      }, MODEL_C_KEYWORD_TIMEOUT_MS);
+      const streamText = await streamResponse.text();
+      if (!streamResponse.ok) throw new Error(`${config.provider} request failed: ${streamResponse.status} ${streamText.slice(0, 500)}`);
+      const streamedContent = parseOpenAICompatibleStream(streamText);
+      if (streamedContent) return streamedContent;
+    }
+
     const response = await fetchWithTimeout(endpoint.url, {
       method: "POST",
       headers: buildOpenAICompatibleHeaders(config.apiKey, endpoint.type),
@@ -556,6 +568,41 @@ function requireModelText(provider: string, data: unknown) {
   const text = extractModelText(data);
   if (text.trim()) return text.trim();
   throw new Error(`${provider} returned empty content. ${formatResponse(data)}`);
+}
+
+function parseOpenAICompatibleStream(text: string) {
+  if (!text.trim()) return "";
+
+  if (text.trimStart().startsWith("{")) {
+    try {
+      return extractModelText(JSON.parse(text));
+    } catch {
+      return "";
+    }
+  }
+
+  const contentChunks: string[] = [];
+  const fallbackChunks: string[] = [];
+  for (const line of text.split(/\r?\n/u)) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+
+    const payload = trimmed.slice(5).trim();
+    if (!payload || payload === "[DONE]") continue;
+
+    try {
+      const data = JSON.parse(payload);
+      const choice = data.choices?.[0];
+      const textPart = extractTextPart(choice?.delta?.content) || extractTextPart(choice?.message?.content) || extractTextPart(choice?.text);
+      const reasoningPart = extractTextPart(choice?.delta?.reasoning_content);
+      if (textPart) contentChunks.push(textPart);
+      if (reasoningPart) fallbackChunks.push(reasoningPart);
+    } catch {
+      // Compatible gateways can emit non-JSON keep-alive lines.
+    }
+  }
+
+  return contentChunks.join("").trim() || fallbackChunks.join("").trim();
 }
 
 function parseJsonPayload(text: string): any {

@@ -65,7 +65,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
     let timeout: number | undefined;
     try {
       const controller = new AbortController();
-      timeout = window.setTimeout(() => controller.abort(), 22000);
+      timeout = window.setTimeout(() => controller.abort(), 60000);
       const response = await fetch(`${apiBase}/keyword-research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -84,7 +84,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       const warning = payload?.warning ? ` ${payload.warning}` : "";
       setLastMessage(`已生成 ${rows.length} 个候选词，可用 ${payload?.summary?.available ?? 0} 个。来源：${engineLabel}。${warning}`);
     } catch (nextError) {
-      const message = nextError instanceof Error && nextError.name === "AbortError" ? "关键词挖掘请求超过 22 秒未响应，请检查模型C连接，或稍后重试。" : nextError instanceof Error ? nextError.message : "关键词挖掘失败。";
+      const message = nextError instanceof Error && nextError.name === "AbortError" ? "关键词挖掘请求超过 60 秒未响应，请检查模型C连接，或稍后重试。" : nextError instanceof Error ? nextError.message : "关键词挖掘失败。";
       setProgress({ value: 0, label: "" });
       setError(message);
     } finally {
@@ -151,7 +151,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
             <div className="h-full rounded-full bg-brand-500 transition-all duration-500" style={{ width: `${progress.value}%` }} />
           </div>
-          <p className="mt-2 text-xs text-slate-400">模型C最长等待约 15 秒；无响应时会自动使用本地规则返回候选词。</p>
+          <p className="mt-2 text-xs text-slate-400">模型C最长等待约 30 秒；无响应时会自动使用本地规则返回候选词。</p>
         </div>
       )}
 
