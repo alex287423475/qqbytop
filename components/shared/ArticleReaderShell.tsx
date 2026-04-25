@@ -36,6 +36,7 @@ type ReaderCopy = {
   openOutline: string;
   closeOutline: string;
   currentSectionLabel: string;
+  backToTop: string;
 };
 
 type ArticleReaderShellProps = {
@@ -85,6 +86,7 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
   const [activeSection, setActiveSection] = useState(article.sections[0]?.id ?? "");
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
   const [mobileOutlineOpen, setMobileOutlineOpen] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   const outlineItems = useMemo(() => article.sections.filter((section) => section.level === 2), [article.sections]);
   const numberedOutlineItems = useMemo(
@@ -246,6 +248,20 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
       window.removeEventListener("keydown", handleEscape);
     };
   }, [lightbox]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowBackToTop(window.scrollY > 720);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <>
@@ -441,11 +457,28 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
         </section>
       )}
 
-      {hasOutline && (
-        <>
+      <div className="fixed bottom-5 right-5 z-30 flex flex-col items-end gap-2">
+        <Link
+          href={quoteHref}
+          className="inline-flex items-center justify-center rounded-full bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition hover:bg-brand-500"
+        >
+          {copy.jumpToQuote}
+        </Link>
+
+        {showBackToTop && (
           <button
             type="button"
-            className="fixed bottom-5 right-5 z-30 inline-flex items-center gap-2 rounded-full bg-brand-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-brand-800 lg:hidden"
+            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-brand-900 shadow-lg shadow-slate-900/10 transition hover:border-brand-200 hover:text-brand-600"
+            onClick={scrollToTop}
+          >
+            {copy.backToTop}
+          </button>
+        )}
+
+        {hasOutline && (
+          <button
+            type="button"
+            className="inline-flex items-center gap-2 rounded-full bg-brand-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-brand-800 lg:hidden"
             aria-expanded={mobileOutlineOpen}
             aria-controls="article-mobile-outline"
             onClick={() => setMobileOutlineOpen(true)}
@@ -457,67 +490,67 @@ export function ArticleReaderShell({ locale, article, quoteHref, copy, related }
               </span>
             )}
           </button>
+        )}
+      </div>
 
-          {mobileOutlineOpen && (
-            <div className="fixed inset-0 z-40 bg-slate-950/45 lg:hidden" onClick={() => setMobileOutlineOpen(false)}>
-              <div
-                id="article-mobile-outline"
-                className="absolute inset-x-0 bottom-0 rounded-t-[1.75rem] border border-slate-200 bg-white px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl"
-                role="dialog"
-                aria-modal="true"
-                aria-label={copy.articleOutline}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
+      {hasOutline && mobileOutlineOpen && (
+        <div className="fixed inset-0 z-40 bg-slate-950/45 lg:hidden" onClick={() => setMobileOutlineOpen(false)}>
+          <div
+            id="article-mobile-outline"
+            className="absolute inset-x-0 bottom-0 rounded-t-[1.75rem] border border-slate-200 bg-white px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-4 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label={copy.articleOutline}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-200" />
 
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-semibold text-brand-600">{copy.currentSectionLabel}</p>
-                    <h2 className="mt-1 text-lg font-bold text-brand-900">{activeOutlineTitle || copy.articleOutline}</h2>
-                  </div>
-                  <button
-                    type="button"
-                    className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-brand-700"
-                    onClick={() => setMobileOutlineOpen(false)}
-                  >
-                    {copy.closeOutline}
-                  </button>
-                </div>
-
-                <nav className="mt-4 max-h-[65vh] overflow-y-auto pr-1">
-                  <ul className="space-y-2">
-                    {numberedOutlineItems.map((section) => {
-                      const isActive = section.id === activeSection;
-
-                      return (
-                        <li key={section.id}>
-                          <a
-                            href={`#${section.id}`}
-                            className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm leading-6 transition ${
-                              isActive
-                                ? "border-brand-200 bg-brand-50 font-semibold text-brand-700"
-                                : "border-slate-200 text-slate-600 hover:border-brand-100 hover:bg-slate-50 hover:text-brand-600"
-                            }`}
-                            onClick={() => setMobileOutlineOpen(false)}
-                          >
-                            <span
-                              className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-bold ${
-                                isActive ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500"
-                              }`}
-                            >
-                              {section.number}
-                            </span>
-                            <span>{section.title}</span>
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </nav>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-brand-600">{copy.currentSectionLabel}</p>
+                <h2 className="mt-1 text-lg font-bold text-brand-900">{activeOutlineTitle || copy.articleOutline}</h2>
               </div>
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-600 transition hover:border-slate-300 hover:text-brand-700"
+                onClick={() => setMobileOutlineOpen(false)}
+              >
+                {copy.closeOutline}
+              </button>
             </div>
-          )}
-        </>
+
+            <nav className="mt-4 max-h-[65vh] overflow-y-auto pr-1">
+              <ul className="space-y-2">
+                {numberedOutlineItems.map((section) => {
+                  const isActive = section.id === activeSection;
+
+                  return (
+                    <li key={section.id}>
+                      <a
+                        href={`#${section.id}`}
+                        className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm leading-6 transition ${
+                          isActive
+                            ? "border-brand-200 bg-brand-50 font-semibold text-brand-700"
+                            : "border-slate-200 text-slate-600 hover:border-brand-100 hover:bg-slate-50 hover:text-brand-600"
+                        }`}
+                        onClick={() => setMobileOutlineOpen(false)}
+                      >
+                        <span
+                          className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-bold ${
+                            isActive ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {section.number}
+                        </span>
+                        <span>{section.title}</span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
+        </div>
       )}
 
       {lightbox && (

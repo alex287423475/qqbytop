@@ -36,6 +36,7 @@ const copy = {
     openOutline: "打开目录",
     closeOutline: "关闭",
     currentSectionLabel: "当前阅读",
+    backToTop: "返回顶部",
   },
   en: {
     blogLabel: "Insights",
@@ -62,6 +63,7 @@ const copy = {
     openOutline: "Outline",
     closeOutline: "Close",
     currentSectionLabel: "Current section",
+    backToTop: "Back to top",
   },
   ja: {
     blogLabel: "専門情報",
@@ -88,6 +90,7 @@ const copy = {
     openOutline: "目次を開く",
     closeOutline: "閉じる",
     currentSectionLabel: "現在の章",
+    backToTop: "ページ上部へ",
   },
 } as const;
 
@@ -359,6 +362,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
           openOutline: ui.openOutline,
           closeOutline: ui.closeOutline,
           currentSectionLabel: ui.currentSectionLabel,
+          backToTop: ui.backToTop,
         }}
         related={related.map((item) => ({
           slug: item.slug,
