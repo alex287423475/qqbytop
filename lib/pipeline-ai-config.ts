@@ -78,18 +78,18 @@ export function getAiRoleConfig(role: AiRole): AiConfig {
   const env = readLocalEnv();
   const meta = roleMeta[role];
   const legacyProvider = env.get("AI_PROVIDER") || process.env.AI_PROVIDER || "mock";
-  const provider = normalizeProvider(env.get(`${meta.prefix}_PROVIDER`) || legacyProvider);
+  const provider = normalizeProvider(env.get(`${meta.prefix}_PROVIDER`) || process.env[`${meta.prefix}_PROVIDER`] || legacyProvider);
   const modelKey = providerModelKeys[provider];
-  const legacyModel = env.get("LLM_MODEL") || env.get(modelKey) || defaultModels[provider];
-  const apiKey = env.get(`${meta.prefix}_API_KEY`) || env.get("LLM_API_KEY") || "";
+  const legacyModel = env.get("LLM_MODEL") || process.env.LLM_MODEL || env.get(modelKey) || process.env[modelKey] || defaultModels[provider];
+  const apiKey = env.get(`${meta.prefix}_API_KEY`) || process.env[`${meta.prefix}_API_KEY`] || env.get("LLM_API_KEY") || process.env.LLM_API_KEY || "";
 
   return {
     role,
     label: meta.label,
     purpose: meta.purpose,
     provider,
-    baseUrl: env.get(`${meta.prefix}_BASE_URL`) || env.get("LLM_BASE_URL") || "",
-    model: env.get(`${meta.prefix}_MODEL`) || legacyModel,
+    baseUrl: env.get(`${meta.prefix}_BASE_URL`) || process.env[`${meta.prefix}_BASE_URL`] || env.get("LLM_BASE_URL") || process.env.LLM_BASE_URL || "",
+    model: env.get(`${meta.prefix}_MODEL`) || process.env[`${meta.prefix}_MODEL`] || legacyModel,
     apiKeySet: apiKey.length > 0,
     apiKeyMasked: maskSecret(apiKey),
   };
@@ -101,9 +101,9 @@ export function getAiEnvForChild(role: AiRole = "modelA", providerOverride?: str
   const config = getAiRoleConfig(role);
   const provider = normalizeProvider(providerOverride || config.provider);
   const modelKey = providerModelKeys[provider];
-  const model = env.get(`${meta.prefix}_MODEL`) || config.model || defaultModels[provider];
-  const apiKey = env.get(`${meta.prefix}_API_KEY`) || env.get("LLM_API_KEY") || "";
-  const baseUrl = env.get(`${meta.prefix}_BASE_URL`) || env.get("LLM_BASE_URL") || "";
+  const model = env.get(`${meta.prefix}_MODEL`) || process.env[`${meta.prefix}_MODEL`] || config.model || defaultModels[provider];
+  const apiKey = env.get(`${meta.prefix}_API_KEY`) || process.env[`${meta.prefix}_API_KEY`] || env.get("LLM_API_KEY") || process.env.LLM_API_KEY || "";
+  const baseUrl = env.get(`${meta.prefix}_BASE_URL`) || process.env[`${meta.prefix}_BASE_URL`] || env.get("LLM_BASE_URL") || process.env.LLM_BASE_URL || "";
 
   return {
     AI_PROVIDER: provider,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { SearchAiAnswer } from "@/components/shared/SearchAiAnswer";
 import { searchSite, searchTypeLabels, type SearchResultType } from "@/lib/search";
 import { locales, type Locale } from "@/lib/site-data";
 
@@ -90,6 +91,8 @@ export default async function SearchPage({ params, searchParams }: SearchPagePro
 
       <section className="py-14">
         <div className="mx-auto max-w-7xl px-5">
+          {query && <SearchAiAnswer query={query} locale={normalized} type={activeType} />}
+
           <div className="mb-8 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h2 className="text-2xl font-bold text-brand-900">{query ? `“${query}” 的搜索结果` : "推荐入口"}</h2>

@@ -1074,7 +1074,7 @@ function AiConfigPanel({
     <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">AI 模型配置</h2>
-        <p className="text-sm text-slate-400">模型A用于生成文章；模型B用于AI质检和AI重写。配置只保存在本地 local-brain/.env，API Key 不会提交到 Git。</p>
+        <p className="text-sm text-slate-400">模型A用于生成文章和站内AI搜索回答；模型B用于AI质检和AI重写。配置只保存在本地 local-brain/.env，API Key 不会提交到 Git。</p>
       </div>
 
       <div className="mt-5 flex items-center justify-between gap-3">
