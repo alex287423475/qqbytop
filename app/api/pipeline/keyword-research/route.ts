@@ -376,13 +376,11 @@ async function callModelC(
     const endpoint = resolveOpenAICompatibleEndpoint(config.baseUrl || defaultBaseUrl(config.provider));
     const body = buildOpenAICompatibleBody(endpoint.type, config.model, systemPrompt, userPrompt, 0.25, 3000);
     if (endpoint.type === "chat") {
-      const streamResponse = await fetchWithTimeout(endpoint.url, {
+      const streamText = await fetchTextWithTimeout(endpoint.url, {
         method: "POST",
         headers: buildOpenAICompatibleHeaders(config.apiKey, endpoint.type),
         body: JSON.stringify({ ...body, stream: true }),
       }, MODEL_C_KEYWORD_TIMEOUT_MS);
-      const streamText = await streamResponse.text();
-      if (!streamResponse.ok) throw new Error(`${config.provider} request failed: ${streamResponse.status} ${streamText.slice(0, 500)}`);
       const streamedContent = parseOpenAICompatibleStream(streamText);
       if (streamedContent) return streamedContent;
     }
@@ -442,6 +440,25 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`模型C请求超过 ${Math.round(timeoutMs / 1000)} 秒未响应`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchTextWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    const text = await response.text();
+    if (!response.ok) throw new Error(`request failed: ${response.status} ${text.slice(0, 500)}`);
+    return text;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       throw new Error(`模型C请求超过 ${Math.round(timeoutMs / 1000)} 秒未响应`);
