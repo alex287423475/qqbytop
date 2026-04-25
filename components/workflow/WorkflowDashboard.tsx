@@ -460,6 +460,16 @@ export function WorkflowDashboard({
     () => keywordRows.filter((row) => selectedKeywordSlugs[row.slug]),
     [keywordRows, selectedKeywordSlugs],
   );
+  const pendingKeywordRows = useMemo(() => keywordRows.filter((row) => !row.generated), [keywordRows]);
+  const generatedKeywordRows = useMemo(() => keywordRows.filter((row) => row.generated), [keywordRows]);
+  const selectedPendingKeywordRows = useMemo(
+    () => pendingKeywordRows.filter((row) => selectedKeywordSlugs[row.slug]),
+    [pendingKeywordRows, selectedKeywordSlugs],
+  );
+  const selectedGeneratedKeywordRows = useMemo(
+    () => generatedKeywordRows.filter((row) => selectedKeywordSlugs[row.slug]),
+    [generatedKeywordRows, selectedKeywordSlugs],
+  );
 
   async function saveAiConfig(role: AiRole) {
     if (aiTestBusy === role) return;
@@ -614,6 +624,15 @@ export function WorkflowDashboard({
     const selectable = keywordRows.filter((row) => row.slug);
     const allSelected = selectable.length > 0 && selectable.every((row) => selectedKeywordSlugs[row.slug]);
     setSelectedKeywordSlugs(Object.fromEntries(selectable.map((row) => [row.slug, !allSelected])));
+  }
+
+  function toggleKeywordGroup(rows: KeywordRow[]) {
+    const selectable = rows.filter((row) => row.slug);
+    const allSelected = selectable.length > 0 && selectable.every((row) => selectedKeywordSlugs[row.slug]);
+    setSelectedKeywordSlugs((current) => ({
+      ...current,
+      ...Object.fromEntries(selectable.map((row) => [row.slug, !allSelected])),
+    }));
   }
 
   async function submitBaidu(mode: "single" | "batch" | "sitemap") {
@@ -1158,16 +1177,81 @@ export function WorkflowDashboard({
                       </button>
                     </div>
                   </div>
-                  {selectedKeywordRows.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {selectedKeywordRows.slice(0, 12).map((row) => (
-                        <span key={row.slug} className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-200">
-                          {row.keyword}
-                        </span>
-                      ))}
-                      {selectedKeywordRows.length > 12 && <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">+{selectedKeywordRows.length - 12}</span>}
+                  <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                    <div className="rounded border border-emerald-500/25 bg-emerald-950/10 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-emerald-100">未生成文章的关键词</p>
+                          <p className="mt-1 text-xs text-emerald-200/70">共 {pendingKeywordRows.length} 个，已选 {selectedPendingKeywordRows.length} 个。建议优先从这里生成新文章。</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleKeywordGroup(pendingKeywordRows)}
+                          disabled={pendingKeywordRows.length === 0 || isBusy}
+                          className="shrink-0 rounded border border-emerald-500/40 px-3 py-1.5 text-xs text-emerald-100 hover:border-emerald-300 disabled:text-slate-600"
+                        >
+                          全选/取消
+                        </button>
+                      </div>
+                      <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                        {pendingKeywordRows.length === 0 ? (
+                          <p className="rounded bg-slate-900/60 px-3 py-3 text-xs text-slate-500">暂无未生成文章的关键词。</p>
+                        ) : (
+                          pendingKeywordRows.map((row) => (
+                            <label key={row.slug} className="flex items-start gap-2 rounded bg-slate-900/60 px-3 py-2 text-xs text-slate-200 hover:bg-slate-800">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(selectedKeywordSlugs[row.slug])}
+                                onChange={(event) => toggleKeywordSlug(row.slug, event.target.checked)}
+                                className="mt-0.5 h-4 w-4 accent-emerald-500"
+                              />
+                              <span className="min-w-0">
+                                <span className="block font-medium text-slate-100">{row.keyword}</span>
+                                <span className="mt-0.5 block text-slate-500">{row.slug}</span>
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  )}
+
+                    <div className="rounded border border-slate-700 bg-slate-950/40 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-100">已有文章的关键词</p>
+                          <p className="mt-1 text-xs text-slate-400">共 {generatedKeywordRows.length} 个，已选 {selectedGeneratedKeywordRows.length} 个。通常用于重生成或覆盖草稿。</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleKeywordGroup(generatedKeywordRows)}
+                          disabled={generatedKeywordRows.length === 0 || isBusy}
+                          className="shrink-0 rounded border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:border-brand-500 disabled:text-slate-600"
+                        >
+                          全选/取消
+                        </button>
+                      </div>
+                      <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+                        {generatedKeywordRows.length === 0 ? (
+                          <p className="rounded bg-slate-900/60 px-3 py-3 text-xs text-slate-500">暂无已有文章的关键词。</p>
+                        ) : (
+                          generatedKeywordRows.map((row) => (
+                            <label key={row.slug} className="flex items-start gap-2 rounded bg-slate-900/60 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">
+                              <input
+                                type="checkbox"
+                                checked={Boolean(selectedKeywordSlugs[row.slug])}
+                                onChange={(event) => toggleKeywordSlug(row.slug, event.target.checked)}
+                                className="mt-0.5 h-4 w-4 accent-brand-500"
+                              />
+                              <span className="min-w-0">
+                                <span className="block font-medium text-slate-100">{row.keyword}</span>
+                                <span className="mt-0.5 block text-slate-500">{row.articleStatusLabel || "已有文章"} / {row.slug}</span>
+                              </span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
