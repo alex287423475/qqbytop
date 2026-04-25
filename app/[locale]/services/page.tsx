@@ -2,12 +2,20 @@ import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
+import { buildSeoMetadata } from "@/lib/seo";
 import { services, type Locale } from "@/lib/site-data";
 
-export const metadata = {
-  title: "翻译服务",
-  description: "QQBY 翻译服务总览：专业文档翻译、法律合规翻译、跨境电商合规翻译、技术文档本地化。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+
+  return buildSeoMetadata({
+    locale,
+    path: "/services",
+    title: "翻译服务",
+    description: "北京全球博译翻译服务总览：专业文档翻译、法律合规翻译、跨境电商合规翻译、技术文档本地化与证件翻译。",
+    keywords: services.flatMap((service) => [service.title, service.shortTitle, service.badge]),
+  });
+}
 
 const serviceDecisionRows = [
   ["只需要读懂内容", "标准翻译", "内部参考、邮件、普通说明材料", "控制成本，重点保证准确完整"],

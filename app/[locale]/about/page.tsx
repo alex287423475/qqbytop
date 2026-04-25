@@ -4,12 +4,20 @@ import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { contact, getQqHref, getWhatsappHref } from "@/lib/contact";
+import { buildSeoMetadata } from "@/lib/seo";
 import { about, type Locale } from "@/lib/site-data";
 
-export const metadata = {
-  title: "关于我们",
-  description: "了解北京全球博译翻译公司的服务理念、交付体系、质量控制、保密机制和联系方式。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+
+  return buildSeoMetadata({
+    locale,
+    path: "/about",
+    title: "关于我们",
+    description: "了解北京全球博译翻译公司的服务理念、交付体系、质量控制、保密机制、适合客户类型和联系方式。",
+    keywords: ["北京全球博译翻译公司", "全球博译", "翻译公司介绍", "翻译质量控制"],
+  });
+}
 
 const trustMetrics = [
   ["2014", "开始服务企业笔译和口译项目"],

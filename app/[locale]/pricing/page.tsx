@@ -2,12 +2,20 @@ import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
+import { buildSeoMetadata } from "@/lib/seo";
 import { pricing, type Locale } from "@/lib/site-data";
 
-export const metadata = {
-  title: "价格说明",
-  description: "QQBY 翻译服务价格说明：服务级别、语种系数、紧急通道、格式处理和报价原则。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+
+  return buildSeoMetadata({
+    locale,
+    path: "/pricing",
+    title: "价格说明",
+    description: "北京全球博译翻译服务价格说明：服务级别、语种系数、紧急通道、格式处理、报价原则和常见费用边界。",
+    keywords: ["翻译价格", "翻译报价", "证件翻译价格", "合同翻译报价", "技术文档翻译价格"],
+  });
+}
 
 const priceFactors = [
   ["文件用途", "内部阅读、机构提交、平台申诉、法律审阅、对外发布对应不同审校深度。"],

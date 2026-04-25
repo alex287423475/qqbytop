@@ -4,6 +4,7 @@ import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { getAllArticles } from "@/lib/articles";
+import { buildSeoMetadata } from "@/lib/seo";
 import { home, industries, services, type Locale } from "@/lib/site-data";
 
 const searchSuggestions = ["证件翻译", "合同翻译报价", "跨境电商 POA", "SDLXLIFF", "专利翻译", "电气设备手册"];
@@ -106,10 +107,16 @@ const testimonialCases = [
   },
 ];
 
-export const metadata = {
-  title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
-  description: "QQBY 全球博译提供跨境电商合规翻译、法律合规翻译、技术文档本地化与专业文档翻译服务。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+
+  return buildSeoMetadata({
+    locale,
+    title: "北京全球博译翻译 | 跨境合规翻译 · 技术本地化 · 专利文档翻译",
+    description: "北京全球博译翻译公司提供跨境电商合规翻译、法律合规翻译、技术文档本地化、证件翻译与专利文档翻译服务。",
+    keywords: ["翻译报价", "文件翻译", "翻译公司", "本地化服务"],
+  });
+}
 
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

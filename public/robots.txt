@@ -1,3 +1,10 @@
 User-agent: *
 Allow: /
-Disallow: /ad*
+Disallow: /api/
+Disallow: /zh/admin/
+Disallow: /en/admin/
+Disallow: /ja/admin/
+Disallow: /en/
+Disallow: /ja/
+
+Sitemap: https://qqbytop.com/sitemap.xml

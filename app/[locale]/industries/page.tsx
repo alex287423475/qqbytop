@@ -2,12 +2,20 @@ import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
+import { buildSeoMetadata } from "@/lib/seo";
 import { industries, type Locale } from "@/lib/site-data";
 
-export const metadata = {
-  title: "行业翻译方案",
-  description: "QQBY 行业翻译方案：法律、跨境电商、科技、制造业专属翻译解决方案。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+
+  return buildSeoMetadata({
+    locale,
+    path: "/industries",
+    title: "行业翻译方案",
+    description: "北京全球博译行业翻译方案：法律、跨境电商、科技、制造业等行业的专业翻译、本地化与合规交付方案。",
+    keywords: industries.flatMap((industry) => [industry.title, industry.badge]),
+  });
+}
 
 const industryMethod = [
   ["行业风险", "先判断文件会影响审批、交易、平台审核还是现场执行。"],

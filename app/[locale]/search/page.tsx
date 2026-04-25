@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SearchAiAnswer } from "@/components/shared/SearchAiAnswer";
 import { searchSite, searchTypeLabels, type SearchResultType } from "@/lib/search";
+import { buildSeoMetadata } from "@/lib/seo";
 import { locales, type Locale } from "@/lib/site-data";
 
 type SearchPageProps = {
@@ -23,14 +24,14 @@ export async function generateMetadata({ params, searchParams }: SearchPageProps
   const normalized = locales.includes(locale as Locale) ? (locale as Locale) : "zh";
   const title = q ? `搜索：${q}` : "全站搜索";
 
-  return {
+  return buildSeoMetadata({
+    locale: normalized,
+    path: "/search",
     title,
     description: "搜索北京全球博译翻译公司网站内的服务、行业方案、专业文章和询价入口。",
-    alternates: {
-      canonical: `https://qqbytop.com/${normalized}/search`,
-    },
-    robots: q ? { index: false, follow: true } : { index: true, follow: true },
-  };
+    keywords: ["站内搜索", "翻译服务搜索", "翻译问题答案"],
+    noIndex: true,
+  });
 }
 
 export default async function SearchPage({ params, searchParams }: SearchPageProps) {

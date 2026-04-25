@@ -218,6 +218,7 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
   return {
     title: article.title,
     description: article.description,
+    keywords: article.keywords.join(", "),
     alternates: {
       canonical,
     },
@@ -226,6 +227,12 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
       title: article.title,
       description: article.description,
       url: canonical,
+      images: ogImages,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.title,
+      description: article.description,
       images: ogImages,
     },
   };

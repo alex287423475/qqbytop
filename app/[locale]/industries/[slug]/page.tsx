@@ -3,20 +3,24 @@ import { notFound } from "next/navigation";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
+import { buildSeoMetadata } from "@/lib/seo";
 import { getIndustry, getService, industries, type Locale } from "@/lib/site-data";
 
 export function generateStaticParams() {
   return industries.flatMap((industry) => ["zh", "en", "ja"].map((locale) => ({ locale, slug: industry.slug })));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }) {
+  const { locale, slug } = await params;
   const industry = getIndustry(slug);
 
-  return {
+  return buildSeoMetadata({
+    locale,
+    path: `/industries/${slug}`,
     title: industry?.title ?? "行业翻译方案",
-    description: industry?.summary,
-  };
+    description: industry?.summary ?? "北京全球博译行业翻译方案详情页，说明行业材料场景、风险控制、关联服务和常见问题。",
+    keywords: industry ? [industry.title, industry.badge, ...industry.scenarios.map((item) => item.title)] : ["行业翻译方案"],
+  });
 }
 
 const industryOperatingModels: Record<string, string[]> = {

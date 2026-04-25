@@ -422,6 +422,7 @@ export function buildBlogPageMetadata({
 }): Metadata {
   const copy = getBlogCopy(locale);
   const canonical = buildBlogHref(locale, category, page);
+  const absoluteCanonical = buildAbsoluteUrl(canonical);
   const categoryLabel = category && category !== "all" ? category : "";
 
   if (locale === "zh") {
@@ -435,11 +436,20 @@ export function buildBlogPageMetadata({
     return {
       title,
       description,
+      keywords: categoryLabel ? `${categoryLabel}, 翻译文章, 北京全球博译, 专业翻译` : "翻译文章, 翻译报价, 法律翻译, 技术本地化, 跨境电商翻译",
       alternates: { canonical },
       openGraph: {
         title,
         description,
-        url: canonical,
+        url: absoluteCanonical,
+        siteName: "北京全球博译翻译公司",
+        images: ["/brand/qqby-og.svg"],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: ["/brand/qqby-og.svg"],
       },
     };
   }
@@ -454,11 +464,20 @@ export function buildBlogPageMetadata({
   return {
     title,
     description,
+    keywords: categoryLabel ? `${categoryLabel}, translation insights, QQBY` : "translation insights, compliance translation, technical localization",
     alternates: { canonical },
     openGraph: {
       title,
       description,
-      url: canonical,
+      url: absoluteCanonical,
+      siteName: "QQBY",
+      images: ["/brand/qqby-og.svg"],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/brand/qqby-og.svg"],
     },
   };
 }

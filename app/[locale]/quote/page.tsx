@@ -1,11 +1,19 @@
 import { SmartQuoteForm } from "@/components/quote/SmartQuoteForm";
 import { buildQuotePrefill } from "@/lib/quote-page";
+import { buildSeoMetadata } from "@/lib/seo";
 import { locales, type Locale } from "@/lib/site-data";
 
-export const metadata = {
-  title: "获取翻译报价",
-  description: "在线提交翻译需求，30 分钟内获得项目经理响应和报价建议。",
-};
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+
+  return buildSeoMetadata({
+    locale,
+    path: "/quote",
+    title: "获取翻译报价",
+    description: "在线提交证件翻译、合同翻译、跨境电商翻译、技术文档翻译等需求，获取北京全球博译项目经理的报价建议。",
+    keywords: ["获取翻译报价", "翻译询价", "北京翻译报价", "文件翻译报价"],
+  });
+}
 
 export default async function QuotePage({
   params,

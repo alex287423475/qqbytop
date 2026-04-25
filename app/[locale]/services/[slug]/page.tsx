@@ -3,19 +3,24 @@ import { notFound } from "next/navigation";
 import { CTA } from "@/components/shared/CTA";
 import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
+import { buildSeoMetadata } from "@/lib/seo";
 import { getService, industries, services, type Locale } from "@/lib/site-data";
 
 export function generateStaticParams() {
   return services.flatMap((service) => ["zh", "en", "ja"].map((locale) => ({ locale, slug: service.slug })));
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ locale: string; slug: string }> }) {
+  const { locale, slug } = await params;
   const service = getService(slug);
-  return {
+
+  return buildSeoMetadata({
+    locale,
+    path: `/services/${slug}`,
     title: service?.title ?? "翻译服务",
-    description: service?.summary,
-  };
+    description: service?.summary ?? "北京全球博译翻译服务详情页，说明适用材料、交付流程、报价口径和常见问题。",
+    keywords: service ? [service.title, service.shortTitle, service.badge, ...service.scenarios] : ["翻译服务"],
+  });
 }
 
 const serviceEnhancements: Record<string, { suitable: string[]; deliverables: string[]; checks: string[] }> = {
