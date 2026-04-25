@@ -37,6 +37,11 @@ const copy = {
     closeOutline: "关闭",
     currentSectionLabel: "当前阅读",
     backToTop: "返回顶部",
+    trustTitle: "内容可信度",
+    trustReviewer: "北京全球博译翻译公司内容与项目团队审核",
+    trustScope: "适用范围",
+    trustUpdated: "最近更新",
+    trustHumanNote: "本文用于项目判断和准备沟通，不替代具体文件、用途和交付要求的人工确认。",
   },
   en: {
     blogLabel: "Insights",
@@ -64,6 +69,11 @@ const copy = {
     closeOutline: "Close",
     currentSectionLabel: "Current section",
     backToTop: "Back to top",
+    trustTitle: "Content trust",
+    trustReviewer: "Reviewed by QQBY content and project team",
+    trustScope: "Applies to",
+    trustUpdated: "Last updated",
+    trustHumanNote: "This article supports project scoping and preparation, but does not replace human review of the actual files, use case, and deadline.",
   },
   ja: {
     blogLabel: "専門情報",
@@ -91,6 +101,11 @@ const copy = {
     closeOutline: "閉じる",
     currentSectionLabel: "現在の章",
     backToTop: "ページ上部へ",
+    trustTitle: "信頼性情報",
+    trustReviewer: "QQBY コンテンツ・プロジェクトチーム確認済み",
+    trustScope: "適用範囲",
+    trustUpdated: "最終更新",
+    trustHumanNote: "この記事は案件判断と準備の参考情報であり、実際のファイル、用途、納期に基づく個別確認に代わるものではありません。",
   },
 } as const;
 
@@ -117,6 +132,10 @@ function buildArticleSchema(locale: string, article: Awaited<ReturnType<typeof g
     image: article.images.map((image) => `${getBaseUrl()}${image}`),
     mainEntityOfPage: `${getBaseUrl()}/${locale}/blog/${article.slug}`,
     author: {
+      "@type": "Organization",
+      name: "北京全球博译翻译公司",
+    },
+    reviewedBy: {
       "@type": "Organization",
       name: "北京全球博译翻译公司",
     },
@@ -293,6 +312,33 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <p className="text-sm font-semibold text-brand-600">{ui.articleMetaTitle}</p>
               <p className="mt-3 text-sm leading-7 text-slate-600">{article.description}</p>
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-brand-900">{ui.trustTitle}</p>
+                <dl className="mt-4 space-y-3 text-sm">
+                  <div>
+                    <dt className="text-slate-500">{ui.trustUpdated}</dt>
+                    <dd className="mt-1 font-medium text-brand-900">{article.date}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">{ui.trustScope}</dt>
+                    <dd className="mt-1 flex flex-wrap gap-2">
+                      {article.categories.slice(0, 3).map((category) => (
+                        <span key={category} className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-slate-600">
+                          {category}
+                        </span>
+                      ))}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-slate-500">{ui.contentModeLabel}</dt>
+                    <dd className="mt-1 font-medium text-brand-900">
+                      {article.contentMode === "fact-source" ? ui.factSource : article.contentMode || "-"}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="mt-4 text-xs leading-6 text-slate-500">{ui.trustReviewer}</p>
+                <p className="mt-2 text-xs leading-6 text-slate-500">{ui.trustHumanNote}</p>
+              </div>
               <div className="mt-6 flex flex-col gap-3">
                 <Link
                   href={quoteHref}
