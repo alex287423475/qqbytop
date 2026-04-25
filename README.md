@@ -22,6 +22,7 @@
 - `/[locale]/quote` 智能询价
 - `/[locale]/blog` 文章列表
 - `/[locale]/blog/[slug]` 文章详情页
+- `/[locale]/search` 全站搜索
 - `/sitemap.xml` 自动站点地图
 
 ## 内容维护

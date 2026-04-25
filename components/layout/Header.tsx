@@ -48,6 +48,17 @@ export function Header({ locale }: { locale: Locale }) {
         </nav>
 
         <div className="flex min-w-0 items-center gap-3">
+          <Link
+            href={`/${locale}/search`}
+            className={`hidden rounded-full border px-3 py-1.5 text-sm font-semibold transition sm:inline-flex ${
+              pathname.startsWith(`/${locale}/search`)
+                ? "border-brand-600 bg-brand-50 text-brand-700"
+                : "border-slate-200 text-slate-600 hover:border-brand-300 hover:text-brand-700"
+            }`}
+          >
+            搜索
+          </Link>
+
           <div className="hidden leading-tight text-right sm:block">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">咨询电话</p>
             <p className="whitespace-nowrap text-sm font-bold text-brand-900">{contact.phone}</p>
@@ -90,6 +101,9 @@ export function Header({ locale }: { locale: Locale }) {
                 {item.label}
               </Link>
             ))}
+            <Link href={`/${locale}/search`} onClick={() => setOpen(false)} className="py-2 text-base font-medium text-slate-700">
+              站内搜索
+            </Link>
             <Link href={`/${locale}/quote`} onClick={() => setOpen(false)} className="rounded bg-brand-600 px-4 py-3 text-center font-semibold text-white">
               获取报价
             </Link>
