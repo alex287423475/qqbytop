@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 
 export type AiProvider = "mock" | "openai" | "gemini" | "claude" | "deepseek";
-export type AiRole = "modelA" | "modelB";
+export type AiRole = "modelA" | "modelB" | "modelC";
 
 export type AiConfig = {
   role: AiRole;
@@ -18,6 +18,7 @@ export type AiConfig = {
 export type AiConfigBundle = {
   modelA: AiConfig;
   modelB: AiConfig;
+  modelC: AiConfig;
 };
 
 export type AiConfigInput = {
@@ -49,6 +50,7 @@ const defaultModels: Record<AiProvider, string> = {
 const roleMeta: Record<AiRole, { label: string; purpose: string; prefix: string }> = {
   modelA: { label: "模型A", purpose: "生成文章", prefix: "MODEL_A" },
   modelB: { label: "模型B", purpose: "AI质检与AI重写", prefix: "MODEL_B" },
+  modelC: { label: "模型C", purpose: "站内AI搜索回答", prefix: "MODEL_C" },
 };
 
 export function readLocalEnv() {
@@ -71,6 +73,7 @@ export function getAiConfig(): AiConfigBundle {
   return {
     modelA: getAiRoleConfig("modelA"),
     modelB: getAiRoleConfig("modelB"),
+    modelC: getAiRoleConfig("modelC"),
   };
 }
 
@@ -147,7 +150,9 @@ export function saveAiConfig(input: AiConfigInput): AiConfigBundle {
 }
 
 export function normalizeRole(role: string): AiRole {
-  return role === "modelB" ? "modelB" : "modelA";
+  if (role === "modelB") return "modelB";
+  if (role === "modelC") return "modelC";
+  return "modelA";
 }
 
 function normalizeProvider(provider: string): AiProvider {
@@ -167,6 +172,10 @@ function writeLocalEnv(env: Map<string, string>) {
     "MODEL_B_BASE_URL",
     "MODEL_B_MODEL",
     "MODEL_B_API_KEY",
+    "MODEL_C_PROVIDER",
+    "MODEL_C_BASE_URL",
+    "MODEL_C_MODEL",
+    "MODEL_C_API_KEY",
     "AI_PROVIDER",
     "LLM_BASE_URL",
     "LLM_MODEL",

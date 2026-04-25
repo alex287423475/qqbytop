@@ -102,7 +102,7 @@ export function SearchAiAnswer({ query, locale, type }: SearchAiAnswerProps) {
               <div className="whitespace-pre-line text-base leading-8 text-slate-700">{payload.answer}</div>
               {payload.degraded && (
                 <p className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-7 text-amber-800">
-                  当前使用站内摘要模式。若要启用大模型回答，请在 SEO 文章生产线控制台的 AI 模型配置里设置模型A。
+                  当前使用站内摘要模式。若要启用大模型回答，请在 SEO 文章生产线控制台的 AI 模型配置里设置模型C。
                 </p>
               )}
             </div>

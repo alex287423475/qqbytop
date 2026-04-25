@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   const user = [`客户问题：${query}`, "站内搜索结果：", context, "请基于以上结果给出答案，并在最后提醒用户可点击下方推荐页面继续查看。"].join("\n\n");
 
   try {
-    const answer = await callConfiguredModel("modelA", system, user, {
+    const answer = await callConfiguredModel("modelC", system, user, {
       temperature: 0.2,
       maxTokens: 700,
       fallback,

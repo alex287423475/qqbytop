@@ -4,7 +4,7 @@ import { getAiRoleConfig, normalizeRole, readLocalEnv } from "@/lib/pipeline-ai-
 export const runtime = "nodejs";
 
 type TestInput = {
-  role?: "modelA" | "modelB";
+  role?: "modelA" | "modelB" | "modelC";
   provider?: string;
   baseUrl?: string;
   model?: string;
@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
   const provider = normalizeProvider(body.provider || saved.provider);
   const baseUrl = String(body.baseUrl ?? saved.baseUrl ?? "").trim();
   const model = String(body.model || saved.model || defaultModel(provider)).trim();
-  const apiKey = String(body.apiKey || env.get(`${role === "modelB" ? "MODEL_B" : "MODEL_A"}_API_KEY`) || env.get("LLM_API_KEY") || "").trim();
+  const rolePrefix = role === "modelB" ? "MODEL_B" : role === "modelC" ? "MODEL_C" : "MODEL_A";
+  const apiKey = String(
+    body.apiKey || env.get(`${rolePrefix}_API_KEY`) || process.env[`${rolePrefix}_API_KEY`] || env.get("LLM_API_KEY") || process.env.LLM_API_KEY || "",
+  ).trim();
 
   if (provider === "mock") {
     return NextResponse.json({
