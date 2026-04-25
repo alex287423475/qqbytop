@@ -1,39 +1,141 @@
 import Image from "next/image";
+import Link from "next/link";
 import { CTA } from "@/components/shared/CTA";
+import { JsonLd } from "@/components/shared/JsonLd";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { contact, getQqHref, getWhatsappHref } from "@/lib/contact";
 import { about, type Locale } from "@/lib/site-data";
 
 export const metadata = {
   title: "关于我们",
-  description: "了解北京全球博译翻译服务有限公司的服务理念、发展历程、价值观和联系信息。",
+  description: "了解北京全球博译翻译公司的服务理念、交付体系、质量控制、保密机制和联系方式。",
 };
+
+const trustMetrics = [
+  ["2014", "开始服务企业笔译和口译项目"],
+  ["50+", "覆盖语种与长期协作译员资源"],
+  ["30+", "可处理 Office、PDF、SDLXLIFF、IDML 等格式"],
+  ["4 类", "法律、电商、技术、制造重点行业能力"],
+];
+
+const deliverySystem = [
+  ["需求分诊", "先确认文件用途、接收机构、语种、格式、交期和是否需要盖章。"],
+  ["行业匹配", "按法律、技术、跨境电商、制造等方向匹配译员和审校资源。"],
+  ["术语沉淀", "为长期项目建立术语库、禁用词表、风格偏好和修改记录。"],
+  ["交付验收", "交付前检查漏译、数字、专名、标签、格式、图表和可提交性。"],
+];
+
+const riskControls = [
+  ["保密与权限", "涉密项目可签署 NDA，项目资料按最小必要原则分配给项目成员。"],
+  ["质量复核", "重要文件采用翻译、审校、QA 检查分层处理，降低单点失误。"],
+  ["格式保护", "复杂文件先评估格式风险，必要时先做标签、变量和版式保护。"],
+  ["售后修订", "接收机构或客户提出合理修改意见后，可继续协助修订和说明。"],
+];
 
 export default async function AboutPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const typedLocale = locale as Locale;
   const whatsappHref = getWhatsappHref(typedLocale);
   const qqHref = getQqHref();
+  const pageUrl = `https://qqbytop.com/${locale}/about`;
+  const aboutJsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://qqbytop.com/#organization",
+        name: "北京全球博译翻译公司",
+        alternateName: "QQBY",
+        url: "https://qqbytop.com",
+        logo: "https://qqbytop.com/brand/qqby-logo-pro.svg",
+        email: contact.email,
+        telephone: contact.phone,
+        address: contact.address,
+        description: about.intro,
+      },
+      {
+        "@type": "AboutPage",
+        "@id": `${pageUrl}#about-page`,
+        url: pageUrl,
+        name: "关于北京全球博译翻译公司",
+        isPartOf: { "@id": "https://qqbytop.com/#website" },
+        about: { "@id": "https://qqbytop.com/#organization" },
+      },
+      {
+        "@type": "BreadcrumbList",
+        "@id": `${pageUrl}#breadcrumb`,
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "首页", item: `https://qqbytop.com/${locale}` },
+          { "@type": "ListItem", position: 2, name: "关于我们", item: pageUrl },
+        ],
+      },
+    ],
+  };
 
   return (
     <>
+      <JsonLd data={aboutJsonLd} />
       <section className="bg-slate-50 py-16">
-        <div className="mx-auto max-w-7xl px-5">
-          <p className="text-sm font-semibold text-brand-600">关于 QQBY</p>
-          <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">
-            让专业翻译成为企业出海和跨境合作的确定性基础设施
-          </h1>
-          <p className="mt-5 max-w-2xl leading-8 text-slate-600">{about.intro}</p>
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[minmax(0,0.95fr)_420px] lg:items-end">
+          <div>
+            <p className="text-sm font-semibold text-brand-600">关于北京全球博译翻译公司</p>
+            <h1 className="mt-3 max-w-3xl text-4xl font-bold text-brand-900">让专业翻译成为企业出海和跨境合作的确定性基础设施</h1>
+            <p className="mt-5 max-w-2xl leading-8 text-slate-600">{about.intro}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {trustMetrics.map(([value, label]) => (
+              <div key={label} className="border border-slate-200 bg-white p-5">
+                <strong className="text-3xl text-brand-600">{value}</strong>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{label}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
       <section className="py-16">
         <div className="mx-auto max-w-7xl px-5">
-          <SectionHeader title="我们的价值观" />
+          <SectionHeader title="我们解决的不是翻译动作，而是交付确定性" subtitle="客户真正需要的不是一份看起来通顺的译文，而是能被机构、平台、客户或内部团队接收和继续使用的交付件。" />
           <div className="mt-10 grid gap-6 md:grid-cols-4">
             {about.values.map(([title, text]) => (
               <div key={title} className="border border-slate-200 p-6">
                 <h2 className="font-bold text-brand-900">{title}</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-slate-50 py-16">
+        <div className="mx-auto max-w-7xl px-5">
+          <SectionHeader title="交付体系" subtitle="从接收文件到最终交付，每一步都围绕用途、风险、格式和验收标准展开。" />
+          <ol className="mt-10 grid gap-4 md:grid-cols-4">
+            {deliverySystem.map(([title, text], index) => (
+              <li key={title} className="border border-slate-200 bg-white p-6">
+                <span className="text-sm font-bold text-brand-600">0{index + 1}</span>
+                <h2 className="mt-3 font-bold text-brand-900">{title}</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      <section className="py-16">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 lg:grid-cols-[0.75fr_1.25fr] lg:items-start">
+          <div>
+            <p className="text-sm font-semibold text-brand-600">风险控制</p>
+            <h2 className="mt-3 text-3xl font-bold text-brand-900">翻译项目越重要，越要把流程前置</h2>
+            <p className="mt-4 leading-8 text-slate-600">法律、专利、技术、平台申诉、认证文件和批量项目都不适合只按字数粗略处理。我们会先确认风险点，再安排人员和交付方式。</p>
+            <Link href={`/${locale}/quote?source=about-risk-control`} className="mt-6 inline-flex rounded bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-500">
+              提交项目评估
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {riskControls.map(([title, text]) => (
+              <div key={title} className="border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="font-bold text-brand-900">{title}</h3>
                 <p className="mt-3 text-sm leading-7 text-slate-600">{text}</p>
               </div>
             ))}
@@ -56,25 +158,27 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
       </section>
 
       <section className="py-16">
-        <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-2">
+        <div className="mx-auto grid max-w-7xl gap-10 px-5 md:grid-cols-[minmax(0,1fr)_320px]">
           <div>
             <h2 className="text-2xl font-bold text-brand-900">联系信息</h2>
-            <div className="mt-6 space-y-4 leading-7 text-slate-600">
-              <p>
-                电话：
-                <a className="font-semibold text-brand-700 hover:text-brand-600" href={contact.phoneHref}>
+            <div className="mt-6 grid gap-4 text-slate-600 sm:grid-cols-2">
+              <div className="border border-slate-200 p-5">
+                <p className="text-sm text-slate-500">咨询电话</p>
+                <a className="mt-2 block font-bold text-brand-900 hover:text-brand-600" href={contact.phoneHref}>
                   {contact.phone}
                 </a>
-              </p>
-              <p>
-                邮箱：
-                <a className="font-semibold text-brand-700 hover:text-brand-600" href={contact.emailHref}>
+              </div>
+              <div className="border border-slate-200 p-5">
+                <p className="text-sm text-slate-500">邮箱</p>
+                <a className="mt-2 block font-bold text-brand-900 hover:text-brand-600" href={contact.emailHref}>
                   {contact.email}
                 </a>
-              </p>
-              <p>地址：{contact.address}</p>
+              </div>
+              <div className="border border-slate-200 p-5 sm:col-span-2">
+                <p className="text-sm text-slate-500">地址</p>
+                <p className="mt-2 font-semibold text-brand-900">{contact.address}</p>
+              </div>
             </div>
-
             <div className="mt-8 flex flex-wrap gap-3">
               <a className="rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500" href={contact.wechatQr} target="_blank" rel="noreferrer">
                 微信扫码咨询
@@ -90,21 +194,11 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
                 </a>
               )}
             </div>
-
-            <div className="mt-6 inline-block border border-slate-200 bg-white p-3">
-              <Image src={contact.wechatQr} alt="微信咨询二维码" width={132} height={132} className="h-32 w-32" />
-              <p className="mt-2 text-center text-xs text-slate-500">{contact.wechatHint}</p>
-            </div>
           </div>
 
-          <div id="quality-commitment" className="scroll-mt-24 bg-slate-50 p-8">
-            <h2 className="text-2xl font-bold text-brand-900">资质与承诺</h2>
-            <ul className="mt-6 space-y-3 text-slate-600">
-              <li>ISO 质量管理流程</li>
-              <li>NDA 保密协议覆盖</li>
-              <li>项目经理全程跟进</li>
-              <li>交付后合理修改支持</li>
-            </ul>
+          <div className="border border-slate-200 bg-white p-4">
+            <Image src={contact.wechatQr} alt="微信咨询二维码" width={280} height={280} className="h-auto w-full" />
+            <p className="mt-3 text-center text-sm text-slate-500">{contact.wechatHint}</p>
           </div>
         </div>
       </section>
