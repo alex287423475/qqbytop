@@ -12,7 +12,7 @@ export function Footer({ locale }: { locale: Locale }) {
       <div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <Image
-            src="/brand/qqby-logo-light.svg"
+            src="/brand/qqby-logo-pro-light.svg"
             alt="全球博译 Pro Compliance"
             width={176}
             height={60}

@@ -29,7 +29,7 @@ export function Header({ locale }: { locale: Locale }) {
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-4">
         <Link href={`/${locale}`} className="flex shrink-0 items-center" aria-label="全球博译首页">
           <Image
-            src="/brand/qqby-logo.svg"
+            src="/brand/qqby-logo-pro.svg"
             alt="全球博译 Pro Compliance"
             width={176}
             height={60}

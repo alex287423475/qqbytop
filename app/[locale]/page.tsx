@@ -125,7 +125,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
         "@id": "https://qqbytop.com/#organization",
         name: "北京全球博译翻译公司",
         url: "https://qqbytop.com",
-        logo: "https://qqbytop.com/brand/qqby-logo.svg",
+        logo: "https://qqbytop.com/brand/qqby-logo-pro.svg",
         contactPoint: [
           {
             "@type": "ContactPoint",
