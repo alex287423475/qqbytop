@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAiEnvForChild, getAiRoleConfig } from "@/lib/pipeline-ai-config";
+import { collectKeywordSourceItems, type KeywordSourceItem } from "@/lib/pipeline-keyword-sources";
 import { readKeywordRows } from "@/lib/pipeline-keywords";
 
 export const runtime = "nodejs";
@@ -18,6 +19,9 @@ type KeywordCandidate = {
   reason: string;
   score: number;
   duplicate: boolean;
+  searchVolume?: string;
+  competition?: string;
+  difficulty?: string;
 };
 
 type DedupeResult = {
@@ -227,7 +231,32 @@ function normalizeAiCandidate(
     reason: String(row.reason || "模型C基于种子词、已有关键词和翻译业务场景生成。").slice(0, 160),
     score: Math.max(0, Math.min(100, duplicate ? Math.min(score, 45) : score)),
     duplicate,
+    searchVolume: stringifyMetric((row as any).searchVolume),
+    competition: String((row as any).competition || "").trim(),
+    difficulty: String((row as any).difficulty || "").trim(),
   };
+}
+
+function stringifyMetric(value: unknown) {
+  if (value === undefined || value === null || value === "") return "";
+  return String(value).trim();
+}
+
+function enrichCandidateFromSource(row: KeywordCandidate, sourceItems: KeywordSourceItem[]) {
+  const source = sourceItems.find((item) => normalizeKeywordForLookup(item.keyword) === normalizeKeywordForLookup(row.keyword));
+  if (!source) return row;
+
+  return {
+    ...row,
+    source: source.source,
+    searchVolume: stringifyMetric(row.searchVolume || source.searchVolume || source.index || ""),
+    competition: row.competition || source.competition || "",
+    difficulty: row.difficulty || source.difficulty || "",
+  };
+}
+
+function normalizeKeywordForLookup(value: string) {
+  return value.toLowerCase().replace(/\s+/gu, "");
 }
 
 function normalizeCategory(value: string) {
@@ -268,7 +297,12 @@ function generateResearchSlug(keyword: string) {
   return slug || `keyword-${Date.now().toString(36)}`;
 }
 
-async function createAiCandidates(seeds: string[], limit: number, existingRows: Array<{ keyword: string; slug: string }>) {
+async function createAiCandidates(
+  seeds: string[],
+  limit: number,
+  existingRows: Array<{ keyword: string; slug: string }>,
+  sourceItems: KeywordSourceItem[],
+) {
   const config = getAiRoleConfig("modelC");
   if (config.provider === "mock") throw new Error("模型C当前为 Mock，请先在 AI 模型配置中设置可用模型C。");
   if (!config.apiKeySet) throw new Error("模型C未配置 API Key。");
@@ -282,7 +316,7 @@ async function createAiCandidates(seeds: string[], limit: number, existingRows: 
       apiKey: env.LLM_API_KEY,
     },
     buildKeywordResearchSystemPrompt(),
-    buildKeywordResearchUserPrompt(seeds, limit, existingRows),
+    buildKeywordResearchUserPrompt(seeds, limit, existingRows, sourceItems),
   );
 
   const parsed = parseJsonPayload(text);
@@ -302,7 +336,12 @@ function buildKeywordResearchSystemPrompt() {
   ].join("\n");
 }
 
-function buildKeywordResearchUserPrompt(seeds: string[], limit: number, existingRows: Array<{ keyword: string; slug: string }>) {
+function buildKeywordResearchUserPrompt(
+  seeds: string[],
+  limit: number,
+  existingRows: Array<{ keyword: string; slug: string }>,
+  sourceItems: KeywordSourceItem[],
+) {
   const existing = existingRows
     .slice(0, 160)
     .map((row) => `${row.keyword} (${row.slug})`)
@@ -313,6 +352,13 @@ function buildKeywordResearchUserPrompt(seeds: string[], limit: number, existing
       task: "根据种子词扩展 SEO 候选关键词",
       seeds,
       limit,
+      rules: [
+        "只允许从 sourceKeywords 中挑选和轻微整理，不要凭空生成新关键词。",
+        "相同搜索意图只保留一个主关键词。",
+        "优先保留有搜索量、竞价、竞争度或更强转化意图的关键词。",
+        "source、searchVolume、competition、difficulty 字段要尽量沿用 sourceKeywords 的数据。",
+      ],
+      sourceKeywords: sourceItems.slice(0, 240),
       business: "北京全球博译翻译公司，服务企业客户与个人客户，重点业务包括证件翻译、法律翻译、技术文档翻译、跨境电商翻译、法律合规翻译。",
       existingKeywords: existing,
       outputSchema: {
@@ -324,6 +370,10 @@ function buildKeywordResearchUserPrompt(seeds: string[], limit: number, existing
             intent: "询价|信息|比较|办理|风险|合规",
             priority: "P0|P1|P2",
             contentMode: "standard|fact-source",
+            source: "5118下拉词|站长工具百度长尾词|5118下拉词+站长工具百度长尾词",
+            searchVolume: "数字或空字符串",
+            competition: "竞价竞争度或空字符串",
+            difficulty: "高|中|低|空字符串",
             score: "0-100",
             reason: "为什么值得写，控制在60字内",
           },
@@ -709,7 +759,7 @@ export async function POST(request: NextRequest) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
 
-  const body = (await request.json().catch(() => ({}))) as { seeds?: string; limit?: number };
+  const body = (await request.json().catch(() => ({}))) as { seeds?: string; limit?: number; use5118?: boolean; useChinaz?: boolean };
   const seeds = normalizeSeedText(body.seeds || "");
   if (seeds.length === 0) {
     return NextResponse.json({ message: "请至少输入一个种子词。" }, { status: 400 });
@@ -719,15 +769,29 @@ export async function POST(request: NextRequest) {
   const existingSlugs = new Set(existingRows.map((row) => row.slug));
   const existingKeywords = new Set(existingRows.map((row) => row.keyword));
   const limit = Math.max(1, Math.min(100, Number(body.limit) || 40));
+  const sourceResult = await collectKeywordSourceItems(seeds, { use5118: body.use5118, useChinaz: body.useChinaz });
+
+  if (sourceResult.items.length === 0) {
+    return NextResponse.json(
+      {
+        message: sourceResult.errors.length > 0 ? sourceResult.errors.join("\n") : "5118 和站长工具都没有返回可用候选词，请检查 API 配置或更换种子词。",
+        seeds,
+        logs: sourceResult.logs,
+        errors: sourceResult.errors,
+      },
+      { status: 400 },
+    );
+  }
 
   let rows: KeywordCandidate[] = [];
   let semanticGroups = 0;
   let semanticRemoved = 0;
   try {
-    const aiRows = await createAiCandidates(seeds, limit, existingRows);
+    const aiRows = await createAiCandidates(seeds, limit, existingRows, sourceResult.items);
     const normalizedRows = aiRows
       .map((row) => normalizeAiCandidate(row, existingSlugs, existingKeywords))
       .filter((row): row is KeywordCandidate => row !== null)
+      .map((row) => enrichCandidateFromSource(row, sourceResult.items))
       .sort((a, b) => Number(a.duplicate) - Number(b.duplicate) || b.score - a.score || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"));
     const deduped = dedupeSemanticCandidates(normalizedRows, limit);
     rows = uniquifyCandidateSlugs(deduped.rows, existingSlugs, existingKeywords);
@@ -747,12 +811,17 @@ export async function POST(request: NextRequest) {
     seeds,
     engine: "modelC",
     warning: "",
+    logs: sourceResult.logs,
+    errors: sourceResult.errors,
     candidates: rows,
     summary: {
       total: rows.length,
       available: rows.filter((row) => !row.duplicate).length,
       duplicates: rows.filter((row) => row.duplicate).length,
       ai: rows.filter((row) => row.source === "模型C语义挖掘").length,
+      sourceItems: sourceResult.items.length,
+      source5118: sourceResult.items.filter((row) => row.source.includes("5118")).length,
+      sourceChinaz: sourceResult.items.filter((row) => row.source.includes("站长工具")).length,
       local: 0,
       semanticGroups,
       semanticRemoved,

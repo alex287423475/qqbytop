@@ -10,9 +10,25 @@ export type KeywordRow = {
   intent: string;
   priority: string;
   contentMode?: string;
+  source?: string;
+  searchVolume?: string;
+  competition?: string;
+  difficulty?: string;
 };
 
-const headers: Array<keyof KeywordRow> = ["keyword", "slug", "locale", "category", "intent", "priority", "contentMode"];
+const headers: Array<keyof KeywordRow> = [
+  "keyword",
+  "slug",
+  "locale",
+  "category",
+  "intent",
+  "priority",
+  "contentMode",
+  "source",
+  "searchVolume",
+  "competition",
+  "difficulty",
+];
 
 export const keywordsPath = path.join(process.cwd(), "local-brain", "inputs", "keywords.csv");
 
@@ -83,6 +99,10 @@ export function normalizeKeywordRow(input: Partial<KeywordRow>): KeywordRow {
     intent: String(input.intent || "信息").trim(),
     priority: String(input.priority || "P1").trim(),
     contentMode: String(input.contentMode || "standard").trim(),
+    source: String(input.source || "").trim(),
+    searchVolume: String(input.searchVolume || "").trim(),
+    competition: String(input.competition || "").trim(),
+    difficulty: String(input.difficulty || "").trim(),
   };
 
   if (!row.keyword) throw new Error("关键词不能为空。");
