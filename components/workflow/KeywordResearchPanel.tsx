@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+type ResearchDepth = "suggest" | "longtail" | "full";
+
 type KeywordCandidate = {
   keyword: string;
   slug: string;
@@ -22,15 +24,16 @@ type KeywordCandidate = {
 type KeywordSourceConfig = {
   source5118: {
     enabled: boolean;
-    endpoint: string;
-    platform: string;
-    apiKeySet: boolean;
-    apiKeyMasked: string;
-  };
-  chinaz: {
-    enabled: boolean;
-    endpoint: string;
-    version: string;
+    suggestEndpoint: string;
+    longTailEndpoint: string;
+    metricsEndpoint: string;
+    platforms: string[];
+    defaultDepth: ResearchDepth;
+    suggestLimitPerPlatform: number;
+    expandTopN: number;
+    longTailPageSize: number;
+    metricLimit: number;
+    metricPollSeconds: number;
     apiKeySet: boolean;
     apiKeyMasked: string;
   };
@@ -42,18 +45,26 @@ type KeywordResearchPanelProps = {
   onKeywordsChanged?: () => void;
 };
 
+const platformOptions = [
+  { value: "baidu", label: "百度PC" },
+  { value: "baidumobile", label: "百度移动" },
+  { value: "xiaohongshu", label: "小红书" },
+  { value: "douyin", label: "抖音" },
+];
+
 const emptySourceConfig: KeywordSourceConfig = {
   source5118: {
     enabled: true,
-    endpoint: "https://apis.5118.com/suggest/list",
-    platform: "baidu",
-    apiKeySet: false,
-    apiKeyMasked: "",
-  },
-  chinaz: {
-    enabled: true,
-    endpoint: "https://openapi.chinaz.net/v1/1001/longkeyword",
-    version: "1.0",
+    suggestEndpoint: "https://apis.5118.com/suggest/list",
+    longTailEndpoint: "https://apis.5118.com/keyword/word/v2",
+    metricsEndpoint: "https://apis.5118.com/keywordparam/v2",
+    platforms: ["baidu", "baidumobile", "xiaohongshu", "douyin"],
+    defaultDepth: "full",
+    suggestLimitPerPlatform: 30,
+    expandTopN: 8,
+    longTailPageSize: 30,
+    metricLimit: 80,
+    metricPollSeconds: 90,
     apiKeySet: false,
     apiKeyMasked: "",
   },
@@ -73,8 +84,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
   const [lastMessage, setLastMessage] = useState<string | null>(null);
   const [progress, setProgress] = useState({ value: 0, label: "" });
   const [sourceConfig, setSourceConfig] = useState<KeywordSourceConfig>(emptySourceConfig);
-  const [sourceSecrets, setSourceSecrets] = useState({ source5118ApiKey: "", chinazApiKey: "" });
-  const [sourceUsage, setSourceUsage] = useState({ use5118: true, useChinaz: true });
+  const [sourceSecret, setSourceSecret] = useState("");
   const sourceApiBase = `${apiBase}/keyword-sources`;
 
   const selectedRows = useMemo(
@@ -91,19 +101,19 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
 
     const timer = window.setInterval(() => {
       setProgress((current) => {
-        if (current.value >= 92) return current;
-        const nextValue = Math.min(92, current.value + (current.value < 30 ? 7 : current.value < 65 ? 5 : 2));
+        if (current.value >= 94) return current;
+        const nextValue = Math.min(94, current.value + (current.value < 25 ? 7 : current.value < 58 ? 4 : 2));
         const nextLabel =
           nextValue < 25
-            ? "正在请求 5118 下拉词和站长工具百度长尾词..."
-            : nextValue < 55
-              ? "正在合并 API 候选词、去重和整理指标..."
-              : nextValue < 82
-                ? "正在调用模型C做意图分类、主题聚类和内容模式判断..."
-                : "正在等待模型C返回结构化结果...";
+            ? "正在调用 5118 suggest/list 获取多平台下拉词..."
+            : nextValue < 50
+              ? "正在调用 5118 keyword/word/v2 扩展高价值长尾词..."
+              : nextValue < 76
+                ? "正在调用 5118 keywordparam/v2 补搜索量、指数和竞价数据..."
+                : "正在调用模型C做去重、分类、评分和内容模式判断...";
         return { value: nextValue, label: nextLabel };
       });
-    }, 700);
+    }, 900);
 
     return () => window.clearInterval(timer);
   }, [busy]);
@@ -114,7 +124,6 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       if (!response.ok) return;
       const payload = (await response.json()) as KeywordSourceConfig;
       setSourceConfig(payload);
-      setSourceUsage({ use5118: payload.source5118.enabled, useChinaz: payload.chinaz.enabled });
     } catch {
       // The dashboard can still render; saving will show the concrete error if needed.
     }
@@ -131,27 +140,18 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source5118: {
-            enabled: sourceConfig.source5118.enabled,
-            endpoint: sourceConfig.source5118.endpoint,
-            platform: sourceConfig.source5118.platform,
-            apiKey: sourceSecrets.source5118ApiKey || undefined,
-          },
-          chinaz: {
-            enabled: sourceConfig.chinaz.enabled,
-            endpoint: sourceConfig.chinaz.endpoint,
-            version: sourceConfig.chinaz.version,
-            apiKey: sourceSecrets.chinazApiKey || undefined,
+            ...sourceConfig.source5118,
+            apiKey: sourceSecret || undefined,
           },
         }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.message || "保存关键词数据源配置失败。");
+      if (!response.ok) throw new Error(payload?.message || "保存 5118 配置失败。");
       setSourceConfig(payload);
-      setSourceUsage({ use5118: payload.source5118.enabled, useChinaz: payload.chinaz.enabled });
-      setSourceSecrets({ source5118ApiKey: "", chinazApiKey: "" });
-      setLastMessage("关键词数据源配置已保存。");
+      setSourceSecret("");
+      setLastMessage("5118 关键词数据源配置已保存。");
     } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "保存关键词数据源配置失败。");
+      setError(nextError instanceof Error ? nextError.message : "保存 5118 配置失败。");
     } finally {
       setBusy(null);
     }
@@ -163,20 +163,24 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
     setLastMessage(null);
     setCandidates([]);
     setSelected({});
-    setProgress({ value: 8, label: "正在准备关键词挖掘请求..." });
+    setProgress({ value: 8, label: "正在准备 5118 全链路关键词挖掘..." });
 
     let timeout: number | undefined;
     try {
       const controller = new AbortController();
-      timeout = window.setTimeout(() => controller.abort(), 90000);
+      timeout = window.setTimeout(() => controller.abort(), 180000);
       const response = await fetch(`${apiBase}/keyword-research`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           seeds,
           limit: Number.parseInt(limit, 10) || 40,
-          use5118: sourceUsage.use5118,
-          useChinaz: sourceUsage.useChinaz,
+          platforms: sourceConfig.source5118.platforms,
+          depth: sourceConfig.source5118.defaultDepth,
+          suggestLimitPerPlatform: sourceConfig.source5118.suggestLimitPerPlatform,
+          expandTopN: sourceConfig.source5118.expandTopN,
+          longTailPageSize: sourceConfig.source5118.longTailPageSize,
+          metricLimit: sourceConfig.source5118.metricLimit,
         }),
         signal: controller.signal,
       });
@@ -190,13 +194,14 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
 
       const semanticRemoved = Number(payload?.summary?.semanticRemoved || 0);
       const sourceItems = Number(payload?.summary?.sourceItems || 0);
-      const warning = payload?.errors?.length ? ` 部分数据源提示：${payload.errors.slice(0, 2).join("；")}` : "";
+      const warning = payload?.errors?.length ? ` 提示：${payload.errors.slice(0, 2).join("；")}` : "";
       const semanticText = semanticRemoved > 0 ? ` 已归并 ${semanticRemoved} 个相似候选词。` : "";
-      setLastMessage(`API 候选词 ${sourceItems} 个，生成候选词 ${rows.length} 个，可用 ${payload?.summary?.available ?? 0} 个。${semanticText}${warning}`);
+      const stats = `下拉调用 ${payload?.summary?.suggestCalls ?? 0} 次，长尾调用 ${payload?.summary?.longTailCalls ?? 0} 次，补指标 ${payload?.summary?.metricKeywords ?? 0} 个。`;
+      setLastMessage(`5118 候选词 ${sourceItems} 个，模型C输出 ${rows.length} 个，可用 ${payload?.summary?.available ?? 0} 个。${stats}${semanticText}${warning}`);
     } catch (nextError) {
       const message =
         nextError instanceof Error && nextError.name === "AbortError"
-          ? "关键词挖掘请求超过 90 秒未响应，请检查 5118/站长工具 API 或模型C连接。"
+          ? "关键词挖掘请求超过 180 秒未响应，请检查 5118 API 权限、keywordparam/v2 指标任务或模型C连接。"
           : nextError instanceof Error
             ? nextError.message
             : "关键词挖掘失败。";
@@ -250,12 +255,23 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
     setSelected(Object.fromEntries(candidates.map((candidate, index) => [getCandidateKey(candidate, index), !candidate.duplicate && !allSelected])));
   }
 
+  function updateSourceConfig(next: Partial<KeywordSourceConfig["source5118"]>) {
+    setSourceConfig((current) => ({ source5118: { ...current.source5118, ...next } }));
+  }
+
+  function togglePlatform(platform: string, checked: boolean) {
+    const next = checked
+      ? Array.from(new Set([...sourceConfig.source5118.platforms, platform]))
+      : sourceConfig.source5118.platforms.filter((item) => item !== platform);
+    updateSourceConfig({ platforms: next.length > 0 ? next : ["baidu"] });
+  }
+
   return (
     <section className="pipeline-panel p-5">
       <div className="flex flex-col gap-2 border-b border-slate-700 pb-5">
         <h2 className="text-lg font-bold text-white">关键词挖掘工具</h2>
         <p className="max-w-4xl text-sm leading-6 text-slate-400">
-          输入种子词后，系统先调用 5118 下拉词和站长工具百度长尾词 API 获取真实候选词，再交给模型C做去重、意图分类、主题聚类和内容模式判断。模型C不再凭空补充本地规则词。
+          点击“开始挖掘”后，系统会自动完成：种子词 → 5118 下拉词 → 5118 长尾扩展 → 5118 指标补全 → 模型C去重分类 → 候选词表。模型C只做分类和评分，不凭空造词。
         </p>
       </div>
 
@@ -265,8 +281,8 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
       <div className="mt-5 rounded border border-slate-700 bg-slate-950/30 p-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-semibold text-white">关键词数据源配置</h3>
-            <p className="mt-1 text-xs text-slate-400">API Key 只保存在本地 local-brain/.env。留空保存时会沿用已保存密钥。</p>
+            <h3 className="font-semibold text-white">5118 全链路配置</h3>
+            <p className="mt-1 text-xs text-slate-400">API Key 只保存在本地 local-brain/.env。keywordparam/v2 是异步任务，指标补全可能需要等待。</p>
           </div>
           <button
             type="button"
@@ -274,85 +290,71 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
             disabled={busy !== null}
             className="rounded bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
           >
-            {busy === "saveSources" ? "保存中..." : "保存数据源配置"}
+            {busy === "saveSources" ? "保存中..." : "保存5118配置"}
           </button>
         </div>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <div className="rounded border border-slate-800 p-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-              <input
-                type="checkbox"
-                checked={sourceConfig.source5118.enabled}
-                onChange={(event) => {
-                  setSourceConfig((current) => ({ ...current, source5118: { ...current.source5118, enabled: event.target.checked } }));
-                  setSourceUsage((current) => ({ ...current, use5118: event.target.checked }));
-                }}
-                className="h-4 w-4 accent-brand-500"
-              />
-              5118 下拉词 API
-            </label>
-            <div className="mt-3 grid gap-3">
-              <input
-                value={sourceConfig.source5118.endpoint}
-                onChange={(event) => setSourceConfig((current) => ({ ...current, source5118: { ...current.source5118, endpoint: event.target.value } }))}
-                className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
-                placeholder="https://apis.5118.com/suggest/list"
-              />
-              <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
-                <input
-                  value={sourceConfig.source5118.platform}
-                  onChange={(event) => setSourceConfig((current) => ({ ...current, source5118: { ...current.source5118, platform: event.target.value } }))}
-                  className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
-                  placeholder="baidu"
-                />
-                <input
-                  value={sourceSecrets.source5118ApiKey}
-                  onChange={(event) => setSourceSecrets((current) => ({ ...current, source5118ApiKey: event.target.value }))}
-                  className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
-                  placeholder={sourceConfig.source5118.apiKeySet ? `已保存：${sourceConfig.source5118.apiKeyMasked}` : "5118 API Key"}
-                  type="password"
-                />
-              </div>
-            </div>
+        <div className="mt-4 grid gap-4">
+          <div className="grid gap-3 lg:grid-cols-[1fr_1fr_1fr]">
+            <input
+              value={sourceConfig.source5118.suggestEndpoint}
+              onChange={(event) => updateSourceConfig({ suggestEndpoint: event.target.value })}
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+              placeholder="suggest/list"
+            />
+            <input
+              value={sourceConfig.source5118.longTailEndpoint}
+              onChange={(event) => updateSourceConfig({ longTailEndpoint: event.target.value })}
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+              placeholder="keyword/word/v2"
+            />
+            <input
+              value={sourceConfig.source5118.metricsEndpoint}
+              onChange={(event) => updateSourceConfig({ metricsEndpoint: event.target.value })}
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+              placeholder="keywordparam/v2"
+            />
           </div>
 
-          <div className="rounded border border-slate-800 p-4">
-            <label className="flex items-center gap-2 text-sm font-semibold text-slate-200">
-              <input
-                type="checkbox"
-                checked={sourceConfig.chinaz.enabled}
-                onChange={(event) => {
-                  setSourceConfig((current) => ({ ...current, chinaz: { ...current.chinaz, enabled: event.target.checked } }));
-                  setSourceUsage((current) => ({ ...current, useChinaz: event.target.checked }));
-                }}
-                className="h-4 w-4 accent-brand-500"
-              />
-              站长工具百度长尾词 API
-            </label>
-            <div className="mt-3 grid gap-3">
-              <input
-                value={sourceConfig.chinaz.endpoint}
-                onChange={(event) => setSourceConfig((current) => ({ ...current, chinaz: { ...current.chinaz, endpoint: event.target.value } }))}
-                className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
-                placeholder="https://openapi.chinaz.net/v1/1001/longkeyword"
-              />
-              <div className="grid gap-3 sm:grid-cols-[120px_1fr]">
+          <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
+            <input
+              value={sourceSecret}
+              onChange={(event) => setSourceSecret(event.target.value)}
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+              placeholder={sourceConfig.source5118.apiKeySet ? `已保存：${sourceConfig.source5118.apiKeyMasked}` : "5118 API Key"}
+              type="password"
+            />
+            <select
+              value={sourceConfig.source5118.defaultDepth}
+              onChange={(event) => updateSourceConfig({ defaultDepth: event.target.value as ResearchDepth })}
+              className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+            >
+              <option value="suggest">只跑下拉词</option>
+              <option value="longtail">下拉词 + 长尾扩展</option>
+              <option value="full">全流程补指标</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap gap-3 text-sm text-slate-300">
+            {platformOptions.map((platform) => (
+              <label key={platform.value} className="flex items-center gap-2 rounded border border-slate-700 px-3 py-2">
                 <input
-                  value={sourceConfig.chinaz.version}
-                  onChange={(event) => setSourceConfig((current) => ({ ...current, chinaz: { ...current.chinaz, version: event.target.value } }))}
-                  className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
-                  placeholder="1.0"
+                  type="checkbox"
+                  checked={sourceConfig.source5118.platforms.includes(platform.value)}
+                  onChange={(event) => togglePlatform(platform.value, event.target.checked)}
+                  className="h-4 w-4 accent-brand-500"
                 />
-                <input
-                  value={sourceSecrets.chinazApiKey}
-                  onChange={(event) => setSourceSecrets((current) => ({ ...current, chinazApiKey: event.target.value }))}
-                  className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
-                  placeholder={sourceConfig.chinaz.apiKeySet ? `已保存：${sourceConfig.chinaz.apiKeyMasked}` : "站长工具 APIKey"}
-                  type="password"
-                />
-              </div>
-            </div>
+                {platform.label}
+              </label>
+            ))}
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <NumberField label="每平台下拉词" value={sourceConfig.source5118.suggestLimitPerPlatform} onChange={(value) => updateSourceConfig({ suggestLimitPerPlatform: value })} />
+            <NumberField label="扩长尾TopN" value={sourceConfig.source5118.expandTopN} onChange={(value) => updateSourceConfig({ expandTopN: value })} />
+            <NumberField label="长尾每页数量" value={sourceConfig.source5118.longTailPageSize} onChange={(value) => updateSourceConfig({ longTailPageSize: value })} />
+            <NumberField label="补指标词数" value={sourceConfig.source5118.metricLimit} onChange={(value) => updateSourceConfig({ metricLimit: value })} />
+            <NumberField label="指标等待秒数" value={sourceConfig.source5118.metricPollSeconds} onChange={(value) => updateSourceConfig({ metricPollSeconds: value })} />
           </div>
         </div>
       </div>
@@ -366,7 +368,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
             <div className="h-full rounded-full bg-brand-500 transition-all duration-500" style={{ width: `${progress.value}%` }} />
           </div>
-          <p className="mt-2 text-xs text-slate-400">流程：5118/站长工具 API → 合并去重 → 模型C分类评分 → 候选词表。</p>
+          <p className="mt-2 text-xs text-slate-400">流程：suggest/list → keyword/word/v2 → keywordparam/v2 → 模型C分类评分 → 候选词表。</p>
         </div>
       )}
 
@@ -381,7 +383,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
           />
         </label>
         <label className="flex flex-col gap-2 text-sm text-slate-300">
-          生成数量
+          输出数量
           <input
             value={limit}
             onChange={(event) => setLimit(event.target.value)}
@@ -393,33 +395,12 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
           <button
             type="button"
             onClick={researchKeywords}
-            disabled={busy !== null || !seeds.trim() || (!sourceUsage.use5118 && !sourceUsage.useChinaz)}
+            disabled={busy !== null || !seeds.trim() || sourceConfig.source5118.platforms.length === 0}
             className="rounded bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-500 disabled:cursor-not-allowed disabled:bg-slate-700"
           >
             {busy === "research" ? "挖掘中..." : "开始挖掘"}
           </button>
         </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-400">
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sourceUsage.use5118}
-            onChange={(event) => setSourceUsage((current) => ({ ...current, use5118: event.target.checked }))}
-            className="h-4 w-4 accent-brand-500"
-          />
-          本次使用 5118
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={sourceUsage.useChinaz}
-            onChange={(event) => setSourceUsage((current) => ({ ...current, useChinaz: event.target.checked }))}
-            className="h-4 w-4 accent-brand-500"
-          />
-          本次使用站长工具
-        </label>
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -498,7 +479,7 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
             {candidates.length === 0 && (
               <tr>
                 <td colSpan={13} className="px-3 py-10 text-center text-slate-500">
-                  先配置数据源、输入种子词，然后点击“开始挖掘”。
+                  先配置 5118 API Key、输入种子词，然后点击“开始挖掘”。
                 </td>
               </tr>
             )}
@@ -506,5 +487,19 @@ export function KeywordResearchPanel({ apiBase, keywordApiBase, onKeywordsChange
         </table>
       </div>
     </section>
+  );
+}
+
+function NumberField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="flex flex-col gap-2 text-xs text-slate-400">
+      {label}
+      <input
+        value={value}
+        onChange={(event) => onChange(Number.parseInt(event.target.value, 10) || 0)}
+        className="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand-500"
+        inputMode="numeric"
+      />
+    </label>
   );
 }

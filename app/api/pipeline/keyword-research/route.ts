@@ -370,7 +370,7 @@ function buildKeywordResearchUserPrompt(
             intent: "询价|信息|比较|办理|风险|合规",
             priority: "P0|P1|P2",
             contentMode: "standard|fact-source",
-            source: "5118下拉词|站长工具百度长尾词|5118下拉词+站长工具百度长尾词",
+            source: "5118下拉词|5118长尾词|5118指标补全",
             searchVolume: "数字或空字符串",
             competition: "竞价竞争度或空字符串",
             difficulty: "高|中|低|空字符串",
@@ -759,7 +759,16 @@ export async function POST(request: NextRequest) {
   const blocked = assertDevOnly();
   if (blocked) return blocked;
 
-  const body = (await request.json().catch(() => ({}))) as { seeds?: string; limit?: number; use5118?: boolean; useChinaz?: boolean };
+  const body = (await request.json().catch(() => ({}))) as {
+    seeds?: string;
+    limit?: number;
+    platforms?: string[];
+    depth?: "suggest" | "longtail" | "full";
+    suggestLimitPerPlatform?: number;
+    expandTopN?: number;
+    longTailPageSize?: number;
+    metricLimit?: number;
+  };
   const seeds = normalizeSeedText(body.seeds || "");
   if (seeds.length === 0) {
     return NextResponse.json({ message: "请至少输入一个种子词。" }, { status: 400 });
@@ -769,12 +778,19 @@ export async function POST(request: NextRequest) {
   const existingSlugs = new Set(existingRows.map((row) => row.slug));
   const existingKeywords = new Set(existingRows.map((row) => row.keyword));
   const limit = Math.max(1, Math.min(100, Number(body.limit) || 40));
-  const sourceResult = await collectKeywordSourceItems(seeds, { use5118: body.use5118, useChinaz: body.useChinaz });
+  const sourceResult = await collectKeywordSourceItems(seeds, {
+    platforms: body.platforms,
+    depth: body.depth,
+    suggestLimitPerPlatform: body.suggestLimitPerPlatform,
+    expandTopN: body.expandTopN,
+    longTailPageSize: body.longTailPageSize,
+    metricLimit: body.metricLimit,
+  });
 
   if (sourceResult.items.length === 0) {
     return NextResponse.json(
       {
-        message: sourceResult.errors.length > 0 ? sourceResult.errors.join("\n") : "5118 和站长工具都没有返回可用候选词，请检查 API 配置或更换种子词。",
+        message: sourceResult.errors.length > 0 ? sourceResult.errors.join("\n") : "5118 没有返回可用候选词，请检查 API 配置或更换种子词。",
         seeds,
         logs: sourceResult.logs,
         errors: sourceResult.errors,
@@ -821,7 +837,10 @@ export async function POST(request: NextRequest) {
       ai: rows.filter((row) => row.source === "模型C语义挖掘").length,
       sourceItems: sourceResult.items.length,
       source5118: sourceResult.items.filter((row) => row.source.includes("5118")).length,
-      sourceChinaz: sourceResult.items.filter((row) => row.source.includes("站长工具")).length,
+      suggestCalls: sourceResult.stats.suggestCalls,
+      longTailCalls: sourceResult.stats.longTailCalls,
+      metricKeywords: sourceResult.stats.metricKeywords,
+      metricCompleted: sourceResult.stats.metricCompleted,
       local: 0,
       semanticGroups,
       semanticRemoved,
