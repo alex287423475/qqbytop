@@ -768,9 +768,12 @@ export async function POST(request: NextRequest) {
     expandTopN?: number;
     longTailPageSize?: number;
     metricLimit?: number;
+    sourceMode?: "api" | "manual-import";
+    sourceItems?: KeywordSourceItem[];
   };
+  const manualItems = Array.isArray(body.sourceItems) ? sanitizeManualSourceItems(body.sourceItems) : [];
   const seeds = normalizeSeedText(body.seeds || "");
-  if (seeds.length === 0) {
+  if (seeds.length === 0 && manualItems.length === 0) {
     return NextResponse.json({ message: "请至少输入一个种子词。" }, { status: 400 });
   }
 
@@ -778,14 +781,29 @@ export async function POST(request: NextRequest) {
   const existingSlugs = new Set(existingRows.map((row) => row.slug));
   const existingKeywords = new Set(existingRows.map((row) => row.keyword));
   const limit = Math.max(1, Math.min(100, Number(body.limit) || 40));
-  const sourceResult = await collectKeywordSourceItems(seeds, {
-    platforms: body.platforms,
-    depth: body.depth,
-    suggestLimitPerPlatform: body.suggestLimitPerPlatform,
-    expandTopN: body.expandTopN,
-    longTailPageSize: body.longTailPageSize,
-    metricLimit: body.metricLimit,
-  });
+  const sourceResult =
+    manualItems.length > 0
+      ? {
+          items: manualItems,
+          logs: [`5118 手动导入：已接收 ${manualItems.length} 个去重后的候选词。`],
+          errors: [],
+          stats: {
+            suggestCalls: 0,
+            longTailCalls: 0,
+            metricKeywords: manualItems.filter(
+              (item) => item.searchVolume || item.index || item.mobileIndex || item.douyinIndex || item.competition,
+            ).length,
+            metricCompleted: true,
+          },
+        }
+      : await collectKeywordSourceItems(seeds, {
+          platforms: body.platforms,
+          depth: body.depth,
+          suggestLimitPerPlatform: body.suggestLimitPerPlatform,
+          expandTopN: body.expandTopN,
+          longTailPageSize: body.longTailPageSize,
+          metricLimit: body.metricLimit,
+        });
 
   if (sourceResult.items.length === 0) {
     return NextResponse.json(
@@ -803,7 +821,8 @@ export async function POST(request: NextRequest) {
   let semanticGroups = 0;
   let semanticRemoved = 0;
   try {
-    const aiRows = await createAiCandidates(seeds, limit, existingRows, sourceResult.items);
+    const promptSeeds = seeds.length > 0 ? seeds : sourceResult.items.slice(0, 12).map((item) => item.keyword);
+    const aiRows = await createAiCandidates(promptSeeds, limit, existingRows, sourceResult.items);
     const normalizedRows = aiRows
       .map((row) => normalizeAiCandidate(row, existingSlugs, existingKeywords))
       .filter((row): row is KeywordCandidate => row !== null)
@@ -825,7 +844,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     seeds,
-    engine: "modelC",
+    engine: manualItems.length > 0 ? "modelC-manual-import" : "modelC",
     warning: "",
     logs: sourceResult.logs,
     errors: sourceResult.errors,
@@ -846,4 +865,78 @@ export async function POST(request: NextRequest) {
       semanticRemoved,
     },
   });
+}
+
+function sanitizeManualSourceItems(items: KeywordSourceItem[]) {
+  const byKeyword = new Map<string, KeywordSourceItem>();
+
+  for (const item of items) {
+    const keyword = String(item?.keyword || "").trim();
+    if (!keyword || keyword.length < 2 || keyword.length > 60) continue;
+
+    const current = byKeyword.get(normalizeKeywordForLookup(keyword));
+    const next: KeywordSourceItem = {
+      keyword,
+      source: String(item.source || "5118手动导入").trim(),
+      platforms: Array.isArray(item.platforms) ? item.platforms.map((platform) => String(platform).trim()).filter(Boolean) : undefined,
+      stage: item.stage === "suggest" ? "suggest" : "longtail",
+      searchVolume: toOptionalNumber(item.searchVolume),
+      pcSearchVolume: toOptionalNumber(item.pcSearchVolume),
+      mobileSearchVolume: toOptionalNumber(item.mobileSearchVolume),
+      index: toOptionalNumber(item.index),
+      mobileIndex: toOptionalNumber(item.mobileIndex),
+      douyinIndex: toOptionalNumber(item.douyinIndex),
+      semPrice: item.semPrice === undefined || item.semPrice === null ? undefined : String(item.semPrice).trim(),
+      competition: String(item.competition || "").trim(),
+      difficulty: String(item.difficulty || "").trim(),
+      pageCount: toOptionalNumber(item.pageCount),
+      longKeywordCount: toOptionalNumber(item.longKeywordCount),
+      bidwordCompanyCount: toOptionalNumber(item.bidwordCompanyCount),
+      features: String(item.features || "").trim() || undefined,
+    };
+
+    if (!current) {
+      byKeyword.set(normalizeKeywordForLookup(keyword), next);
+      continue;
+    }
+
+    byKeyword.set(normalizeKeywordForLookup(keyword), {
+      ...current,
+      ...next,
+      source: Array.from(new Set([current.source, next.source].join("+").split("+").filter(Boolean))).join("+"),
+      platforms: Array.from(new Set([...(current.platforms || []), ...(next.platforms || [])])),
+      searchVolume: Math.max(current.searchVolume || 0, next.searchVolume || 0) || undefined,
+      pcSearchVolume: Math.max(current.pcSearchVolume || 0, next.pcSearchVolume || 0) || undefined,
+      mobileSearchVolume: Math.max(current.mobileSearchVolume || 0, next.mobileSearchVolume || 0) || undefined,
+      index: Math.max(current.index || 0, next.index || 0) || undefined,
+      mobileIndex: Math.max(current.mobileIndex || 0, next.mobileIndex || 0) || undefined,
+      douyinIndex: Math.max(current.douyinIndex || 0, next.douyinIndex || 0) || undefined,
+      longKeywordCount: Math.max(current.longKeywordCount || 0, next.longKeywordCount || 0) || undefined,
+      bidwordCompanyCount: Math.max(current.bidwordCompanyCount || 0, next.bidwordCompanyCount || 0) || undefined,
+      competition: next.competition || current.competition,
+      difficulty: next.difficulty || current.difficulty,
+      features: next.features || current.features,
+    });
+  }
+
+  return Array.from(byKeyword.values())
+    .sort((a, b) => manualSourceScore(b) - manualSourceScore(a) || a.keyword.localeCompare(b.keyword, "zh-Hans-CN"))
+    .slice(0, 500);
+}
+
+function manualSourceScore(item: KeywordSourceItem) {
+  return (
+    (item.searchVolume || 0) +
+    (item.index || 0) +
+    (item.mobileIndex || 0) +
+    (item.douyinIndex || 0) +
+    (item.longKeywordCount || 0) * 2 +
+    (item.bidwordCompanyCount || 0) * 3 +
+    scoreKeyword(item.keyword, false, "source") * 4
+  );
+}
+
+function toOptionalNumber(value: unknown) {
+  const next = Number(String(value ?? "").replace(/[,\s]/gu, ""));
+  return Number.isFinite(next) && next > 0 ? next : undefined;
 }
