@@ -11,7 +11,7 @@
     <meta property="og:locale" content="zh_CN" />
     <link rel="canonical" href="https://qqbytop.com/tools/business-image/" />
     <link rel="icon" href="data:," />
-    <link rel="stylesheet" href="/tools/business-image/styles.css?v=20260503-tool-deploy" />
+    <link rel="stylesheet" href="/tools/business-image/styles.css?v=20260503-main-nav" />
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -28,7 +28,33 @@
       }
     </script>
   </head>
-  <body>
+  <body class="tool-with-main-nav">
+    <header class="main-site-nav" aria-label="全球博译主站导航">
+      <div class="main-site-nav-inner">
+        <a class="main-site-logo" href="/zh" aria-label="全球博译首页">
+          <img src="/brand/qqby-logo-pro.svg" alt="全球博译 Pro Compliance" />
+        </a>
+        <nav class="main-site-links" aria-label="主导航">
+          <a href="/zh/services">翻译服务</a>
+          <a href="/zh/industries">行业方案</a>
+          <a class="active" href="/zh/tools" aria-current="page">诊断工具</a>
+          <a href="/zh/about">关于我们</a>
+          <a href="/zh/pricing">价格说明</a>
+          <a href="/zh/blog">专业资讯</a>
+        </nav>
+        <a class="main-site-cta" href="/zh/quote?source=business-image-tool">获取报价</a>
+        <button class="main-site-menu-button" type="button" aria-expanded="false" aria-controls="mainSiteMobileNav">菜单</button>
+      </div>
+      <nav id="mainSiteMobileNav" class="main-site-mobile-links" aria-label="移动端主导航" hidden>
+        <a href="/zh/services">翻译服务</a>
+        <a href="/zh/industries">行业方案</a>
+        <a class="active" href="/zh/tools" aria-current="page">诊断工具</a>
+        <a href="/zh/about">关于我们</a>
+        <a href="/zh/pricing">价格说明</a>
+        <a href="/zh/blog">专业资讯</a>
+        <a href="/zh/quote?source=business-image-tool">获取报价</a>
+      </nav>
+    </header>
     <main class="app-shell">
       <section class="workspace" aria-label="海外商务第一印象诊断工具">
         <aside class="brief-panel">
@@ -546,6 +572,18 @@
       </footer>
     </main>
     <script src="/tools/business-image/app.js?v=20260503-tool-deploy"></script>
+    <script>
+      const mainSiteMenuButton = document.querySelector(".main-site-menu-button");
+      const mainSiteMobileNav = document.querySelector("#mainSiteMobileNav");
+      if (mainSiteMenuButton && mainSiteMobileNav) {
+        mainSiteMenuButton.addEventListener("click", () => {
+          const isOpen = mainSiteMenuButton.getAttribute("aria-expanded") === "true";
+          mainSiteMenuButton.setAttribute("aria-expanded", String(!isOpen));
+          mainSiteMenuButton.textContent = isOpen ? "菜单" : "关闭";
+          mainSiteMobileNav.hidden = isOpen;
+        });
+      }
+    </script>
   </body>
 </html>
 
