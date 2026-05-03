@@ -49,11 +49,74 @@ export type DiagnosticTool = {
   badge: string;
   summary: string;
   href: string;
+  externalHref?: string;
   status: "available" | "planned";
+  priority?: "primary" | "secondary";
+  cta?: string;
   useCases: string[];
 };
 
+export const productCopyDiagnosticUrl =
+  process.env.NEXT_PUBLIC_PRODUCT_COPY_DIAGNOSTIC_URL || "http://127.0.0.1:3001";
+
 export const diagnosticTools: DiagnosticTool[] = [
+  {
+    slug: "product-copy-compliance",
+    title: "跨境产品文案合规翻译诊断",
+    badge: "Amazon Listing / Shopify / 包装 / 说明书",
+    summary: "粘贴产品英文文案，筛查翻译腔、合规声明、平台审核和转化表达风险，报告后可提交人工审校与合规改写需求。",
+    href: "/tools/product-copy-compliance-checker",
+    externalHref: productCopyDiagnosticUrl,
+    status: "available",
+    priority: "primary",
+    cta: "开始诊断产品文案",
+    useCases: ["Amazon Listing 翻译质量", "Shopify 产品页英文", "包装文案合规", "产品说明书风险", "独立站广告语"],
+  },
+  {
+    slug: "amazon-listing-translation",
+    title: "Amazon Listing 翻译质量诊断",
+    badge: "Listing 翻译 / 平台审核 / 本地化",
+    summary: "针对标题、五点、描述和功效表达，优先识别中式英语、夸大承诺、敏感合规词和影响转化的表达问题。",
+    href: "/tools/amazon-listing-translation-checker",
+    externalHref: `${productCopyDiagnosticUrl}?contentType=amazon_listing`,
+    status: "available",
+    priority: "primary",
+    cta: "检查 Listing 文案",
+    useCases: ["标题本地化", "五点描述优化", "敏感声明筛查", "人工 Listing 审校"],
+  },
+  {
+    slug: "shopify-product-page-english",
+    title: "Shopify 产品页英文诊断",
+    badge: "独立站产品页 / SEO / 转化表达",
+    summary: "检查 Shopify 或独立站产品页中的英文表达、Meta 描述、卖点顺序和合规风险，适合上线前快速筛查。",
+    href: "/tools/shopify-product-page-english-checker",
+    externalHref: `${productCopyDiagnosticUrl}?contentType=shopify_product_page`,
+    status: "available",
+    cta: "检查产品页英文",
+    useCases: ["产品页英文", "Meta 描述", "卖点顺序", "SEO/GEO 内容"],
+  },
+  {
+    slug: "packaging-copy-risk",
+    title: "包装文案风险诊断",
+    badge: "包装标签 / 警示语 / 声明风险",
+    summary: "检查包装文案中可能影响平台审核、消费者理解或合规边界的表达，尤其适合母婴、美妆、家居和保健品。",
+    href: "/tools/packaging-copy-risk-checker",
+    externalHref: `${productCopyDiagnosticUrl}?contentType=packaging_copy`,
+    status: "available",
+    cta: "检查包装文案",
+    useCases: ["包装标签", "安全警示", "认证声明", "人工合规翻译"],
+  },
+  {
+    slug: "manual-translation-risk",
+    title: "产品说明书翻译风险检查",
+    badge: "说明书 / 安全警示 / 技术表达",
+    summary: "检查说明书里的翻译腔、警示语缺失、单位表达和使用步骤风险，适合出海产品交付前复核。",
+    href: "/tools/manual-translation-risk-checker",
+    externalHref: `${productCopyDiagnosticUrl}?contentType=manual`,
+    status: "available",
+    cta: "检查说明书翻译",
+    useCases: ["说明书翻译", "安全警示", "使用步骤", "技术文档本地化"],
+  },
   {
     slug: "business-image",
     title: "海外商务第一印象诊断",
@@ -61,6 +124,8 @@ export const diagnosticTools: DiagnosticTool[] = [
     summary: "上传一张商务头像或个人形象照，生成基础诊断、12 项标准报告、参考形象图和英文个人品牌文案。",
     href: "/tools/business-image",
     status: "available",
+    priority: "secondary",
+    cta: "诊断商务形象",
     useCases: ["LinkedIn 头像优化", "官网 About 形象", "海外客户第一印象", "展会/名片商务形象"],
   },
 ];

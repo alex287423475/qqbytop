@@ -97,6 +97,28 @@ NEXT_PUBLIC_CRISP_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 `NEXT_PUBLIC_WHATSAPP_NUMBER` 需要使用可接收 WhatsApp 的真实号码，包含国家区号，不要带 `+`、空格或横线。
 
+## 诊断工具矩阵
+
+`/[locale]/tools` 会展示主站诊断工具入口。跨境产品文案合规翻译诊断工具是独立 Next.js 应用，默认本地联调地址为：
+
+```text
+http://127.0.0.1:3001
+```
+
+线上部署后，在 Vercel 或本地 `.env.local` 中配置：
+
+```text
+NEXT_PUBLIC_PRODUCT_COPY_DIAGNOSTIC_URL=https://your-diagnostic-tool-domain.example
+```
+
+当前官网会把以下入口导向同一套诊断引擎：
+
+- `/[locale]/tools/product-copy-compliance-checker`
+- `/[locale]/tools/amazon-listing-translation-checker`
+- `/[locale]/tools/shopify-product-page-english-checker`
+- `/[locale]/tools/packaging-copy-risk-checker`
+- `/[locale]/tools/manual-translation-risk-checker`
+
 ## 本地运行
 
 ```powershell
