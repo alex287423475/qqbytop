@@ -127,6 +127,13 @@ NEXT_PUBLIC_APP_URL=https://qqbytop.com/tools/product-copy-compliance-checker
 - `/[locale]/tools/packaging-copy-risk-checker`
 - `/[locale]/tools/manual-translation-risk-checker`
 
+场景入口使用静态路径承接，不使用 `contentType` 查询参数：
+
+- `/tools/product-copy-compliance-checker/amazon-listing`
+- `/tools/product-copy-compliance-checker/shopify-product-page`
+- `/tools/product-copy-compliance-checker/packaging-copy`
+- `/tools/product-copy-compliance-checker/manual-translation-risk`
+
 ## 本地运行
 
 ```powershell
