@@ -20,7 +20,7 @@ const legacyRedirects: Record<string, string> = {
 export function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
-  if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.includes(".")) {
+  if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.startsWith("/tools") || pathname.includes(".")) {
     return NextResponse.next();
   }
 
