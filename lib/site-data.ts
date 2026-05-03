@@ -37,9 +37,32 @@ export type Industry = {
 export const nav = [
   { href: "/services", label: "翻译服务" },
   { href: "/industries", label: "行业方案" },
+  { href: "/tools", label: "诊断工具" },
   { href: "/about", label: "关于我们" },
   { href: "/pricing", label: "价格说明" },
   { href: "/blog", label: "专业资讯" },
+];
+
+export type DiagnosticTool = {
+  slug: string;
+  title: string;
+  badge: string;
+  summary: string;
+  href: string;
+  status: "available" | "planned";
+  useCases: string[];
+};
+
+export const diagnosticTools: DiagnosticTool[] = [
+  {
+    slug: "business-image",
+    title: "海外商务第一印象诊断",
+    badge: "形象诊断 / 英文简介 / 参考图",
+    summary: "上传一张商务头像或个人形象照，生成基础诊断、12 项标准报告、参考形象图和英文个人品牌文案。",
+    href: "/tools/business-image",
+    status: "available",
+    useCases: ["LinkedIn 头像优化", "官网 About 形象", "海外客户第一印象", "展会/名片商务形象"],
+  },
 ];
 
 export const home = {
@@ -267,4 +290,3 @@ export function getService(slug: string) {
 export function getIndustry(slug: string) {
   return industries.find((industry) => industry.slug === slug);
 }
-
