@@ -128,11 +128,18 @@ textarea:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  color: var(--teal-dark);
+  color: var(--teal-dark) !important;
   line-height: 1;
   text-align: left;
-  text-decoration: none;
+  text-decoration: none !important;
   white-space: nowrap;
+}
+
+.main-site-phone:visited,
+.main-site-phone:hover,
+.main-site-phone:focus-visible {
+  color: var(--teal-dark) !important;
+  text-decoration: none !important;
 }
 
 .main-site-phone span {
