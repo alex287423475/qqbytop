@@ -13,7 +13,6 @@ function parseLastModified(date: string | undefined) {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const staticPages = ["", "/services", "/industries", "/about", "/pricing", "/quote", "/blog"];
-  const toolPages = ["/tools/business-image"];
   const servicePages = services.map((service) => `/services/${service.slug}`);
   const industryPages = industries.map((industry) => `/industries/${industry.slug}`);
   const articleDateMap = new Map(getAllArticles("zh").map((article) => [article.slug, article.date]));
@@ -34,12 +33,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: path === "" ? 1 : path.startsWith("/services") ? 0.9 : 0.7,
     })),
   ).concat(
-    toolPages.map((path) => ({
-      url: `${baseUrl}${path}`,
-      lastModified: new Date(),
-      changeFrequency: "monthly" as MetadataRoute.Sitemap[number]["changeFrequency"],
-      priority: 0.8,
-    })),
     blogPages.map((entry) => ({
       url: `${baseUrl}/${entry.locale}${entry.path}`,
       lastModified: parseLastModified(articleDateMap.get(entry.path.replace("/blog/", ""))),
