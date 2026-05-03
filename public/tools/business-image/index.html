@@ -1,0 +1,551 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>海外商务第一印象诊断</title>
+    <meta name="description" content="上传一张当前商务头像，生成海外商务第一印象诊断、照片优化建议、参考形象方向图和英文个人品牌文案样例。" />
+    <meta property="og:title" content="海外商务第一印象诊断" />
+    <meta property="og:description" content="面向跨境服务、翻译合规、外贸顾问和出海创始人的商务头像与英文形象诊断工具。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+    <link rel="canonical" href="https://qqbytop.com/tools/business-image/" />
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/tools/business-image/styles.css?v=20260503-tool-deploy" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "海外商务第一印象诊断",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "description": "上传商务头像，生成海外商务第一印象诊断、照片优化建议、参考形象方向图和英文个人品牌文案样例。",
+        "offers": {
+          "@type": "Offer",
+          "priceCurrency": "CNY",
+          "price": "0"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="海外商务第一印象诊断工具">
+        <aside class="brief-panel">
+          <div class="brand-block">
+            <span class="brand-mark">IB</span>
+            <div>
+              <p class="eyebrow">International Business Image</p>
+              <h1>海外商务第一印象诊断</h1>
+            </div>
+          </div>
+
+          <div class="progress-rail" aria-label="诊断流程">
+            <div class="progress-step active">
+              <span>1</span>
+              <p>上传头像</p>
+            </div>
+            <div class="progress-step">
+              <span>2</span>
+              <p>选择用途</p>
+            </div>
+            <div class="progress-step">
+              <span>3</span>
+              <p>生成报告</p>
+            </div>
+          </div>
+
+          <div class="positioning">
+            <h2>不是颜值打分</h2>
+            <p>
+              这个工具只评估商务场景里的信任感、专业度和跨文化表达，不做面相、健康、年龄或敏感属性判断。
+            </p>
+          </div>
+
+          <div class="service-menu">
+            <button type="button" class="service-pill active" data-scenario="linkedin">LinkedIn 头像</button>
+            <button type="button" class="service-pill" data-scenario="founder">出海创始人</button>
+            <button type="button" class="service-pill" data-scenario="expo">展会洽谈</button>
+            <button type="button" class="service-pill" data-scenario="consultant">顾问官网</button>
+          </div>
+        </aside>
+
+        <section class="input-panel">
+          <div class="section-heading">
+            <p class="eyebrow">Step 01</p>
+            <h2>上传一张当前商务头像</h2>
+          </div>
+
+          <label class="upload-zone" for="portraitInput">
+            <input id="portraitInput" type="file" accept="image/*" />
+            <div id="uploadEmpty" class="upload-empty">
+              <span class="upload-icon">+</span>
+              <strong>点击上传头像或半身照</strong>
+              <small>建议使用清晰正脸照片。MVP 演示版仅在浏览器内预览，正式版会增加自动删除和隐私授权。</small>
+            </div>
+            <img id="portraitPreview" alt="上传照片预览" hidden />
+          </label>
+
+          <div class="field-grid">
+            <label>
+              <span>你的行业/身份</span>
+              <input id="roleInput" type="text" value="跨境服务顾问" placeholder="例如：创始人 / 顾问 / 业务负责人" />
+            </label>
+            <label>
+              <span>目标客户</span>
+              <input id="audienceInput" type="text" value="海外品牌方 / 外贸客户" placeholder="例如：海外客户 / 合作伙伴 / 招聘方" />
+            </label>
+          </div>
+
+          <div class="checklist">
+            <label><input name="goal" value="头像更专业" type="checkbox" checked /> 我需要头像更专业</label>
+            <label><input name="goal" value="英文简介建议" type="checkbox" checked /> 我需要英文简介建议</label>
+            <label><input name="goal" value="展会或客户会议" type="checkbox" /> 我准备参加展会或客户会议</label>
+          </div>
+
+          <p class="privacy-note">
+            正式上线前需要补充隐私政策、照片保存期限、删除入口和未成年人限制。当前原型用于验证产品链路。
+          </p>
+
+          <button type="button" id="generateBtn" class="primary-action">生成基础诊断</button>
+        </section>
+
+        <section class="report-panel" aria-live="polite">
+          <div class="report-header">
+            <div>
+              <p class="eyebrow">Preview Report</p>
+              <h2>基础诊断报告</h2>
+            </div>
+            <div class="score-ring">
+              <strong id="scoreValue">--</strong>
+              <span>信任感</span>
+            </div>
+          </div>
+
+          <div id="emptyReport" class="empty-report">
+            上传照片并生成后，这里会展示当前形象问题、商务风格方向和可立即执行的优化动作。
+          </div>
+
+          <div id="operationProgress" class="operation-progress" hidden>
+            <div class="operation-progress-header">
+              <div>
+                <p class="eyebrow">Generation Progress</p>
+                <h3 id="progressTitle">正在生成</h3>
+              </div>
+              <strong id="progressPercent">0%</strong>
+            </div>
+            <div class="progress-track" aria-hidden="true">
+              <span id="progressFill"></span>
+            </div>
+            <p id="progressDetail" class="progress-detail"></p>
+            <p id="progressHint" class="progress-hint" hidden></p>
+            <div id="progressSteps" class="progress-steps"></div>
+          </div>
+
+          <div id="reportContent" class="report-content" hidden>
+            <div id="demoNotice" class="demo-notice" hidden>
+              当前为演示模板结果：AI 接口未返回真实诊断时，系统会用示例逻辑展示流程。正式上线时请以真实 AI 分析结果为准。
+            </div>
+            <div class="finding-strip">
+              <div>
+                <span>主要问题</span>
+                <strong id="mainIssue"></strong>
+              </div>
+              <div>
+                <span>推荐方向</span>
+                <strong id="styleDirection"></strong>
+              </div>
+            </div>
+
+            <div class="meta-row">
+              <span id="scenarioLabel"></span>
+              <span id="reportMode">Demo report</span>
+            </div>
+
+            <div class="insight-list" id="insightList"></div>
+
+            <div class="pricing-block">
+              <p class="eyebrow">Pricing</p>
+              <div class="pricing-grid">
+                <article class="price-card">
+                  <span>免费诊断</span>
+                  <strong>¥0</strong>
+                  <p>评分、主要问题、3 条建议</p>
+                  <button type="button" data-plan="free">当前版本</button>
+                </article>
+                <article class="price-card featured">
+                  <span>标准报告</span>
+                  <strong>¥19.9</strong>
+                  <p>12 项报告 + 2 张参考图</p>
+                  <button type="button" data-plan="standard">在线生成</button>
+                  <button type="button" class="sample-link" data-sample="standard">查看报告样例</button>
+                </article>
+                <article class="price-card">
+                  <span>专业形象包</span>
+                  <strong>¥99</strong>
+                  <p>12 项报告 + 6 个场景方案 + 英文简介</p>
+                  <button type="button" data-plan="pro">在线生成</button>
+                  <button type="button" class="sample-link" data-sample="pro">查看专业形象包样例</button>
+                </article>
+                <article class="price-card">
+                  <span>定制方案</span>
+                  <strong>¥399 起</strong>
+                  <p>定制方案压缩包：形象方案、照片建议、参考图、英文文案和执行清单</p>
+                  <button type="button" data-plan="human">预约定制</button>
+                  <button type="button" class="sample-link" data-sample="human">查看定制方案样例</button>
+                </article>
+              </div>
+              <p id="pricingMessage" class="pricing-message">标准报告可直接在线生成；专业形象包需要先补充业务信息；定制方案需要留下联系方式。</p>
+
+              <section id="samplePreview" class="sample-preview" aria-label="付费报告完整样例">
+                <div class="sample-preview-heading">
+                  <div>
+                    <p class="eyebrow">Sample Preview</p>
+                    <h3>完整样例：一份付费报告会长什么样</h3>
+                  </div>
+                  <div class="sample-tabs" role="tablist" aria-label="样例类型">
+                    <button type="button" role="tab" aria-selected="true" data-sample-tab="standard">标准报告样例</button>
+                    <button type="button" role="tab" aria-selected="false" data-sample-tab="pro">专业形象包样例</button>
+                    <button type="button" role="tab" aria-selected="false" data-sample-tab="human">定制方案样例</button>
+                  </div>
+                </div>
+
+                <div class="sample-panel active" data-sample-panel="standard">
+                  <div class="sample-deliverable-note">
+                    <strong>标准报告实际包含</strong>
+                    <p>12 项完整商务形象建议 + 2 张基于上传照片保留本人脸部特征的参考形象图。</p>
+                  </div>
+                  <div class="sample-report-list" id="standardSampleList">
+                    <article>
+                      <span>01 头像构图与裁切</span>
+                      <strong>判断</strong>
+                      <p>当前头像面部识别清楚，但肩颈和上半身空间不足，放到 LinkedIn 圆形头像后容易显得紧张。</p>
+                      <strong>动作</strong>
+                      <p>裁成胸上半身构图，头顶保留 8%-12% 留白，肩部完整露出，让头像在小尺寸下仍然稳定可信。</p>
+                    </article>
+                    <article>
+                      <span>02 表情与视线</span>
+                      <strong>判断</strong>
+                      <p>表情需要稳定、自然、可交流，避免过度严肃或自拍感，才能让海外客户愿意继续了解服务。</p>
+                      <strong>动作</strong>
+                      <p>选择轻微微笑、正视镜头的版本，眼神保持清晰，避免俯拍、仰拍和距离过近的自拍角度。</p>
+                    </article>
+                    <article>
+                      <span>03 服装色彩</span>
+                      <strong>判断</strong>
+                      <p>服装颜色偏生活化，和跨境合规翻译的专业定位不够一致，容易削弱首次信任感。</p>
+                      <strong>动作</strong>
+                      <p>优先选择深海军蓝、西装灰或白衬衫组合，减少图案和强休闲元素，形成更清晰的顾问型形象。</p>
+                    </article>
+                    <article>
+                      <span>04 背景与光线</span>
+                      <strong>判断</strong>
+                      <p>背景需要服务于专业身份，如果环境信息杂乱，会让头像看起来像生活照而不是商务资料照。</p>
+                      <strong>动作</strong>
+                      <p>使用浅灰、米白或明亮办公室背景，保持柔和正面光，减少强阴影和明显滤镜痕迹。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>05 姿态与肩颈线条</span>
+                      <strong>判断</strong>
+                      <p>肩颈线条决定头像是否显得稳定可靠，过近裁切或身体倾斜会削弱顾问型信任感。</p>
+                      <strong>动作</strong>
+                      <p>采用自然打开的肩线，身体略微面向镜头，保留上胸空间，让姿态更从容。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>06 跨文化信任感</span>
+                      <strong>判断</strong>
+                      <p>面对海外客户时，照片需要减少本地生活化表达，突出清晰、克制、可信的专业边界。</p>
+                      <strong>动作</strong>
+                      <p>统一服装、背景和表情风格，避免强美颜、夸张姿势和过度社交化头像。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>07 行业身份匹配</span>
+                      <strong>判断</strong>
+                      <p>跨境合规翻译的头像要让客户感到“准确、可靠、懂业务语境”，不能只表达普通翻译能力。</p>
+                      <strong>动作</strong>
+                      <p>在头像和简介中同步出现合规、法律、技术文档等关键词，强化服务边界。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>08 LinkedIn 首屏表达</span>
+                      <strong>判断</strong>
+                      <p>头像、Headline 和背景图需要同时说明你服务谁、解决什么问题，否则客户只看到“翻译”，看不到专业边界。</p>
+                      <strong>动作</strong>
+                      <p>用头像建立可信感，Headline 写成 “Cross-border Compliance Translator | Legal and Technical Translation for Export Teams”。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>09 英文个人简介</span>
+                      <strong>判断</strong>
+                      <p>英文简介要承接头像传递的专业感，避免只罗列能力，而没有说明服务对象和业务结果。</p>
+                      <strong>动作</strong>
+                      <p>用 3-5 句话写清服务对象、交付内容、优势和预约行动，语气保持可信、具体、不过度营销。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>10 官网 About 页面</span>
+                      <strong>判断</strong>
+                      <p>官网 About 页要让头像、个人介绍和服务范围互相支撑，降低首次咨询阻力。</p>
+                      <strong>动作</strong>
+                      <p>在头像旁边加入服务对象、典型文件类型、交付方式和联系方式，不让客户自己猜测服务边界。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>11 展会/名片场景</span>
+                      <strong>判断</strong>
+                      <p>展会、名片、邮箱签名和社媒头像如果风格不一致，会让客户对服务专业度产生犹豫。</p>
+                      <strong>动作</strong>
+                      <p>沿用同一张核心头像，分别裁切出 LinkedIn、官网、名片和邮件签名版本。</p>
+                    </article>
+                    <article class="sample-extra" hidden>
+                      <span>12 30 天执行清单</span>
+                      <strong>判断</strong>
+                      <p>如果只换头像，不同步官网、名片和邮箱签名，客户在不同触点看到的专业形象会不一致。</p>
+                      <strong>动作</strong>
+                      <p>第 1 周确定头像版本，第 2 周更新 LinkedIn 和官网 About，第 3-4 周同步名片、邮件签名和商务资料页。</p>
+                    </article>
+                  </div>
+                  <button type="button" id="standardSampleToggle" class="sample-toggle">展开查看 12 项完整样例</button>
+                  <div class="sample-reference-preview" id="standardSampleReferences">
+                    <article>
+                      <div class="sample-image-placeholder">
+                        <span>LinkedIn</span>
+                        <strong>保脸头像参考</strong>
+                      </div>
+                      <h4>LinkedIn 商务头像参考</h4>
+                      <p>方形头像构图，浅色背景，深色西装或低饱和商务上装，适合 LinkedIn 圆形裁切。</p>
+                      <em>实际生成会基于用户上传照片保留本人脸部特征。</em>
+                    </article>
+                    <article>
+                      <div class="sample-image-placeholder website">
+                        <span>Website</span>
+                        <strong>官网顾问形象</strong>
+                      </div>
+                      <h4>官网顾问形象</h4>
+                      <p>半身构图，保留网页留白，背景偏办公室或咨询场景，适合 About 页面展示。</p>
+                      <em>实际生成会基于用户上传照片保留本人脸部特征。</em>
+                    </article>
+                  </div>
+                </div>
+
+                <div class="sample-panel" data-sample-panel="pro">
+                  <div class="sample-deliverable-note">
+                    <strong>专业形象包固定样例实际包含</strong>
+                    <p>12 项照片相关报告 + 6 个商务场景参考图 + LinkedIn / Website / Email 可用英文简介文案。</p>
+                  </div>
+                  <h4 class="sample-section-title">12 项照片诊断报告样例</h4>
+                  <div class="sample-report-list professional-report-sample" id="professionalSampleReport"></div>
+                  <button type="button" id="professionalSampleToggle" class="sample-toggle">展开查看 12 项完整样例</button>
+                  <h4 class="sample-section-title">英文个人品牌文案样例</h4>
+                  <div class="profile-sample-grid" id="professionalSampleCopy">
+                    <article>
+                      <span>LinkedIn Headline</span>
+                      <p>Cross-border Compliance Translator | Legal and Technical Translation for Overseas Brands and Export Clients</p>
+                    </article>
+                    <article>
+                      <span>LinkedIn About</span>
+                      <p>Ms. Li helps overseas brands and export clients handle legal and technical translation for cross-border business. Her work focuses on accuracy, compliance context, and clear communication, helping clients reduce misunderstandings and move international projects forward with confidence.</p>
+                    </article>
+                    <article>
+                      <span>Website About</span>
+                      <p>Ms. Li provides legal translation, technical translation, and cross-border documentation support for export teams. The service is designed for clients who need accurate communication, reliable delivery, and a professional international presence.</p>
+                    </article>
+                    <article>
+                      <span>6 个场景方案会包含</span>
+                      <p>LinkedIn 头像、官网顾问图、展会洽谈图、创始人介绍图、英文简介配图、商务社媒头像。每个场景会给出构图、背景、服装、表情姿态和保脸生图提示词。</p>
+                    </article>
+                  </div>
+                  <h4 class="sample-section-title">6 个场景参考形象图样例</h4>
+                  <div class="sample-reference-preview compact" id="professionalSampleReferences"></div>
+                </div>
+
+                <div class="sample-panel" data-sample-panel="human">
+                  <div class="sample-deliverable-note">
+                    <strong>定制方案实际交付</strong>
+                    <p>以压缩包形式交付多份文件：人工定制形象方案、照片使用/拍摄建议、参考形象方向图、英文个人品牌文案、30 天执行清单和修改反馈表。</p>
+                  </div>
+                  <div class="human-sample">
+                    <article>
+                      <span>01_定制形象方案.pdf</span>
+                      <p>明确客户的海外商务形象定位，例如从“普通翻译服务商”升级为“Cross-border Compliance Translation Consultant”，并说明适合服务的客户、视觉气质和不建议采用的表达方式。</p>
+                    </article>
+                    <article>
+                      <span>02_照片使用与拍摄建议.pdf</span>
+                      <p>分别给出 LinkedIn 头像、官网 About 图、商务资料页配图的构图、背景、服装、表情和裁切建议，说明哪些照片适合直接用，哪些需要重拍或重新生成。</p>
+                    </article>
+                    <article>
+                      <span>03_参考形象方向图</span>
+                      <p>提供 2-3 张人工筛选后的参考方向图，例如 LinkedIn 顾问头像、官网 About 顾问图、商务资料页配图。每张图标注用途、使用位置和为什么适合当前客户。</p>
+                    </article>
+                    <article>
+                      <span>04_英文个人品牌文案.docx</span>
+                      <p>交付可直接复制使用的 LinkedIn Headline、LinkedIn About、Website About、Email Signature 和短版英文介绍，不只是翻译，而是围绕目标客户和服务价值重写。</p>
+                    </article>
+                    <article>
+                      <span>05_30天执行清单.xlsx</span>
+                      <p>把方案拆成可执行任务：第 1 周统一头像，第 2 周更新 LinkedIn 首屏，第 3 周更新官网 About，第 4 周同步邮件签名、报价单和资料页。</p>
+                    </article>
+                    <article>
+                      <span>06_修改反馈表.docx</span>
+                      <p>客户可反馈目标客户、服务重点、形象风格偏好和现有官网/LinkedIn 信息，用于一次人工修改沟通，避免方案停留在泛泛建议。</p>
+                    </article>
+                  </div>
+                </div>
+              </section>
+
+              <div id="generatedResults" class="generated-results" hidden>
+                <div class="generated-results-heading">
+                  <div>
+                    <p class="eyebrow">Generated Results</p>
+                    <h3>生成结果</h3>
+                  </div>
+                  <div class="download-actions">
+                    <button type="button" id="saveStandardSampleBtn" hidden>保存为标准报告样例</button>
+                    <button type="button" id="saveProfessionalSampleBtn" hidden>保存为专业形象包样例</button>
+                    <button type="button" id="downloadAllBtn" hidden>下载全部</button>
+                    <button type="button" id="downloadReportBtn" hidden>下载报告</button>
+                    <button type="button" id="downloadCopyBtn" hidden>下载英文简介</button>
+                  </div>
+                </div>
+
+                <div id="standardReportBlock" class="standard-report-block" hidden>
+                  <div>
+                    <p class="eyebrow">Standard Report</p>
+                    <h3>12 项标准报告</h3>
+                    <p>以下内容为在线生成后的完整报告，可作为下载版或付费解锁版展示。</p>
+                  </div>
+                  <div id="standardReportGrid" class="standard-report-grid"></div>
+                </div>
+
+                <div id="referenceBlock" class="reference-block" hidden>
+                  <div class="reference-heading">
+                    <div>
+                      <p class="eyebrow">Reference Images</p>
+                      <h3>参考形象图</h3>
+                    </div>
+                  </div>
+                  <div id="referenceGrid" class="reference-grid"></div>
+                  <p id="referenceMessage" class="reference-message"></p>
+                </div>
+
+                <div id="copyBlock" class="copy-block" hidden>
+                  <p class="eyebrow">English Profile Copy</p>
+                  <h3>英文商务简介</h3>
+                  <div id="copyGrid" class="copy-grid"></div>
+                </div>
+              </div>
+            </div>
+
+            <form id="proForm" class="pro-form" hidden>
+              <div class="pro-form-header">
+                <div>
+                  <p class="eyebrow">Professional Package</p>
+                  <h3>生成英文简介前，请补充业务信息</h3>
+                </div>
+                <button type="button" id="proCancelBtn" class="ghost-action">收起</button>
+              </div>
+              <div class="pro-field-grid">
+                <label>
+                  <span>姓名或品牌名</span>
+                  <input id="proNameInput" type="text" placeholder="例如：Qianbei Translation" />
+                </label>
+                <label>
+                  <span>职位或身份</span>
+                  <input id="proTitleInput" type="text" placeholder="例如：跨境合规翻译顾问" />
+                </label>
+                <label>
+                  <span>主要服务</span>
+                  <input id="proServicesInput" type="text" placeholder="例如：法律翻译、技术文档、本地化" />
+                </label>
+                <label>
+                  <span>核心优势</span>
+                  <input id="proStrengthsInput" type="text" placeholder="例如：熟悉欧美合规、交付稳定" />
+                </label>
+                <label class="wide-field">
+                  <span>希望客户采取的动作</span>
+                  <input id="proCtaInput" type="text" placeholder="例如：预约咨询 / 发送项目文件 / 访问官网" />
+                </label>
+              </div>
+              <button type="submit" class="primary-action">开始生成专业形象包</button>
+              <p id="proFormMessage" class="form-message" hidden></p>
+            </form>
+
+            <div class="upgrade-block">
+              <div>
+                <p class="eyebrow">Paid Upgrade</p>
+                <h3>适合做成付费项</h3>
+                <p>标准报告包含 12 项形象建议和 2 张参考图；专业形象包包含 6 个场景方案和英文简介；定制方案以压缩包交付多份可直接使用的商务形象文件。</p>
+              </div>
+              <button type="button" id="leadBtn" class="secondary-action">预约定制方案</button>
+            </div>
+
+            <div id="customContact" class="contact-card">
+              <div>
+                <p class="eyebrow">Contact</p>
+                <h3>需要先沟通定制方案？</h3>
+                <p>可直接邮件联系 <a href="mailto:info@qqbytop.com">info@qqbytop.com</a>。提交定制需求后，资料仅用于确认方案范围、交付文件和报价，不会公开展示你的照片和业务信息。</p>
+              </div>
+              <a class="contact-link" href="mailto:info@qqbytop.com">邮件联系</a>
+            </div>
+
+            <form id="leadForm" class="lead-form" hidden>
+              <div class="lead-form-heading">
+                <p class="eyebrow">Custom Brief</p>
+                <h3>定制方案需求</h3>
+                <p>提交后用于确认定制方案范围、交付文件和报价。</p>
+              </div>
+              <label>
+                <span>微信或手机号</span>
+                <input id="contactInput" name="contact" type="text" placeholder="用于确认方案范围和交付方式" />
+              </label>
+              <label>
+                <span>当前身份/业务</span>
+                <input id="customRoleInput" name="customRole" type="text" placeholder="例如：跨境合规翻译 / 出海顾问 / 外贸公司负责人" />
+              </label>
+              <label>
+                <span>目标客户</span>
+                <input id="customAudienceInput" name="customAudience" type="text" placeholder="例如：海外品牌方 / 外贸客户 / 律所 / 制造业客户" />
+              </label>
+              <label>
+                <span>使用场景</span>
+                <input id="customSceneInput" name="customScene" type="text" placeholder="例如：LinkedIn、官网 About、展会、邮件签名、资料页" />
+              </label>
+              <label>
+                <span>照片情况</span>
+                <input id="customPhotoInput" name="customPhoto" type="text" placeholder="例如：已有头像 / 需要重拍建议 / 需要参考形象图" />
+              </label>
+              <label>
+                <span>英文文案需求</span>
+                <input id="customCopyInput" name="customCopy" type="text" placeholder="例如：LinkedIn 简介、官网 About、邮件签名、短版介绍" />
+              </label>
+              <label class="wide-field">
+                <span>补充需求</span>
+                <textarea id="noteInput" name="note" rows="3" placeholder="例如：准备更新 LinkedIn；希望形象更专家型；需要一份压缩包交付给团队使用。"></textarea>
+              </label>
+              <label class="wide-field">
+                <span>上传照片或资料</span>
+                <input id="customFilesInput" name="files" type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" />
+                <small>可上传头像、参考照片、官网截图、LinkedIn 资料、品牌介绍或现有文案，单次最多 20MB。</small>
+              </label>
+              <button type="submit">提交定制需求</button>
+              <p id="formMessage" class="form-message" hidden></p>
+            </form>
+          </div>
+        </section>
+      </section>
+
+      <footer class="site-footer">
+        <div>
+          <p class="eyebrow">International Business Image</p>
+          <strong>海外商务第一印象诊断</strong>
+          <p>服务方向：商务形象诊断、英文个人品牌文案、跨境翻译与合规沟通支持。</p>
+        </div>
+        <div class="footer-links">
+          <a href="mailto:info@qqbytop.com">info@qqbytop.com</a>
+          <a href="/tools/business-image/about.html">关于我们</a>
+          <a href="/tools/business-image/privacy.html">隐私政策</a>
+          <a href="/tools/business-image/terms.html">服务条款</a>
+          <a href="/tools/business-image/data-policy.html">照片与数据处理</a>
+        </div>
+      </footer>
+    </main>
+    <script src="/tools/business-image/app.js?v=20260503-tool-deploy"></script>
+  </body>
+</html>
+
