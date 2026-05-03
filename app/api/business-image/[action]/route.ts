@@ -10,6 +10,7 @@ const profileCopyModel = process.env.OPENAI_PROFILE_COPY_MODEL || process.env.OP
 const imageModel = process.env.OPENAI_IMAGE_GENERATION_MODEL || "gpt-image-2";
 const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS || 60000);
 const imageTimeoutMs = Number(process.env.OPENAI_IMAGE_TIMEOUT_MS || 55000);
+const imageAttemptTimeoutMs = Math.min(imageTimeoutMs, 25000);
 const referenceImageMax = Number(process.env.REFERENCE_IMAGE_MAX || 1);
 const resendApiKey = process.env.RESEND_API_KEY || "";
 const resendFrom = process.env.RESEND_FROM || "";
@@ -262,7 +263,7 @@ function extractImageUrl(data: any) {
   return "";
 }
 
-async function generateImage(prompt: string, imageData?: string) {
+async function generateImage(prompt: string, imageData?: string, timeoutMs = imageAttemptTimeoutMs) {
   if (!openaiApiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   if (imageData?.startsWith("data:image/")) {
@@ -277,7 +278,7 @@ async function generateImage(prompt: string, imageData?: string) {
       method: "POST",
       headers: { Authorization: `Bearer ${openaiApiKey}` },
       body: form,
-    }, imageTimeoutMs);
+    }, timeoutMs);
     const editData = await editResponse.json().catch(() => ({}));
     if (editResponse.ok) return extractImageUrl(editData);
   }
@@ -289,7 +290,7 @@ async function generateImage(prompt: string, imageData?: string) {
       Authorization: `Bearer ${openaiApiKey}`,
     },
     body: JSON.stringify({ model: imageModel, prompt, size: "1024x1024", n: 1 }),
-  }, imageTimeoutMs);
+  }, timeoutMs);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(`Image HTTP ${response.status}`);
   return extractImageUrl(data);
@@ -356,9 +357,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (action === "generate-reference") {
     const plan = sanitize(payload.plan, "standard", 20);
     const count = plan === "pro" ? 6 : 2;
-    const standardReport = await createStandardReport(payload);
-    const professionalCopy = plan === "pro" ? await createProfessionalCopy(payload) : null;
-    const references = await attachImages(buildReferences(payload, count), String(payload.imageData || ""));
+    const referencesPromise = attachImages(buildReferences(payload, count), String(payload.imageData || ""));
+    const [standardReport, professionalCopy, references] = await Promise.all([
+      createStandardReport(payload),
+      plan === "pro" ? createProfessionalCopy(payload) : Promise.resolve(null),
+      referencesPromise,
+    ]);
     const generatedCount = references.filter((item) => item.imageUrl).length;
 
     return json({
