@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
         source: "/tools/business-image",
         destination: "/tools/business-image/index.html",
       },
+      {
+        source: "/tools/product-copy-compliance-checker/:path*",
+        destination: "https://cross-border-copy-compliance-diagno.vercel.app/:path*",
+      },
     ];
   },
 };

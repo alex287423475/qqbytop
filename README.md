@@ -99,16 +99,24 @@ NEXT_PUBLIC_CRISP_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 ## 诊断工具矩阵
 
-`/[locale]/tools` 会展示主站诊断工具入口。跨境产品文案合规翻译诊断工具是独立 Next.js 应用，默认本地联调地址为：
+`/[locale]/tools` 会展示主站诊断工具入口。跨境产品文案合规翻译诊断工具以同域目录方式挂载在：
 
 ```text
-http://127.0.0.1:3001
+https://qqbytop.com/tools/product-copy-compliance-checker
 ```
 
-线上部署后，在 Vercel 或本地 `.env.local` 中配置：
+主站通过 `next.config.ts` 将该目录代理到诊断工具的独立 Vercel 项目，用户侧不会看到独立项目域名。线上环境建议配置：
 
 ```text
-NEXT_PUBLIC_PRODUCT_COPY_DIAGNOSTIC_URL=https://your-diagnostic-tool-domain.example
+NEXT_PUBLIC_PRODUCT_COPY_DIAGNOSTIC_URL=/tools/product-copy-compliance-checker
+```
+
+诊断工具项目需要配置：
+
+```text
+NEXT_PUBLIC_BASE_PATH=/tools/product-copy-compliance-checker
+NEXT_PUBLIC_ASSET_PREFIX=/tools/product-copy-compliance-checker
+NEXT_PUBLIC_APP_URL=https://qqbytop.com/tools/product-copy-compliance-checker
 ```
 
 当前官网会把以下入口导向同一套诊断引擎：

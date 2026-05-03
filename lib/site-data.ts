@@ -57,7 +57,7 @@ export type DiagnosticTool = {
 };
 
 export const productCopyDiagnosticUrl =
-  process.env.NEXT_PUBLIC_PRODUCT_COPY_DIAGNOSTIC_URL || "http://127.0.0.1:3001";
+  process.env.NEXT_PUBLIC_PRODUCT_COPY_DIAGNOSTIC_URL || "/tools/product-copy-compliance-checker";
 
 export const diagnosticTools: DiagnosticTool[] = [
   {
