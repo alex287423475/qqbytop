@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const locales = ["zh", "en", "ja"];
+const publicRootPaths = new Set(["/privacy-policy", "/advertising-cookie-policy", "/terms", "/contact"]);
 
 const legacyRedirects: Record<string, string> = {
   "biyi/": "/zh/services/document-translation",
@@ -21,6 +22,10 @@ export function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.startsWith("/tools") || pathname.includes(".")) {
+    return NextResponse.next();
+  }
+
+  if (publicRootPaths.has(pathname)) {
     return NextResponse.next();
   }
 

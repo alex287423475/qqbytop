@@ -66,12 +66,17 @@ export function BusinessToolFooter() {
         <p className="eyebrow">Study Abroad Essay Check</p>
         <strong>留学文书诊断</strong>
         <p>服务方向：PS / SOP 诊断、文书润色、结构重写、英文简历优化与申请材料包审核。</p>
+        <p className="adsense-footer-note">
+          本站可能使用 Google AdSense、统计分析和第三方 Cookie。请阅读隐私政策与广告 Cookie 政策了解数据使用方式。
+        </p>
       </div>
       <div className="footer-links">
         <a href={contact.emailHref}>{contact.email}</a>
         <a href="/zh/about">关于我们</a>
-        <a href="/zh/services/document-translation">文档翻译</a>
-        <a href="/zh/services/document-translation">材料翻译</a>
+        <a href="/contact">联系我们</a>
+        <a href="/privacy-policy">隐私政策</a>
+        <a href="/advertising-cookie-policy">广告与 Cookie</a>
+        <a href="/terms">服务条款</a>
         <a href="/zh/quote?source=study-abroad-essay-tool">提交需求</a>
       </div>
     </footer>
