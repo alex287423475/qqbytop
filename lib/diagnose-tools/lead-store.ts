@@ -55,7 +55,7 @@ function buildEmailText(lead: LeadSubmission) {
 async function sendResendLead(lead: LeadSubmission) {
   const apiKey = process.env.RESEND_API_KEY || "";
   const from = process.env.RESEND_FROM || "";
-  const to = process.env.LEAD_NOTIFY_EMAIL || "";
+  const to = process.env.STUDY_ABROAD_LEAD_NOTIFY_EMAIL || process.env.LEAD_NOTIFY_EMAIL || "info@qqbytop.com";
   if (!apiKey || !from || !to) {
     throw new LeadStoreError("留资通知暂未配置，请直接拨打 400-869-9562 或发送邮件到 info@qqbytop.com。");
   }

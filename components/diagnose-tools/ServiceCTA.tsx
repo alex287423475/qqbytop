@@ -24,7 +24,7 @@ export function ServiceCTA({
       </div>
       <div className="essay-service-grid">
         {serviceCards.map((card) => {
-          const href = `/zh/quote?source=study-abroad-essay-tool&category=${encodeURIComponent(card.service)}`;
+          const href = `/tools/study-abroad-essay-check/request?service=${encodeURIComponent(card.service)}`;
 
           return (
             <Link

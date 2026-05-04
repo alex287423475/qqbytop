@@ -22,11 +22,13 @@ export const metadata: Metadata = {
 };
 
 export default function StudyAbroadEssayCheckPage() {
+  const requestHref = "/tools/study-abroad-essay-check/request";
+
   return (
     <div className="tool-with-main-nav">
-      <BusinessToolHeader quoteSource="study-abroad-essay-tool" />
+      <BusinessToolHeader quoteSource="study-abroad-essay-tool" ctaHref={requestHref} ctaLabel="提交文书需求" />
       <EssayDiagnosisForm />
-      <BusinessToolFooter />
+      <BusinessToolFooter requestHref={requestHref} />
     </div>
   );
 }
