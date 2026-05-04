@@ -54,7 +54,7 @@ export function LeadCapture({
     <form className="essay-lead-form" onSubmit={submitLead}>
       <div className="essay-section-heading">
         <p>已选择：{selectedService}</p>
-        <h2>提交材料复核需求</h2>
+        <h2>留学文书需求表单</h2>
       </div>
       <div className="essay-lead-grid">
         <label>

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { DiagnosisProgress } from "@/components/diagnose-tools/DiagnosisProgress";
 import { EssayDiagnosisResult } from "@/components/diagnose-tools/EssayDiagnosisResult";
 import { EssayTextInput, getEssayLengthStatus } from "@/components/diagnose-tools/EssayTextInput";
+import { LeadCapture } from "@/components/diagnose-tools/LeadCapture";
 import { PrivacyNotice } from "@/components/diagnose-tools/PrivacyNotice";
 import { ServiceCTA } from "@/components/diagnose-tools/ServiceCTA";
 import { ToolPageLayout } from "@/components/diagnose-tools/ToolPageLayout";
@@ -20,6 +21,7 @@ import type {
   EssayDiagnosisRequest,
   EssayDiagnosisResult as EssayDiagnosisResultType,
   EssayDocumentType,
+  ServiceName,
 } from "@/lib/diagnose-tools/types";
 
 type Status = "idle" | "input_ready" | "validating" | "diagnosing" | "result_ready" | "demo_result_ready" | "error";
@@ -36,9 +38,11 @@ export function EssayDiagnosisForm() {
   const [draftStage, setDraftStage] = useState<DraftStage>("不确定");
   const [concerns, setConcerns] = useState<string[]>([]);
   const [result, setResult] = useState<EssayDiagnosisResultType | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceName | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const resultRef = useRef<HTMLDivElement>(null);
+  const leadFormRef = useRef<HTMLDivElement>(null);
 
   const requestPayload: EssayDiagnosisRequest = useMemo(
     () => ({
@@ -76,6 +80,7 @@ export function EssayDiagnosisForm() {
 
     setStatus("validating");
     setErrorMessage("");
+    setSelectedService(null);
 
     try {
       setStatus("diagnosing");
@@ -99,6 +104,11 @@ export function EssayDiagnosisForm() {
     }
   }
 
+  function openLead(service: ServiceName) {
+    setSelectedService(service);
+    window.setTimeout(() => leadFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
+
   const currentStep = result ? 2 : essayText ? 1 : 0;
   const resultPanel = (
     <div ref={resultRef}>
@@ -117,7 +127,12 @@ export function EssayDiagnosisForm() {
       {result && (
         <>
           <EssayDiagnosisResult result={result} />
-          <ServiceCTA primaryService={result.serviceRecommendation.primaryService} />
+          <ServiceCTA primaryService={selectedService || result.serviceRecommendation.primaryService} onSelect={openLead} />
+          {selectedService && (
+            <div id="essay-lead-request-form" ref={leadFormRef}>
+              <LeadCapture result={result} selectedService={selectedService} request={requestPayload} />
+            </div>
+          )}
         </>
       )}
     </div>
