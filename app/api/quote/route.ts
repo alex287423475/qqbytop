@@ -4,6 +4,10 @@ import { assessQuoteLead } from "@/lib/quote-lead";
 
 export const runtime = "nodejs";
 
+const resendApiKey = process.env.RESEND_API_KEY || "";
+const resendFrom = process.env.RESEND_FROM || "";
+const quoteNotifyEmail = process.env.QUOTE_NOTIFY_EMAIL || "info@qqbytop.com";
+
 type QuoteSubmission = {
   name: string;
   contact: string;
@@ -37,6 +41,10 @@ function buildSubmission(body: Record<string, unknown>): QuoteSubmission {
     notes: clean(body.notes, 2000),
     submitted_at: new Date().toISOString(),
   };
+}
+
+function extractEmail(value: string) {
+  return value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
 }
 
 function buildFeishuText(submission: QuoteSubmission) {
@@ -149,6 +157,40 @@ async function sendGenericWebhook(submission: QuoteSubmission) {
   return true;
 }
 
+async function sendResendNotification(submission: QuoteSubmission) {
+  if (!resendApiKey || !resendFrom) return true;
+
+  const assessment = assessQuoteLead({
+    source: submission.source,
+    category: submission.category,
+  });
+  const subjectParts = ["QQBY 官网咨询需求"];
+  if (submission.category) subjectParts.push(submission.category);
+  if (assessment.priorityLabel) subjectParts.push(assessment.priorityLabel);
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: resendFrom,
+      to: quoteNotifyEmail,
+      subject: subjectParts.join(" / "),
+      text: buildFeishuText(submission),
+      reply_to: extractEmail(submission.contact) || undefined,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("quote_resend_failed", response.status, await response.text());
+    return false;
+  }
+
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown>;
 
@@ -164,10 +206,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "请填写姓名和联系方式。" }, { status: 400 });
   }
 
-  const feishuOk = await sendFeishuNotification(submission);
-  const webhookOk = await sendGenericWebhook(submission);
+  const [emailOk, feishuOk, webhookOk] = await Promise.all([
+    sendResendNotification(submission),
+    sendFeishuNotification(submission),
+    sendGenericWebhook(submission),
+  ]);
 
-  if (!process.env.QUOTE_FEISHU_WEBHOOK_URL && !process.env.QUOTE_WEBHOOK_URL) {
+  if (!resendApiKey && !process.env.QUOTE_FEISHU_WEBHOOK_URL && !process.env.QUOTE_WEBHOOK_URL) {
     const assessment = assessQuoteLead({
       source: submission.source,
       category: submission.category,
@@ -193,7 +238,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (!feishuOk || !webhookOk) {
+  if (!emailOk || !feishuOk || !webhookOk) {
     return NextResponse.json(
       { message: "询价已收到，但通知系统暂时不可用，请电话联系我们。" },
       { status: 502 },
