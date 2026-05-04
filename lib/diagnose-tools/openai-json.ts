@@ -112,6 +112,26 @@ async function chatCompletionsJson({ systemPrompt, userPrompt }: JsonRequest) {
   const apiKey = process.env.OPENAI_API_KEY || "";
   const model = getModel();
   if (!apiKey || !model) throw new AiUnavailableError("OPENAI_API_KEY or model is not configured");
+  const useCompatibleStream = process.env.OPENAI_COMPAT_STREAM === "1";
+  const requestBody = useCompatibleStream
+    ? {
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        stream: true,
+      }
+    : {
+        model,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: 2200,
+      };
 
   const response = await fetchWithTimeout(
     `${openaiBaseUrl()}/chat/completions`,
@@ -121,22 +141,12 @@ async function chatCompletionsJson({ systemPrompt, userPrompt }: JsonRequest) {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.2,
-        max_tokens: 2200,
-        stream: process.env.OPENAI_COMPAT_STREAM === "1",
-      }),
+      body: JSON.stringify(requestBody),
     },
     aiTimeoutMs(),
   );
 
-  if (process.env.OPENAI_COMPAT_STREAM === "1") {
+  if (useCompatibleStream) {
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (shouldFallbackImmediately(response.status, data)) throw new AiUnavailableError("Configured model is unavailable");
