@@ -46,6 +46,14 @@ function parseJsonText(text: string) {
   return JSON.parse(cleaned || "{}");
 }
 
+function extractSseDataLines(chunk: string) {
+  return chunk
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("data:"))
+    .map((line) => line.slice(5).trim());
+}
+
 function extractResponsesText(data: any) {
   if (typeof data?.output_text === "string") return data.output_text;
   const content = data?.output?.flatMap((item: any) => item?.content || []) || [];
@@ -122,10 +130,52 @@ async function chatCompletionsJson({ systemPrompt, userPrompt }: JsonRequest) {
         response_format: { type: "json_object" },
         temperature: 0.2,
         max_tokens: 2200,
+        stream: process.env.OPENAI_COMPAT_STREAM === "1",
       }),
     },
     aiTimeoutMs(),
   );
+
+  if (process.env.OPENAI_COMPAT_STREAM === "1") {
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      if (shouldFallbackImmediately(response.status, data)) throw new AiUnavailableError("Configured model is unavailable");
+      throw new Error(`AI HTTP ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("AI stream body is empty");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split(/\r?\n\r?\n/);
+      buffer = events.pop() || "";
+
+      for (const event of events) {
+        for (const line of extractSseDataLines(event)) {
+          if (line === "[DONE]") continue;
+          const data = JSON.parse(line);
+          content += data?.choices?.[0]?.delta?.content || "";
+        }
+      }
+    }
+
+    for (const line of extractSseDataLines(buffer)) {
+      if (line !== "[DONE]") {
+        const data = JSON.parse(line);
+        content += data?.choices?.[0]?.delta?.content || "";
+      }
+    }
+
+    return parseJsonText(content);
+  }
+
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (shouldFallbackImmediately(response.status, data)) throw new AiUnavailableError("Configured model is unavailable");
