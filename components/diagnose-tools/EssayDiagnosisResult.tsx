@@ -5,6 +5,19 @@ import type { EssayDiagnosisResult } from "@/lib/diagnose-tools/types";
 const confidenceLabel = { low: "低置信度", normal: "标准置信度", high: "高置信度" };
 const severityLabel = { high: "高", medium: "中", low: "低" };
 
+function scoreLevel(score: number) {
+  if (score >= 8) return "优势项";
+  if (score >= 6) return "可优化";
+  if (score >= 4) return "优先修补";
+  return "高风险";
+}
+
+function scoreTone(score: number) {
+  if (score >= 8) return "strong";
+  if (score >= 6) return "medium";
+  return "weak";
+}
+
 export function EssayDiagnosisResult({ result }: { result: EssayDiagnosisResult }) {
   return (
     <article className="essay-result">
@@ -34,12 +47,32 @@ export function EssayDiagnosisResult({ result }: { result: EssayDiagnosisResult 
         <h2>六维评分</h2>
         <div className="essay-score-grid">
           {result.dimensionScores.map((item) => (
-            <div key={item.id} className="essay-score-card">
-              <div>
-                <span>{item.name}</span>
+            <div key={item.id} className={`essay-score-card is-${scoreTone(item.score)}`}>
+              <div className="essay-score-card-head">
+                <div>
+                  <span>{item.name}</span>
+                  <em>{scoreLevel(item.score)}</em>
+                </div>
                 <strong>{item.score}/10</strong>
               </div>
-              <p>{item.comment}</p>
+              <div className="essay-score-bar" aria-hidden="true">
+                <span style={{ width: `${Math.max(8, Math.min(100, item.score * 10))}%` }} />
+              </div>
+              <p className="essay-score-comment">{item.comment}</p>
+              <dl className="essay-dimension-detail">
+                <div>
+                  <dt>判断依据</dt>
+                  <dd>{item.finding}</dd>
+                </div>
+                <div>
+                  <dt>原文信号</dt>
+                  <dd className="essay-dimension-evidence">{item.evidence}</dd>
+                </div>
+                <div>
+                  <dt>下一步动作</dt>
+                  <dd>{item.action}</dd>
+                </div>
+              </dl>
             </div>
           ))}
         </div>

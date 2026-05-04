@@ -967,21 +967,33 @@ body {
 .essay-score-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
   margin-top: 12px;
 }
 
 .essay-score-card {
-  min-height: 118px;
   border: 1px solid var(--essay-line-soft);
   border-radius: 8px;
   background: var(--essay-surface-soft);
-  padding: 12px;
+  padding: 14px;
 }
 
-.essay-score-card div {
+.essay-score-card.is-strong {
+  border-color: rgba(30, 106, 84, 0.28);
+}
+
+.essay-score-card.is-medium {
+  border-color: rgba(195, 151, 74, 0.28);
+}
+
+.essay-score-card.is-weak {
+  border-color: rgba(171, 84, 71, 0.28);
+}
+
+.essay-score-card-head {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
   color: var(--essay-brand);
   font-size: 13px;
@@ -989,11 +1001,86 @@ body {
   line-height: 1.4;
 }
 
-.essay-score-card p {
-  margin-top: 9px;
+.essay-score-card-head > div {
+  display: grid;
+  gap: 4px;
+}
+
+.essay-score-card-head em {
+  color: var(--essay-muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 750;
+}
+
+.essay-score-card-head strong {
+  flex: 0 0 auto;
+  color: var(--essay-brand);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.essay-score-bar {
+  height: 6px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 47, 45, 0.08);
+}
+
+.essay-score-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--essay-brand);
+}
+
+.essay-score-card.is-medium .essay-score-bar span {
+  background: var(--essay-accent);
+}
+
+.essay-score-card.is-weak .essay-score-bar span {
+  background: var(--essay-danger);
+}
+
+.essay-score-comment {
+  margin-top: 10px;
+  color: var(--essay-ink);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.essay-dimension-detail {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.essay-dimension-detail div {
+  display: grid;
+  gap: 4px;
+}
+
+.essay-dimension-detail dt {
+  color: var(--essay-brand);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.essay-dimension-detail dd {
+  margin: 0;
   color: var(--essay-muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
+}
+
+.essay-dimension-evidence {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .essay-problem-list {

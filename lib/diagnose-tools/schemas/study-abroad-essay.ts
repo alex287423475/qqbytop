@@ -53,8 +53,11 @@ export const studyAbroadEssayJsonSchema = {
             name: { type: "string" },
             score: { type: "integer", minimum: 1, maximum: 10 },
             comment: { type: "string", maxLength: 120 },
+            finding: { type: "string", maxLength: 180 },
+            evidence: { type: "string", maxLength: 180 },
+            action: { type: "string", maxLength: 180 },
           },
-          required: ["id", "name", "score", "comment"],
+          required: ["id", "name", "score", "comment", "finding", "evidence", "action"],
         },
       },
       mainProblems: {
@@ -126,17 +129,60 @@ function enumValue<T extends string>(value: unknown, options: readonly T[], fall
   return options.includes(value as T) ? (value as T) : fallback;
 }
 
-function normalizeDimensions(raw: unknown): DimensionScore[] {
+function dimensionFallback(id: DimensionId, score: number, request: ValidatedEssayDiagnosisRequest) {
+  const firstSentence = sanitizeAiText(request.essayText.split(/[.!?]\s+/)[0] || request.essayText, 160);
+  const targetContext = [request.targetSchoolOrProgram, request.targetMajor, request.targetRegion].filter(Boolean).join(" / ");
+  const byId: Record<DimensionId, { finding: string; evidence: string; action: string }> = {
+    theme_clarity: {
+      finding: score >= 8 ? "主线已经比较清楚，但仍可把核心申请动机压缩成更有辨识度的一句话。" : "主线还偏散，读者需要自己拼出你为什么申请这个方向。",
+      evidence: firstSentence ? `开头信号：${firstSentence}` : "原文开头没有形成足够明确的中心判断。",
+      action: "重写开头和结尾，用同一条能力主线串起经历、目标项目和未来计划。",
+    },
+    structure_completeness: {
+      finding: score >= 8 ? "段落功能基本完整，但段落之间还可以加强因果递进。" : "结构更像经历罗列，段落之间的转折和推进关系不够清楚。",
+      evidence: "观察段落顺序、经历展开和结尾计划，当前仍需要更明确的过渡句。",
+      action: "按“触发点-关键经历-能力证明-项目匹配-未来目标”重排段落功能。",
+    },
+    application_fit: {
+      finding: targetContext ? "已有申请背景信息，但文书里还需要把它转化为具体项目匹配证据。" : "目标项目匹配信息不足，容易显得像可投递给任何学校的通用稿。",
+      evidence: targetContext ? `用户背景：${targetContext}` : "原文缺少课程、导师、项目资源或学校特点的具体对应。",
+      action: "补入 2-3 个目标项目资源，并逐一说明它们如何承接你的经历和目标。",
+    },
+    experience_persuasiveness: {
+      finding: score >= 8 ? "经历已有支撑作用，但还可以强化结果、影响和反思。" : "经历描述偏概括，能力证明不够依赖可验证细节。",
+      evidence: "重点检查实习、项目、研究或活动段落中是否有角色、动作、结果和反思。",
+      action: "每段核心经历至少补齐一个量化结果、一个具体职责和一句能力反思。",
+    },
+    language_expression: {
+      finding: score >= 8 ? "英文表达基本顺畅，但仍可减少普通申请套句。" : "语言可读性尚可，但存在泛化表达和中文思维痕迹。",
+      evidence: "重点关注 high-level adjectives、抽象名词堆叠和缺少动作动词的句子。",
+      action: "把抽象判断改成动作动词和具体场景，最后再做语法、搭配和句式润色。",
+    },
+    generic_risk: {
+      finding: score >= 8 ? "同质化风险较低，但仍应保留个人细节密度。" : "文本有模板化风险，部分句子缺少只有你本人才能写出的细节。",
+      evidence: "关注 interested in、important、help me achieve goals 等泛化动机表达。",
+      action: "删除可替换到任何申请者身上的句子，改用独特事件、数据、人物或选择理由。",
+    },
+  };
+  return byId[id];
+}
+
+function normalizeDimensions(raw: unknown, request: ValidatedEssayDiagnosisRequest): DimensionScore[] {
   const input = Array.isArray(raw) ? raw : [];
   return dimensionIds.map((id) => {
     const found = input.find((item) => item && typeof item === "object" && (item as { id?: unknown }).id === id) as
       | Record<string, unknown>
       | undefined;
+    const score = clampNumber(found?.score, 1, 10, 6);
+    const fallback = dimensionFallback(id, score, request);
     return {
       id,
       name: dimensionNames[id],
-      score: clampNumber(found?.score, 1, 10, 6),
-      comment: sanitizeAiText(found?.comment || "该维度仍有进一步打磨空间。", 120),
+      score,
+      comment: sanitizeAiText(found?.comment || fallback.finding, 120),
+      finding: sanitizeAiText(found?.finding || fallback.finding, 180),
+      evidence: sanitizeAiText(found?.evidence || fallback.evidence, 180),
+      action: sanitizeAiText(found?.action || fallback.action, 180),
     };
   });
 }
@@ -204,7 +250,7 @@ export function normalizeEssayDiagnosisResult(
         180,
       ),
     },
-    dimensionScores: normalizeDimensions(data.dimensionScores),
+    dimensionScores: normalizeDimensions(data.dimensionScores, request),
     mainProblems: normalizeProblems(data.mainProblems, request),
     revisionPriorities: Array.isArray(data.revisionPriorities)
       ? data.revisionPriorities.slice(0, 3).map((item) => {

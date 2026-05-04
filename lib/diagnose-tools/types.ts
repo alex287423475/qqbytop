@@ -72,6 +72,9 @@ export interface DimensionScore {
   name: string;
   score: number;
   comment: string;
+  finding: string;
+  evidence: string;
+  action: string;
 }
 
 export interface MainProblem {

@@ -30,6 +30,14 @@ evidence 规则：
 - 不要修正 evidence 中的拼写、标点、大小写或措辞。
 - 如果无法找到原文证据，不要编造。
 
+dimensionScores 规则：
+- 每个维度不能只写“仍有打磨空间”这类空泛结论。
+- comment：一句短评，说明该维度当前水平。
+- finding：具体说明扣分原因或亮点，必须结合用户文书内容，不要套模板。
+- evidence：写该维度的原文信号，可以是短引文、段落位置描述或缺失项说明；如果引用原文，必须保持原文措辞。
+- action：给一个可执行修改动作，例如补哪类细节、重排哪类段落、删哪类句子。
+- 6 个维度的 finding/evidence/action 必须彼此不同，不能重复同一句话。
+
 输出：
 - 严格符合 EssayDiagnosisResult JSON Schema。
 - diagnosisSummary 不超过 120 中文字。
