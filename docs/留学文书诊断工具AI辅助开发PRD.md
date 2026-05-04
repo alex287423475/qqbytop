@@ -1217,6 +1217,19 @@ Prompt 构造规则：
 - [x] 线上页面可访问。
 - [x] 线上 HTML/CSS 已刷新到最新版本。
 
+#### 10.6 2026-05-04 实施验收记录
+
+- Git 提交：`81e7aad Add study abroad essay diagnosis tool`
+- Vercel 部署：`https://next-vercel-677fos0gv-alexs-projects-7309f453.vercel.app`
+- 生产别名：`https://qqbytop.com`
+- Vercel 状态：Production `Ready`
+- 线上页面验证：`https://qqbytop.com/tools/study-abroad-essay-check` 返回 200。
+- 线上诊断验证：`POST /api/tools/study-abroad-essay-check/diagnose` 返回 200，当前因生产未配置真实模型而进入 `source=demo`。
+- 线上超长输入验证：超过 2500 英文词返回 400，未进入 AI 调用。
+- 当前 AI 超时配置：代码默认 `AI_TIMEOUT_MS=45000`，API route 设置 `maxDuration=60`；Vercel CLI inspect 未直接显示账户级最大函数时长，真实模型上线前仍需结合当前 Vercel 方案复核。
+- 当前模型配置：`OPENAI_REPORT_MODEL || OPENAI_TEXT_MODEL`；生产未确认配置时不会硬编码默认模型，直接 demo fallback。
+- 当前留资策略：生产只走 Resend/邮件通知；缺少 `RESEND_API_KEY`、`RESEND_FROM` 或 `LEAD_NOTIFY_EMAIL` 时 fail fast，引导用户电话或邮箱联系。
+
 ### 11. 生产环境发布说明
 
 本项目不需要 Dockerfile。当前主站发布路径是：
