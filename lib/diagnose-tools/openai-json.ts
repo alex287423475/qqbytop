@@ -190,6 +190,10 @@ export async function callOpenAiJson(request: JsonRequest) {
 
   for (let index = 0; index < attempts; index += 1) {
     try {
+      if (process.env.OPENAI_COMPAT_STREAM === "1") {
+        return { data: await chatCompletionsJson(request), source: "compatible" as const };
+      }
+
       try {
         return { data: await responsesJson(request), source: "openai" as const };
       } catch (error) {
