@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
+import { BusinessToolFooter, BusinessToolHeader } from "@/components/diagnose-tools/BusinessToolChrome";
 import { EssayDiagnosisForm } from "@/components/diagnose-tools/EssayDiagnosisForm";
-import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
 
 export const metadata: Metadata = {
   title: "留学文书诊断工具 | PS / SOP 初稿结构与表达检查",
@@ -24,10 +23,10 @@ export const metadata: Metadata = {
 
 export default function StudyAbroadEssayCheckPage() {
   return (
-    <>
-      <Header locale="zh" />
+    <div className="tool-with-main-nav">
+      <BusinessToolHeader quoteSource="study-abroad-essay-tool" />
       <EssayDiagnosisForm />
-      <Footer locale="zh" />
-    </>
+      <BusinessToolFooter />
+    </div>
   );
 }
