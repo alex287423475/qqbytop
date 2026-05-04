@@ -128,6 +128,18 @@ export const diagnosticTools: DiagnosticTool[] = [
     cta: "诊断商务形象",
     useCases: ["LinkedIn 头像优化", "官网 About 形象", "海外客户第一印象", "展会/名片商务形象"],
   },
+  {
+    slug: "study-abroad-essay-check",
+    title: "留学文书诊断",
+    badge: "PS / SOP / Motivation Letter",
+    summary: "粘贴留学文书初稿，诊断主题、结构、申请匹配、经历说服力、英文表达和文本同质化风险。",
+    href: "/tools/study-abroad-essay-check",
+    externalHref: "/tools/study-abroad-essay-check",
+    status: "available",
+    priority: "secondary",
+    cta: "诊断留学文书",
+    useCases: ["PS 初稿诊断", "SOP 结构检查", "Motivation Letter 优化", "申请材料包审核"],
+  },
 ];
 
 export const home = {
