@@ -1134,11 +1134,13 @@ body {
   display: grid;
   gap: 5px;
   width: 100%;
+  cursor: pointer;
   border: 1px solid var(--essay-line);
   border-radius: 8px;
   background: var(--essay-surface);
   padding: 13px;
   text-align: left;
+  text-decoration: none;
   transition: border-color var(--essay-transition-fast), box-shadow var(--essay-transition-fast), background var(--essay-transition-fast);
 }
 

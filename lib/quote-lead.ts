@@ -56,6 +56,8 @@ export function getQuoteSourceLabel(source: string) {
   const normalized = normalizeSource(source);
 
   switch (normalized) {
+    case "study-abroad-essay-tool":
+      return "留学文书诊断工具";
     case "blog":
       return "博客内容入口";
     case "pricing":
@@ -76,6 +78,8 @@ export function getQuoteLeadGroup({ source }: QuoteLeadContext) {
   const normalized = normalizeSource(source);
 
   switch (normalized) {
+    case "study-abroad-essay-tool":
+      return "留学文书诊断线索";
     case "blog":
       return "博客线索";
     case "service":
@@ -96,6 +100,8 @@ export function getQuoteLeadGroupBadge({ source }: QuoteLeadContext) {
   const normalized = normalizeSource(source);
 
   switch (normalized) {
+    case "study-abroad-essay-tool":
+      return "🎓";
     case "blog":
       return "📝";
     case "service":
@@ -128,6 +134,12 @@ export function getQuotePrioritySuggestion({ source, category }: QuoteLeadContex
   const normalizedCategory = normalizeCategory(category);
 
   switch (normalizedSource) {
+    case "study-abroad-essay-tool":
+      return {
+        priorityLabel: "高优先级",
+        followUpSuggestion: "建议 10 分钟内首次跟进",
+        priorityReason: "用户已完成留学文书诊断并主动选择后续解决方案，问题意识和服务意向都比较明确。",
+      };
     case "service":
       return {
         priorityLabel: "高优先级",
@@ -207,6 +219,12 @@ export function getQuoteFollowUpGuide({ source, category }: QuoteLeadContext) {
   const isHighIntentBlog = normalizedSource === "blog" && HIGH_INTENT_BLOG_CATEGORIES.has(normalizedCategory);
 
   switch (normalizedSource) {
+    case "study-abroad-essay-tool":
+      return {
+        recommendedOpening:
+          "您好，看到您刚完成留学文书诊断并选择了后续方案，我先帮您确认申请阶段、目标项目、截止时间和目前已有材料，方便给出更准确的优化建议。",
+        followUpFocus: "优先确认文书类型、目标学校或项目、申请截止时间、是否已有 CV/推荐信/成绩单，以及用户希望重点解决语言润色、结构重写还是材料包一致性问题。",
+      };
     case "service":
       return {
         recommendedOpening:
@@ -267,6 +285,11 @@ export function getQuoteOwnerRecommendation({ source, category }: QuoteLeadConte
   }
 
   switch (normalizedSource) {
+    case "study-abroad-essay-tool":
+      return {
+        recommendedOwner: "留学材料顾问优先",
+        ownerReason: "用户来自文书诊断工具，通常需要先判断申请材料完整度、文书类型和修改深度，再决定是否转项目经理报价。",
+      };
     case "pricing":
     case "service":
       return {

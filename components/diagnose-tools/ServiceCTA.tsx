@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { ServiceName } from "@/lib/diagnose-tools/types";
 
 const serviceCards: { label: string; service: ServiceName; reason: string }[] = [
@@ -12,10 +13,8 @@ const serviceCards: { label: string; service: ServiceName; reason: string }[] = 
 
 export function ServiceCTA({
   primaryService,
-  onSelect,
 }: {
   primaryService?: ServiceName;
-  onSelect: (service: ServiceName) => void;
 }) {
   return (
     <section className="essay-cta-block">
@@ -24,18 +23,21 @@ export function ServiceCTA({
         <h2>根据问题选择解决方案</h2>
       </div>
       <div className="essay-service-grid">
-        {serviceCards.map((card) => (
-          <button
-            key={card.service}
-            type="button"
-            className={`essay-service-card ${card.service === primaryService ? "is-primary" : ""}`}
-            onClick={() => onSelect(card.service)}
-          >
-            <span>{card.label}</span>
-            <strong>{card.service}</strong>
-            <small>{card.reason}</small>
-          </button>
-        ))}
+        {serviceCards.map((card) => {
+          const href = `/zh/quote?source=study-abroad-essay-tool&category=${encodeURIComponent(card.service)}`;
+
+          return (
+            <Link
+              key={card.service}
+              href={href}
+              className={`essay-service-card ${card.service === primaryService ? "is-primary" : ""}`}
+            >
+              <span>{card.label}</span>
+              <strong>{card.service}</strong>
+              <small>{card.reason}</small>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
