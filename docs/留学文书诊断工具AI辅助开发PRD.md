@@ -1219,15 +1219,19 @@ Prompt 构造规则：
 
 #### 10.6 2026-05-04 实施验收记录
 
-- Git 提交：`81e7aad Add study abroad essay diagnosis tool`
-- Vercel 部署：`https://next-vercel-677fos0gv-alexs-projects-7309f453.vercel.app`
+- Git 提交：
+  - `81e7aad Add study abroad essay diagnosis tool`
+  - `599dd56 Support streaming OpenAI-compatible JSON calls`
+  - `3afedbe Prefer streaming chat completions for compatible providers`
+  - `668bbd9 Redeploy with streaming AI environment`
+- Vercel 最新验证部署：`https://next-vercel-249o3oc7d-alexs-projects-7309f453.vercel.app`
 - 生产别名：`https://qqbytop.com`
 - Vercel 状态：Production `Ready`
 - 线上页面验证：`https://qqbytop.com/tools/study-abroad-essay-check` 返回 200。
-- 线上诊断验证：`POST /api/tools/study-abroad-essay-check/diagnose` 返回 200，当前因生产未配置真实模型而进入 `source=demo`。
+- 线上诊断验证：`POST /api/tools/study-abroad-essay-check/diagnose` 返回 200，当前真实 AI 路径可用，返回 `isDemo=false`、`source=compatible`。
 - 线上超长输入验证：超过 2500 英文词返回 400，未进入 AI 调用。
-- 当前 AI 超时配置：代码默认 `AI_TIMEOUT_MS=45000`，API route 设置 `maxDuration=60`；Vercel CLI inspect 未直接显示账户级最大函数时长，真实模型上线前仍需结合当前 Vercel 方案复核。
-- 当前模型配置：`OPENAI_REPORT_MODEL || OPENAI_TEXT_MODEL`；生产未确认配置时不会硬编码默认模型，直接 demo fallback。
+- 当前 AI 超时配置：代码默认 `AI_TIMEOUT_MS=45000`，API route 设置 `maxDuration=60`；Vercel CLI inspect 未直接显示账户级最大函数时长，当前线上真实调用已在该预算内完成。
+- 当前模型配置：按 Cherry Studio 流式兼容方式配置，`OPENAI_BASE_URL=https://api.longxiadev.store/v1`，`OPENAI_REPORT_MODEL=gpt-5.5`，`OPENAI_TEXT_MODEL=gpt-5.5`，`OPENAI_COMPAT_STREAM=1`；API Key 只存于 Vercel 环境变量，不写入代码或文档。
 - 当前留资策略：生产只走 Resend/邮件通知；缺少 `RESEND_API_KEY`、`RESEND_FROM` 或 `LEAD_NOTIFY_EMAIL` 时 fail fast，引导用户电话或邮箱联系。
 
 ### 11. 生产环境发布说明
