@@ -69,15 +69,21 @@ export function BusinessToolHeader({
 
 export function BusinessToolFooter({
   requestHref = "/tools/study-abroad-essay-check/request",
+  eyebrow = "Study Abroad Essay Check",
+  title = "留学文书诊断",
+  description = "服务方向：PS / SOP 诊断、文书润色、结构重写、英文简历优化与申请材料包审核。",
 }: {
   requestHref?: string;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
 }) {
   return (
     <footer className="site-footer essay-tool-footer">
       <div>
-        <p className="eyebrow">Study Abroad Essay Check</p>
-        <strong>留学文书诊断</strong>
-        <p>服务方向：PS / SOP 诊断、文书润色、结构重写、英文简历优化与申请材料包审核。</p>
+        <p className="eyebrow">{eyebrow}</p>
+        <strong>{title}</strong>
+        <p>{description}</p>
         <p className="adsense-footer-note">
           本站可能使用 Google AdSense、统计分析和第三方 Cookie。请阅读隐私政策与广告 Cookie 政策了解数据使用方式。
         </p>

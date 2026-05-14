@@ -1,0 +1,3 @@
+管理员访问地址：
+
+http://127.0.0.1:4188/?sample_admin_token=sample-admin-local-2026

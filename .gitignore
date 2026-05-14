@@ -4,6 +4,8 @@ out/
 dist/
 *.log
 *.tsbuildinfo
+__pycache__/
+*.pyc
 .env
 .env.*
 !.env.example
@@ -18,3 +20,4 @@ local-brain/rejected/
 local-brain/reports/
 local-brain/status/pipeline.runtime.json
 local-brain/status/pipeline.runtime.corrupt-*.json
+docs/高考英语作文真实服务配置清单.md

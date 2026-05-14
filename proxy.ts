@@ -21,6 +21,20 @@ const legacyRedirects: Record<string, string> = {
 export function proxy(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
+  if (pathname === "/admin/login" || pathname.startsWith("/api/admin")) {
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith("/admin")) {
+    const expectedToken = process.env.ADMIN_SESSION_TOKEN;
+    if (!expectedToken) return NextResponse.next();
+    const currentToken = request.cookies.get("admin_session_token")?.value;
+    if (currentToken === expectedToken) return NextResponse.next();
+    const loginUrl = new URL("/admin/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl, 302);
+  }
+
   if (pathname.startsWith("/_next") || pathname.startsWith("/api") || pathname.startsWith("/tools") || pathname.includes(".")) {
     return NextResponse.next();
   }

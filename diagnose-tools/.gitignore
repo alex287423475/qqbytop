@@ -1,0 +1,8 @@
+.env.local
+server.log
+server.err
+data/
+node_modules/
+video_analysis/
+layout-*.png
+pricing-fixed.png

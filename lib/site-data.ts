@@ -140,6 +140,18 @@ export const diagnosticTools: DiagnosticTool[] = [
     cta: "诊断留学文书",
     useCases: ["PS 初稿诊断", "SOP 结构检查", "Motivation Letter 优化", "申请材料包审核"],
   },
+  {
+    slug: "gaokao-english-essay-diagnosis",
+    title: "高考英语作文 AI 诊断",
+    badge: "高考作文 / AI 摘要 / 同学组队价",
+    summary: "粘贴高考英语作文正文，先生成预估分和风险摘要；完整报告预留逐句荧光笔、高考维度拆解、两版范文和自助重试/退款闭环。",
+    href: "/tools/gaokao-english-essay-diagnosis",
+    externalHref: "/tools/gaokao-english-essay-diagnosis",
+    status: "available",
+    priority: "secondary",
+    cta: "诊断高考英语作文",
+    useCases: ["高考英语作文", "文本版 AI 摘要", "逐句风险定位", "同学组队解锁"],
+  },
 ];
 
 export const home = {
