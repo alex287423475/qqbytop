@@ -173,6 +173,7 @@ export async function saveEditableQualitySettings(input: SaveQualitySettingsInpu
     throw new QualityConsoleError(409, "质量任务正在运行，不能修改模型或 Prompt 设置。");
   }
 
+  await createPreSaveCheckpoint(input);
   if (input.modelSettings) {
     await saveModelSettings(input.modelSettings);
   }
@@ -486,6 +487,41 @@ async function savePromptContent(version: string, content: string) {
     throw new QualityConsoleError(400, `${safeVersion} 内容过长，拒绝保存。`);
   }
   await writeFile(path.join(promptsDir, `${safeVersion}.md`), `${normalized}\n`, "utf-8");
+}
+
+async function createPreSaveCheckpoint(input: SaveQualitySettingsInput) {
+  const labels = [
+    input.modelSettings ? "model" : null,
+    input.prompts?.length ? `prompt-${input.prompts.map((prompt) => prompt.version).join("-")}` : null,
+  ].filter(Boolean);
+  const message = `checkpoint: before quality settings ${labels.join("-") || "update"}`;
+  const isWindows = process.platform === "win32";
+  const command = isWindows
+    ? {
+        cmd: "powershell.exe",
+        args: ["-ExecutionPolicy", "Bypass", "-File", ".\\保存当前版本.ps1", "-Message", message],
+      }
+    : {
+        cmd: "bash",
+        args: ["-lc", `git add -A && if git diff --cached --quiet; then echo "No staged changes"; else git commit -m "${message}"; fi && git log -1 --oneline`],
+      };
+  const exitCode = await runCheckpointCommand(command.cmd, command.args);
+  if (exitCode !== 0) {
+    throw new QualityConsoleError(500, "自动保存修改前节点失败，已取消本次设置保存。");
+  }
+}
+
+function runCheckpointCommand(cmd: string, args: string[]) {
+  return new Promise<number>((resolve) => {
+    const child = spawn(cmd, args, {
+      cwd: rootDir,
+      env: process.env,
+      shell: false,
+      windowsHide: true,
+    });
+    child.on("error", () => resolve(1));
+    child.on("close", (code) => resolve(code ?? 1));
+  });
 }
 
 const PathSafePromptVersion = {

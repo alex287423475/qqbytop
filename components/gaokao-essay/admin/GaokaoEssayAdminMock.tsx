@@ -376,7 +376,7 @@ function QualityGatePanel() {
       if (!response.ok) throw new Error(data.message || `模型设置保存失败 ${response.status}`);
       setEditableSettings(data as EditableQualitySettings);
       await loadStatus();
-      setSettingsMessage("模型设置已保存。重启 FastAPI/后台服务后生产诊断会读取新配置。");
+      setSettingsMessage("已先自动保存修改前节点，再写入模型设置。重启 FastAPI/后台服务后生产诊断会读取新配置。");
     } catch (error) {
       setSettingsMessage(error instanceof Error ? error.message : "模型设置保存失败");
     } finally {
@@ -399,7 +399,7 @@ function QualityGatePanel() {
       if (!response.ok) throw new Error(data.message || `Prompt 保存失败 ${response.status}`);
       setEditableSettings(data as EditableQualitySettings);
       await loadStatus();
-      setSettingsMessage(`${version} 已保存。请立即跑样例批测，未通过不要部署。`);
+      setSettingsMessage(`已先自动保存修改前节点，再写入 ${version}。请立即跑样例批测，未通过不要部署。`);
     } catch (error) {
       setSettingsMessage(error instanceof Error ? error.message : "Prompt 保存失败");
     } finally {
@@ -642,7 +642,7 @@ function EditableQualitySettingsPanel({
           <div>
             <h3 className="text-lg font-bold text-slate-950">修改模型设置</h3>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              写入本地配置文件：<code>{settings?.modelSettings.editableConfigPath || "加载中"}</code>。只允许修改模型相关字段，不编辑密钥。
+              写入本地配置文件：<code>{settings?.modelSettings.editableConfigPath || "加载中"}</code>。保存前会自动创建 Git 节点；只允许修改模型相关字段，不编辑密钥。
             </p>
           </div>
           <button
@@ -706,7 +706,7 @@ function EditableQualitySettingsPanel({
       <article className="border border-blue-100 bg-white p-5">
         <h3 className="text-lg font-bold text-slate-950">修改 Prompt</h3>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          只允许编辑生产默认和实验对照 Prompt。保存后先跑「样例批测」或「一键完整质量闸门」。
+          只允许编辑生产默认和实验对照 Prompt。保存前会自动创建 Git 节点；保存后先跑「样例批测」或「一键完整质量闸门」。
         </p>
         <div className="mt-4 space-y-4">
           {(settings?.prompts || []).map((prompt) => (
