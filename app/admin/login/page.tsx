@@ -26,21 +26,26 @@ export default function AdminLoginPage({ searchParams }: { searchParams: Promise
 async function LoginForm({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const params = await searchParams;
   const next = params.next || "/admin/gaokao-essay";
+  const passwordlessLocal = process.env.ADMIN_PASSWORDLESS_LOCAL === "true" && process.env.NODE_ENV !== "production";
   return (
     <form action="/api/admin/login" method="post" className="mt-6 grid gap-4">
       <input type="hidden" name="next" value={next} />
-      <label className="grid gap-2">
-        <span className="text-sm font-semibold text-slate-700">管理员密码</span>
-        <input
-          type="password"
-          name="password"
-          className="h-12 border border-slate-300 px-3 text-slate-950 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
-          autoComplete="current-password"
-          required
-        />
-      </label>
+      {passwordlessLocal ? (
+        <p className="border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">本地开发免密已启用。该模式只允许 localhost / 127.0.0.1 且非生产环境使用。</p>
+      ) : (
+        <label className="grid gap-2">
+          <span className="text-sm font-semibold text-slate-700">管理员密码</span>
+          <input
+            type="password"
+            name="password"
+            className="h-12 border border-slate-300 px-3 text-slate-950 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            autoComplete="current-password"
+            required
+          />
+        </label>
+      )}
       <button type="submit" className="h-12 bg-blue-700 font-semibold text-white transition hover:bg-blue-800">
-        登录
+        {passwordlessLocal ? "本地免密进入" : "登录"}
       </button>
     </form>
   );

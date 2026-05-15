@@ -6,6 +6,11 @@ function safeNextPath(value: FormDataEntryValue | null) {
   return raw;
 }
 
+function isLocalPasswordlessAllowed(request: NextRequest) {
+  const host = request.nextUrl.hostname;
+  return process.env.ADMIN_PASSWORDLESS_LOCAL === "true" && process.env.NODE_ENV !== "production" && (host === "127.0.0.1" || host === "localhost" || host === "::1");
+}
+
 export async function POST(request: NextRequest) {
   const form = await request.formData();
   const password = String(form.get("password") || "");
@@ -13,11 +18,11 @@ export async function POST(request: NextRequest) {
   const sessionToken = process.env.ADMIN_SESSION_TOKEN;
   const next = safeNextPath(form.get("next"));
 
-  if (!expectedPassword || !sessionToken) {
+  if (!sessionToken || (!expectedPassword && !isLocalPasswordlessAllowed(request))) {
     return NextResponse.json({ message: "后台鉴权环境变量未配置。" }, { status: 500 });
   }
 
-  if (password !== expectedPassword) {
+  if (!isLocalPasswordlessAllowed(request) && password !== expectedPassword) {
     return NextResponse.redirect(new URL(`/admin/login?next=${encodeURIComponent(next)}`, request.url), 303);
   }
 
