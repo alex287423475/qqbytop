@@ -75,6 +75,32 @@ export type QualityPromptFileInfo = {
   preview: string;
 };
 
+export type EditableQualitySettings = {
+  modelSettings: QualityModelSettings & {
+    editableConfigPath: string;
+  };
+  prompts: Array<QualityPromptFileInfo & { content: string }>;
+};
+
+export type SaveQualitySettingsInput = {
+  modelSettings?: Partial<
+    Pick<
+      QualityModelSettings,
+      | "environment"
+      | "llmProviderOrder"
+      | "tencentTokenhubBaseUrl"
+      | "tencentTokenhubFreeModel"
+      | "tencentTokenhubPaidModel"
+      | "tencentTokenhubFallbackModel"
+      | "supportChatLlmEnabled"
+    >
+  >;
+  prompts?: Array<{
+    version: string;
+    content: string;
+  }>;
+};
+
 export class QualityConsoleError extends Error {
   constructor(
     public status: number,
@@ -90,6 +116,7 @@ const batchOutputsDir = path.join(rootDir, "test_outputs", "gaokao_reports");
 const sampleInputDir = path.join(rootDir, "test_inputs", "gaokao_essays");
 const backendDir = path.join(rootDir, "backend");
 const promptsDir = path.join(backendDir, "prompts");
+const editableBackendEnvPath = path.join(backendDir, ".env.local-deepseek");
 
 let activeRunId: string | null = null;
 
@@ -120,6 +147,42 @@ export async function getQualityStatus(): Promise<QualityStatusResponse> {
     modelSettings: await getModelSettings(),
     promptSettings: await getPromptSettings(),
   };
+}
+
+export async function getEditableQualitySettings(): Promise<EditableQualitySettings> {
+  const [modelSettings, promptSettings] = await Promise.all([getModelSettings(), getPromptSettings()]);
+  return {
+    modelSettings: {
+      ...modelSettings,
+      editableConfigPath: editableBackendEnvPath,
+    },
+    prompts: await Promise.all(
+      promptSettings.prompts.map(async (prompt) => ({
+        ...prompt,
+        content: prompt.exists ? await readFile(prompt.filePath, "utf-8") : "",
+      })),
+    ),
+  };
+}
+
+export async function saveEditableQualitySettings(input: SaveQualitySettingsInput) {
+  if (!isQualityConsoleEnabled()) {
+    throw new QualityConsoleError(403, "质量保障控制台未启用。请配置 GAOKAO_QUALITY_CONSOLE_ENABLED=true。");
+  }
+  if (activeRunId) {
+    throw new QualityConsoleError(409, "质量任务正在运行，不能修改模型或 Prompt 设置。");
+  }
+
+  if (input.modelSettings) {
+    await saveModelSettings(input.modelSettings);
+  }
+  if (input.prompts?.length) {
+    for (const prompt of input.prompts) {
+      await savePromptContent(prompt.version, prompt.content);
+    }
+  }
+
+  return getEditableQualitySettings();
 }
 
 export async function startQualityRun(taskType: QualityTaskType): Promise<QualityRunRecord> {
@@ -397,6 +460,105 @@ async function getPromptInfo(version: string, label: string): Promise<QualityPro
       preview: "",
     };
   }
+}
+
+async function saveModelSettings(settings: SaveQualitySettingsInput["modelSettings"]) {
+  if (!settings) return;
+  const nextValues: Record<string, string> = {};
+  if (settings.environment !== undefined) nextValues.ENVIRONMENT = normalizeShortValue(settings.environment, "ENVIRONMENT");
+  if (settings.llmProviderOrder !== undefined) nextValues.LLM_PROVIDER_ORDER = normalizeProviderOrder(settings.llmProviderOrder);
+  if (settings.tencentTokenhubBaseUrl !== undefined) nextValues.TENCENT_TOKENHUB_BASE_URL = normalizeUrl(settings.tencentTokenhubBaseUrl, "TENCENT_TOKENHUB_BASE_URL");
+  if (settings.tencentTokenhubFreeModel !== undefined) nextValues.TENCENT_TOKENHUB_FREE_MODEL = normalizeModelName(settings.tencentTokenhubFreeModel, "TENCENT_TOKENHUB_FREE_MODEL");
+  if (settings.tencentTokenhubPaidModel !== undefined) nextValues.TENCENT_TOKENHUB_PAID_MODEL = normalizeModelName(settings.tencentTokenhubPaidModel, "TENCENT_TOKENHUB_PAID_MODEL");
+  if (settings.tencentTokenhubFallbackModel !== undefined) nextValues.TENCENT_TOKENHUB_FALLBACK_MODEL = normalizeModelName(settings.tencentTokenhubFallbackModel, "TENCENT_TOKENHUB_FALLBACK_MODEL");
+  if (settings.supportChatLlmEnabled !== undefined) nextValues.SUPPORT_CHAT_LLM_ENABLED = normalizeBooleanString(settings.supportChatLlmEnabled, "SUPPORT_CHAT_LLM_ENABLED");
+
+  await updateDotEnvFile(editableBackendEnvPath, nextValues);
+}
+
+async function savePromptContent(version: string, content: string) {
+  const safeVersion = PathSafePromptVersion.parse(version);
+  const normalized = String(content || "").trim();
+  if (normalized.length < 200) {
+    throw new QualityConsoleError(400, `${safeVersion} 内容过短，拒绝保存。`);
+  }
+  if (normalized.length > 20000) {
+    throw new QualityConsoleError(400, `${safeVersion} 内容过长，拒绝保存。`);
+  }
+  await writeFile(path.join(promptsDir, `${safeVersion}.md`), `${normalized}\n`, "utf-8");
+}
+
+const PathSafePromptVersion = {
+  parse(value: string) {
+    const version = String(value || "").trim();
+    if (!["gaokao_default", "gaokao_experiment"].includes(version)) {
+      throw new QualityConsoleError(400, "只允许编辑 gaokao_default 或 gaokao_experiment。");
+    }
+    return version;
+  },
+};
+
+async function updateDotEnvFile(filePath: string, updates: Record<string, string>) {
+  let original = "";
+  try {
+    original = await readFile(filePath, "utf-8");
+  } catch {
+    original = "# Local editable Gaokao quality console model settings.\n";
+  }
+  const remaining = new Set(Object.keys(updates));
+  const lines = original.split(/\r?\n/).map((line) => {
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+    if (!match || !(match[1] in updates)) return line;
+    remaining.delete(match[1]);
+    return `${match[1]}=${formatDotEnvValue(updates[match[1]])}`;
+  });
+  if (remaining.size) {
+    if (lines.length && lines[lines.length - 1].trim() !== "") lines.push("");
+    lines.push("# Editable from /admin/gaokao-essay quality gate.");
+    for (const key of remaining) {
+      lines.push(`${key}=${formatDotEnvValue(updates[key])}`);
+    }
+  }
+  await writeFile(filePath, `${lines.join("\n").replace(/\n+$/g, "")}\n`, "utf-8");
+}
+
+function formatDotEnvValue(value: string) {
+  if (/^[A-Za-z0-9_./:@,-]+$/.test(value)) return value;
+  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+}
+
+function normalizeShortValue(value: unknown, label: string) {
+  const text = String(value || "").trim();
+  if (!text || text.length > 80) throw new QualityConsoleError(400, `${label} 不合法。`);
+  return text;
+}
+
+function normalizeProviderOrder(value: unknown) {
+  const text = normalizeShortValue(value, "LLM_PROVIDER_ORDER");
+  const providers = text.split(",").map((item) => item.trim()).filter(Boolean);
+  const allowed = new Set(["tencent_tokenhub", "deepseek", "qwen", "doubao", "mock_deepseek", "mock_qwen", "mock_doubao"]);
+  if (!providers.length || providers.some((provider) => !allowed.has(provider))) {
+    throw new QualityConsoleError(400, "LLM_PROVIDER_ORDER 包含不支持的 provider。");
+  }
+  return providers.join(",");
+}
+
+function normalizeUrl(value: unknown, label: string) {
+  const text = String(value || "").trim();
+  if (!/^https?:\/\/[^\s]+$/.test(text)) throw new QualityConsoleError(400, `${label} 必须是 http/https URL。`);
+  return text;
+}
+
+function normalizeModelName(value: unknown, label: string) {
+  const text = String(value || "").trim();
+  if (!/^[A-Za-z0-9._:/-]{2,120}$/.test(text)) throw new QualityConsoleError(400, `${label} 模型名不合法。`);
+  return text;
+}
+
+function normalizeBooleanString(value: unknown, label: string) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!["true", "false"].includes(text)) throw new QualityConsoleError(400, `${label} 只能是 true 或 false。`);
+  return text;
 }
 
 async function readBackendEnvSnapshot() {

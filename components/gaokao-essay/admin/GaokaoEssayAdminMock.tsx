@@ -72,6 +72,12 @@ type QualityLogsResponse = {
   stdout: string;
   stderr: string;
 };
+type EditableQualitySettings = {
+  modelSettings: QualityStatusResponse["modelSettings"] & {
+    editableConfigPath: string;
+  };
+  prompts: Array<QualityStatusResponse["promptSettings"]["prompts"][number] & { content: string }>;
+};
 
 export function GaokaoEssayAdminMock() {
   const [tick, setTick] = useState(0);
@@ -253,6 +259,9 @@ function ExceptionsPanel({ exceptions }: { exceptions: AdminExceptionItem[] }) {
 function QualityGatePanel() {
   const [status, setStatus] = useState<QualityStatusResponse | null>(null);
   const [logs, setLogs] = useState<QualityLogsResponse | null>(null);
+  const [editableSettings, setEditableSettings] = useState<EditableQualitySettings | null>(null);
+  const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
+  const [settingsSaving, setSettingsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -264,6 +273,14 @@ function QualityGatePanel() {
     return data as QualityStatusResponse;
   }
 
+  async function loadEditableSettings() {
+    const response = await fetch("/api/admin/gaokao-essay/quality/settings", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || `质量设置接口返回 ${response.status}`);
+    setEditableSettings(data as EditableQualitySettings);
+    return data as EditableQualitySettings;
+  }
+
   async function loadLogs(runId: string) {
     const response = await fetch(`/api/admin/gaokao-essay/quality/logs?runId=${encodeURIComponent(runId)}`, { cache: "no-store" });
     const data = await response.json();
@@ -273,7 +290,7 @@ function QualityGatePanel() {
 
   useEffect(() => {
     let cancelled = false;
-    loadStatus().catch((error) => {
+    Promise.all([loadStatus(), loadEditableSettings()]).catch((error) => {
       if (!cancelled) setMessage(error instanceof Error ? error.message : "质量状态加载失败");
     });
     return () => {
@@ -315,6 +332,78 @@ function QualityGatePanel() {
       setMessage(error instanceof Error ? error.message : "质量任务启动失败");
     } finally {
       setLoading(false);
+    }
+  }
+
+  function updateModelDraft<K extends keyof EditableQualitySettings["modelSettings"]>(key: K, value: EditableQualitySettings["modelSettings"][K]) {
+    setEditableSettings((current) => {
+      if (!current) return current;
+      return { ...current, modelSettings: { ...current.modelSettings, [key]: value } };
+    });
+  }
+
+  function updatePromptDraft(version: string, content: string) {
+    setEditableSettings((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        prompts: current.prompts.map((prompt) => (prompt.version === version ? { ...prompt, content } : prompt)),
+      };
+    });
+  }
+
+  async function saveModelSettings() {
+    if (!editableSettings) return;
+    setSettingsSaving(true);
+    setSettingsMessage(null);
+    try {
+      const response = await fetch("/api/admin/gaokao-essay/quality/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelSettings: {
+            environment: editableSettings.modelSettings.environment,
+            llmProviderOrder: editableSettings.modelSettings.llmProviderOrder,
+            tencentTokenhubBaseUrl: editableSettings.modelSettings.tencentTokenhubBaseUrl,
+            tencentTokenhubFreeModel: editableSettings.modelSettings.tencentTokenhubFreeModel,
+            tencentTokenhubPaidModel: editableSettings.modelSettings.tencentTokenhubPaidModel,
+            tencentTokenhubFallbackModel: editableSettings.modelSettings.tencentTokenhubFallbackModel,
+            supportChatLlmEnabled: editableSettings.modelSettings.supportChatLlmEnabled,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || `模型设置保存失败 ${response.status}`);
+      setEditableSettings(data as EditableQualitySettings);
+      await loadStatus();
+      setSettingsMessage("模型设置已保存。重启 FastAPI/后台服务后生产诊断会读取新配置。");
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : "模型设置保存失败");
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
+
+  async function savePrompt(version: string) {
+    const prompt = editableSettings?.prompts.find((item) => item.version === version);
+    if (!prompt) return;
+    setSettingsSaving(true);
+    setSettingsMessage(null);
+    try {
+      const response = await fetch("/api/admin/gaokao-essay/quality/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompts: [{ version, content: prompt.content }] }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || `Prompt 保存失败 ${response.status}`);
+      setEditableSettings(data as EditableQualitySettings);
+      await loadStatus();
+      setSettingsMessage(`${version} 已保存。请立即跑样例批测，未通过不要部署。`);
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : "Prompt 保存失败");
+    } finally {
+      setSettingsSaving(false);
     }
   }
 
@@ -399,6 +488,17 @@ function QualityGatePanel() {
           </div>
         </article>
       </section>
+
+      <EditableQualitySettingsPanel
+        settings={editableSettings}
+        disabled={!status?.enabled || running || settingsSaving}
+        message={settingsMessage}
+        saving={settingsSaving}
+        onModelChange={updateModelDraft}
+        onPromptChange={updatePromptDraft}
+        onSaveModel={saveModelSettings}
+        onSavePrompt={savePrompt}
+      />
 
       <article className="border border-slate-200 bg-white p-5">
         <h3 className="text-lg font-bold text-slate-950">固定操作</h3>
@@ -513,6 +613,160 @@ function PromptCard({
       </dl>
       {prompt.preview ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{prompt.preview}</p> : null}
     </div>
+  );
+}
+
+function EditableQualitySettingsPanel({
+  settings,
+  disabled,
+  message,
+  saving,
+  onModelChange,
+  onPromptChange,
+  onSaveModel,
+  onSavePrompt,
+}: {
+  settings: EditableQualitySettings | null;
+  disabled: boolean;
+  message: string | null;
+  saving: boolean;
+  onModelChange: (key: keyof EditableQualitySettings["modelSettings"], value: string) => void;
+  onPromptChange: (version: string, content: string) => void;
+  onSaveModel: () => void;
+  onSavePrompt: (version: string) => void;
+}) {
+  return (
+    <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+      <article className="border border-blue-100 bg-white p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-950">修改模型设置</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              写入本地配置文件：<code>{settings?.modelSettings.editableConfigPath || "加载中"}</code>。只允许修改模型相关字段，不编辑密钥。
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={disabled || !settings}
+            onClick={onSaveModel}
+            className="w-fit bg-blue-700 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+          >
+            {saving ? "保存中..." : "保存模型设置"}
+          </button>
+        </div>
+        {message ? <p className="mt-4 border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{message}</p> : null}
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <SettingsInput label="环境" value={settings?.modelSettings.environment || ""} disabled={disabled || !settings} onChange={(value) => onModelChange("environment", value)} />
+          <SettingsInput
+            label="Provider 顺序"
+            value={settings?.modelSettings.llmProviderOrder || ""}
+            disabled={disabled || !settings}
+            onChange={(value) => onModelChange("llmProviderOrder", value)}
+          />
+          <SettingsInput
+            label="TokenHub Base URL"
+            value={settings?.modelSettings.tencentTokenhubBaseUrl || ""}
+            disabled={disabled || !settings}
+            className="md:col-span-2"
+            onChange={(value) => onModelChange("tencentTokenhubBaseUrl", value)}
+          />
+          <SettingsInput
+            label="免费/摘要模型"
+            value={settings?.modelSettings.tencentTokenhubFreeModel || ""}
+            disabled={disabled || !settings}
+            onChange={(value) => onModelChange("tencentTokenhubFreeModel", value)}
+          />
+          <SettingsInput
+            label="付费深度模型"
+            value={settings?.modelSettings.tencentTokenhubPaidModel || ""}
+            disabled={disabled || !settings}
+            onChange={(value) => onModelChange("tencentTokenhubPaidModel", value)}
+          />
+          <SettingsInput
+            label="Fallback 模型"
+            value={settings?.modelSettings.tencentTokenhubFallbackModel || ""}
+            disabled={disabled || !settings}
+            onChange={(value) => onModelChange("tencentTokenhubFallbackModel", value)}
+          />
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">系统护航助手 LLM</span>
+            <select
+              value={settings?.modelSettings.supportChatLlmEnabled || "false"}
+              disabled={disabled || !settings}
+              onChange={(event) => onModelChange("supportChatLlmEnabled", event.target.value)}
+              className="mt-2 w-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 disabled:bg-slate-100"
+            >
+              <option value="false">false - 规则优先，不调用模型</option>
+              <option value="true">true - 未命中规则时调用模型</option>
+            </select>
+          </label>
+        </div>
+      </article>
+
+      <article className="border border-blue-100 bg-white p-5">
+        <h3 className="text-lg font-bold text-slate-950">修改 Prompt</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          只允许编辑生产默认和实验对照 Prompt。保存后先跑「样例批测」或「一键完整质量闸门」。
+        </p>
+        <div className="mt-4 space-y-4">
+          {(settings?.prompts || []).map((prompt) => (
+            <div key={prompt.version} className="border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-bold text-slate-950">{prompt.label}</p>
+                  <p className="mt-1 break-all text-xs text-slate-500">{prompt.filePath}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={disabled || saving}
+                  onClick={() => onSavePrompt(prompt.version)}
+                  className="w-fit bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                >
+                  保存 {prompt.version}
+                </button>
+              </div>
+              <textarea
+                value={prompt.content}
+                disabled={disabled}
+                onChange={(event) => onPromptChange(prompt.version, event.target.value)}
+                rows={10}
+                className="mt-3 w-full resize-y border border-slate-200 bg-white p-3 font-mono text-xs leading-5 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100"
+              />
+              <p className="mt-2 text-xs text-slate-500">
+                当前指纹：{prompt.sha256 || "暂无"}；大小：{prompt.sizeBytes ?? 0} bytes。
+              </p>
+            </div>
+          ))}
+          {!settings?.prompts?.length ? <p className="text-sm text-slate-500">Prompt 编辑器加载中。</p> : null}
+        </div>
+      </article>
+    </section>
+  );
+}
+
+function SettingsInput({
+  label,
+  value,
+  disabled,
+  className = "",
+  onChange,
+}: {
+  label: string;
+  value: string;
+  disabled: boolean;
+  className?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      <input
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-2 w-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100"
+      />
+    </label>
   );
 }
 
