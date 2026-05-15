@@ -78,6 +78,17 @@ type EditableQualitySettings = {
   };
   prompts: Array<QualityStatusResponse["promptSettings"]["prompts"][number] & { content: string }>;
 };
+type QualityCheckpoint = {
+  type: "commit" | "tag";
+  ref: string;
+  subject: string;
+  label: string;
+};
+type RestoreCheckpointPreview = {
+  ref: string;
+  subject: string;
+  changedFiles: string[];
+};
 
 export function GaokaoEssayAdminMock() {
   const [tick, setTick] = useState(0);
@@ -260,6 +271,10 @@ function QualityGatePanel() {
   const [status, setStatus] = useState<QualityStatusResponse | null>(null);
   const [logs, setLogs] = useState<QualityLogsResponse | null>(null);
   const [editableSettings, setEditableSettings] = useState<EditableQualitySettings | null>(null);
+  const [checkpoints, setCheckpoints] = useState<QualityCheckpoint[]>([]);
+  const [restorePreview, setRestorePreview] = useState<RestoreCheckpointPreview | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [restoreLoadingRef, setRestoreLoadingRef] = useState<string | null>(null);
   const [settingsMessage, setSettingsMessage] = useState<string | null>(null);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -281,6 +296,14 @@ function QualityGatePanel() {
     return data as EditableQualitySettings;
   }
 
+  async function loadCheckpoints() {
+    const response = await fetch("/api/admin/gaokao-essay/quality/checkpoints", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || `checkpoint 接口返回 ${response.status}`);
+    setCheckpoints(data as QualityCheckpoint[]);
+    return data as QualityCheckpoint[];
+  }
+
   async function loadLogs(runId: string) {
     const response = await fetch(`/api/admin/gaokao-essay/quality/logs?runId=${encodeURIComponent(runId)}`, { cache: "no-store" });
     const data = await response.json();
@@ -290,7 +313,7 @@ function QualityGatePanel() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadStatus(), loadEditableSettings()]).catch((error) => {
+    Promise.all([loadStatus(), loadEditableSettings(), loadCheckpoints()]).catch((error) => {
       if (!cancelled) setMessage(error instanceof Error ? error.message : "质量状态加载失败");
     });
     return () => {
@@ -407,6 +430,52 @@ function QualityGatePanel() {
     }
   }
 
+  async function previewCheckpoint(ref: string) {
+    setRestoreLoadingRef(ref);
+    setRestoreMessage(null);
+    try {
+      const response = await fetch("/api/admin/gaokao-essay/quality/checkpoints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "preview", ref }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || `checkpoint 预览失败 ${response.status}`);
+      setRestorePreview(data as RestoreCheckpointPreview);
+    } catch (error) {
+      setRestoreMessage(error instanceof Error ? error.message : "checkpoint 预览失败");
+    } finally {
+      setRestoreLoadingRef(null);
+    }
+  }
+
+  async function restoreCheckpoint(ref: string) {
+    const checkpoint = checkpoints.find((item) => item.ref === ref);
+    const confirmed = window.confirm(
+      `确认恢复到 ${checkpoint?.label || ref} 吗？\n\n系统会先自动保存当前节点，再把已跟踪文件恢复到所选节点；未跟踪文件不会被删除。`,
+    );
+    if (!confirmed) return;
+
+    setRestoreLoadingRef(ref);
+    setRestoreMessage(null);
+    try {
+      const response = await fetch("/api/admin/gaokao-essay/quality/checkpoints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore", ref }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || `checkpoint 恢复失败 ${response.status}`);
+      setRestorePreview(data as RestoreCheckpointPreview);
+      await Promise.all([loadStatus(), loadEditableSettings(), loadCheckpoints()]);
+      setRestoreMessage(`已恢复到 ${ref}。当前状态已在恢复前自动保存为新节点。`);
+    } catch (error) {
+      setRestoreMessage(error instanceof Error ? error.message : "checkpoint 恢复失败");
+    } finally {
+      setRestoreLoadingRef(null);
+    }
+  }
+
   const run = status?.latestRun ?? null;
   const running = loading || run?.status === "running" || Boolean(status?.activeRunId);
 
@@ -498,6 +567,16 @@ function QualityGatePanel() {
         onPromptChange={updatePromptDraft}
         onSaveModel={saveModelSettings}
         onSavePrompt={savePrompt}
+      />
+
+      <CheckpointRestorePanel
+        checkpoints={checkpoints}
+        preview={restorePreview}
+        message={restoreMessage}
+        disabled={!status?.enabled || running || settingsSaving}
+        loadingRef={restoreLoadingRef}
+        onPreview={previewCheckpoint}
+        onRestore={restoreCheckpoint}
       />
 
       <article className="border border-slate-200 bg-white p-5">
@@ -741,6 +820,97 @@ function EditableQualitySettingsPanel({
         </div>
       </article>
     </section>
+  );
+}
+
+function CheckpointRestorePanel({
+  checkpoints,
+  preview,
+  message,
+  disabled,
+  loadingRef,
+  onPreview,
+  onRestore,
+}: {
+  checkpoints: QualityCheckpoint[];
+  preview: RestoreCheckpointPreview | null;
+  message: string | null;
+  disabled: boolean;
+  loadingRef: string | null;
+  onPreview: (ref: string) => void;
+  onRestore: (ref: string) => void;
+}) {
+  return (
+    <article className="border border-slate-200 bg-white p-5">
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-slate-950">历史节点与恢复</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+            这里只列出控制台认可的稳定标签和最近提交。恢复前会自动保存当前状态；恢复只覆盖 Git 已跟踪文件，不会清理未跟踪文件。
+          </p>
+        </div>
+        <span className="w-fit bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{checkpoints.length} 个可选节点</span>
+      </div>
+
+      {message ? <p className="mt-4 border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">{message}</p> : null}
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <div className="space-y-3">
+          {checkpoints.map((checkpoint) => (
+            <div key={`${checkpoint.type}-${checkpoint.ref}`} className="border border-slate-200 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="font-bold text-slate-950">{checkpoint.ref}</p>
+                  <p className="mt-1 text-sm text-slate-600">{checkpoint.subject}</p>
+                  <span className="mt-2 inline-block bg-slate-100 px-2 py-1 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">
+                    {checkpoint.type}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={disabled || Boolean(loadingRef)}
+                    onClick={() => onPreview(checkpoint.ref)}
+                    className="border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                  >
+                    查看差异
+                  </button>
+                  <button
+                    type="button"
+                    disabled={disabled || Boolean(loadingRef)}
+                    onClick={() => onRestore(checkpoint.ref)}
+                    className="bg-slate-950 px-3 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                  >
+                    {loadingRef === checkpoint.ref ? "处理中..." : "恢复到此节点"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {!checkpoints.length ? <p className="text-sm text-slate-500">暂无可恢复节点。</p> : null}
+        </div>
+
+        <div className="border border-slate-200 bg-slate-50 p-4">
+          <h4 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-500">差异预览</h4>
+          {preview ? (
+            <>
+              <p className="mt-3 font-bold text-slate-950">{preview.ref}</p>
+              <p className="mt-1 text-sm text-slate-600">{preview.subject}</p>
+              <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                {preview.changedFiles.map((file) => (
+                  <li key={file} className="break-all border border-slate-200 bg-white px-3 py-2 font-mono text-xs">
+                    {file}
+                  </li>
+                ))}
+                {!preview.changedFiles.length ? <li className="text-slate-500">与当前工作区没有已跟踪文件差异。</li> : null}
+              </ul>
+            </>
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-slate-500">先点击某个节点的“查看差异”，确认会回退哪些已跟踪文件，再决定是否恢复。</p>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }
 

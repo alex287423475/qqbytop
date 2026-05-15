@@ -101,6 +101,19 @@ export type SaveQualitySettingsInput = {
   }>;
 };
 
+export type QualityCheckpoint = {
+  type: "commit" | "tag";
+  ref: string;
+  subject: string;
+  label: string;
+};
+
+export type RestoreCheckpointPreview = {
+  ref: string;
+  subject: string;
+  changedFiles: string[];
+};
+
 export class QualityConsoleError extends Error {
   constructor(
     public status: number,
@@ -184,6 +197,52 @@ export async function saveEditableQualitySettings(input: SaveQualitySettingsInpu
   }
 
   return getEditableQualitySettings();
+}
+
+export async function listQualityCheckpoints(): Promise<QualityCheckpoint[]> {
+  const [tags, commits] = await Promise.all([
+    runGitLines(["tag", "--list", "stable-*", "--sort=-creatordate"]),
+    runGitLines(["log", "--format=%h%x09%s", "-20"]),
+  ]);
+  const checkpointTags = await Promise.all(
+    tags.map(async (ref) => {
+      const subject = (await runGitLines(["log", "-1", "--format=%s", ref]))[0] || "";
+      return { type: "tag" as const, ref, subject, label: `${ref} | ${subject}` };
+    }),
+  );
+  const checkpointCommits = commits
+    .map((line): QualityCheckpoint | null => {
+      const [ref, ...subjectParts] = line.split("\t");
+      const subject = subjectParts.join("\t");
+      return ref && subject ? { type: "commit" as const, ref, subject, label: `${ref} ${subject}` } : null;
+    })
+    .filter((item): item is QualityCheckpoint => Boolean(item));
+  return [...checkpointTags, ...checkpointCommits];
+}
+
+export async function previewQualityCheckpointRestore(ref: string): Promise<RestoreCheckpointPreview> {
+  const checkpoint = await getAllowedCheckpoint(ref);
+  return {
+    ref: checkpoint.ref,
+    subject: checkpoint.subject,
+    changedFiles: await runGitLines(["diff", "--name-status", checkpoint.ref, "--", "."]),
+  };
+}
+
+export async function restoreQualityCheckpoint(ref: string): Promise<RestoreCheckpointPreview> {
+  if (!isQualityConsoleEnabled()) {
+    throw new QualityConsoleError(403, "质量保障控制台未启用。请配置 GAOKAO_QUALITY_CONSOLE_ENABLED=true。");
+  }
+  if (activeRunId) {
+    throw new QualityConsoleError(409, "质量任务正在运行，不能恢复历史节点。");
+  }
+  const checkpoint = await getAllowedCheckpoint(ref);
+  await createPreSaveCheckpoint({});
+  const exitCode = await runGitCommand(["restore", "--source", checkpoint.ref, "--", "."]);
+  if (exitCode !== 0) {
+    throw new QualityConsoleError(500, "恢复历史节点失败。");
+  }
+  return previewQualityCheckpointRestore(checkpoint.ref);
 }
 
 export async function startQualityRun(taskType: QualityTaskType): Promise<QualityRunRecord> {
@@ -519,6 +578,40 @@ function runCheckpointCommand(cmd: string, args: string[]) {
       shell: false,
       windowsHide: true,
     });
+    child.on("error", () => resolve(1));
+    child.on("close", (code) => resolve(code ?? 1));
+  });
+}
+
+async function getAllowedCheckpoint(ref: string) {
+  const normalized = String(ref || "").trim();
+  const checkpoints = await listQualityCheckpoints();
+  const checkpoint = checkpoints.find((item) => item.ref === normalized);
+  if (!checkpoint) {
+    throw new QualityConsoleError(400, "只允许恢复控制台列出的历史节点。");
+  }
+  const verifyExitCode = await runGitCommand(["rev-parse", "--verify", `${checkpoint.ref}^{commit}`]);
+  if (verifyExitCode !== 0) {
+    throw new QualityConsoleError(400, "历史节点不存在或不可恢复。");
+  }
+  return checkpoint;
+}
+
+function runGitLines(args: string[]) {
+  return new Promise<string[]>((resolve) => {
+    const child = spawn("git", args, { cwd: rootDir, windowsHide: true });
+    let output = "";
+    child.stdout.on("data", (chunk) => {
+      output += String(chunk);
+    });
+    child.on("close", () => resolve(output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)));
+    child.on("error", () => resolve([]));
+  });
+}
+
+function runGitCommand(args: string[]) {
+  return new Promise<number>((resolve) => {
+    const child = spawn("git", args, { cwd: rootDir, windowsHide: true });
     child.on("error", () => resolve(1));
     child.on("close", (code) => resolve(code ?? 1));
   });
