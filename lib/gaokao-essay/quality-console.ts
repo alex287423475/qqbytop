@@ -1,6 +1,7 @@
 import { spawn } from "child_process";
+import { createHash } from "crypto";
 import { createWriteStream, existsSync } from "fs";
-import { mkdir, readFile, readdir, writeFile } from "fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
 import path from "path";
 
 export type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "typecheck" | "build" | "full_gate";
@@ -40,6 +41,38 @@ export type QualityStatusResponse = {
     batchOutputRoot: string;
     qualityRunRoot: string;
   };
+  modelSettings: QualityModelSettings;
+  promptSettings: QualityPromptSettings;
+};
+
+export type QualityModelSettings = {
+  environment: string;
+  llmProviderOrder: string;
+  tencentTokenhubBaseUrl: string;
+  tencentTokenhubFreeModel: string;
+  tencentTokenhubPaidModel: string;
+  tencentTokenhubFallbackModel: string;
+  supportChatLlmEnabled: string;
+  supportChatModel: string;
+  configSources: string[];
+};
+
+export type QualityPromptSettings = {
+  defaultPromptVersion: string;
+  batchPromptA: string;
+  batchPromptB: string;
+  prompts: QualityPromptFileInfo[];
+};
+
+export type QualityPromptFileInfo = {
+  version: string;
+  label: string;
+  filePath: string;
+  exists: boolean;
+  sizeBytes: number | null;
+  updatedAt: string | null;
+  sha256: string | null;
+  preview: string;
 };
 
 export class QualityConsoleError extends Error {
@@ -56,6 +89,7 @@ const runsDir = path.join(rootDir, "test_outputs", "gaokao_quality_runs");
 const batchOutputsDir = path.join(rootDir, "test_outputs", "gaokao_reports");
 const sampleInputDir = path.join(rootDir, "test_inputs", "gaokao_essays");
 const backendDir = path.join(rootDir, "backend");
+const promptsDir = path.join(backendDir, "prompts");
 
 let activeRunId: string | null = null;
 
@@ -83,6 +117,8 @@ export async function getQualityStatus(): Promise<QualityStatusResponse> {
       batchOutputRoot: batchOutputsDir,
       qualityRunRoot: runsDir,
     },
+    modelSettings: await getModelSettings(),
+    promptSettings: await getPromptSettings(),
   };
 }
 
@@ -304,6 +340,99 @@ async function getLatestCheckpoint() {
     child.on("close", () => resolve(output.trim() || null));
     child.on("error", () => resolve(null));
   });
+}
+
+async function getModelSettings(): Promise<QualityModelSettings> {
+  const env = await readBackendEnvSnapshot();
+  const providerOrder = readConfigValue(env, "LLM_PROVIDER_ORDER", "mock_deepseek,mock_qwen,mock_doubao");
+  const freeModel = readConfigValue(env, "TENCENT_TOKENHUB_FREE_MODEL", "deepseek-v4-flash");
+  return {
+    environment: readConfigValue(env, "ENVIRONMENT", "development"),
+    llmProviderOrder: providerOrder,
+    tencentTokenhubBaseUrl: readConfigValue(env, "TENCENT_TOKENHUB_BASE_URL", "https://tokenhub.tencentmaas.com/v1"),
+    tencentTokenhubFreeModel: freeModel,
+    tencentTokenhubPaidModel: readConfigValue(env, "TENCENT_TOKENHUB_PAID_MODEL", "deepseek-v4-pro"),
+    tencentTokenhubFallbackModel: readConfigValue(env, "TENCENT_TOKENHUB_FALLBACK_MODEL", "deepseek-v4-flash"),
+    supportChatLlmEnabled: readConfigValue(env, "SUPPORT_CHAT_LLM_ENABLED", "false"),
+    supportChatModel: freeModel,
+    configSources: env.sources,
+  };
+}
+
+async function getPromptSettings(): Promise<QualityPromptSettings> {
+  return {
+    defaultPromptVersion: "gaokao_default",
+    batchPromptA: "gaokao_default",
+    batchPromptB: "gaokao_experiment",
+    prompts: await Promise.all([
+      getPromptInfo("gaokao_default", "生产默认 Prompt"),
+      getPromptInfo("gaokao_experiment", "实验对照 Prompt"),
+    ]),
+  };
+}
+
+async function getPromptInfo(version: string, label: string): Promise<QualityPromptFileInfo> {
+  const filePath = path.join(promptsDir, `${version}.md`);
+  try {
+    const [content, info] = await Promise.all([readFile(filePath, "utf-8"), stat(filePath)]);
+    return {
+      version,
+      label,
+      filePath,
+      exists: true,
+      sizeBytes: info.size,
+      updatedAt: info.mtime.toISOString(),
+      sha256: createHash("sha256").update(content).digest("hex").slice(0, 16),
+      preview: content.replace(/\s+/g, " ").trim().slice(0, 180),
+    };
+  } catch {
+    return {
+      version,
+      label,
+      filePath,
+      exists: false,
+      sizeBytes: null,
+      updatedAt: null,
+      sha256: null,
+      preview: "",
+    };
+  }
+}
+
+async function readBackendEnvSnapshot() {
+  const sources: string[] = ["Next.js process.env"];
+  const values: Record<string, string> = {};
+  const candidates = [path.join(backendDir, ".env"), path.join(backendDir, ".env.local-deepseek")];
+  for (const filePath of candidates) {
+    try {
+      const text = await readFile(filePath, "utf-8");
+      Object.assign(values, parseDotEnv(text));
+      sources.push(filePath);
+    } catch {
+      // Optional local files are allowed to be missing.
+    }
+  }
+  return { values, sources };
+}
+
+function readConfigValue(env: { values: Record<string, string> }, key: string, fallback: string) {
+  return process.env[key] || env.values[key] || fallback;
+}
+
+function parseDotEnv(text: string) {
+  const values: Record<string, string> = {};
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const match = line.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+    let value = match[2].trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    values[match[1]] = value;
+  }
+  return values;
 }
 
 async function getLatestBatchSummary(): Promise<QualityBatchSummary | null> {

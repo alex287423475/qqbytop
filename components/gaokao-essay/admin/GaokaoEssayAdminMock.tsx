@@ -39,6 +39,32 @@ type QualityStatusResponse = {
     batchOutputRoot: string;
     qualityRunRoot: string;
   };
+  modelSettings: {
+    environment: string;
+    llmProviderOrder: string;
+    tencentTokenhubBaseUrl: string;
+    tencentTokenhubFreeModel: string;
+    tencentTokenhubPaidModel: string;
+    tencentTokenhubFallbackModel: string;
+    supportChatLlmEnabled: string;
+    supportChatModel: string;
+    configSources: string[];
+  };
+  promptSettings: {
+    defaultPromptVersion: string;
+    batchPromptA: string;
+    batchPromptB: string;
+    prompts: Array<{
+      version: string;
+      label: string;
+      filePath: string;
+      exists: boolean;
+      sizeBytes: number | null;
+      updatedAt: string | null;
+      sha256: string | null;
+      preview: string;
+    }>;
+  };
 };
 type QualityLogsResponse = {
   runId: string;
@@ -334,6 +360,46 @@ function QualityGatePanel() {
         </div>
       </article>
 
+      <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
+        <article className="border border-slate-200 bg-white p-5">
+          <h3 className="text-lg font-bold text-slate-950">模型设置</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">只读展示非密钥配置；API Key 不会在控制台显示。</p>
+          <dl className="mt-4 grid gap-3 text-sm">
+            <InfoRow label="环境" value={status?.modelSettings.environment || "加载中"} />
+            <InfoRow label="Provider 顺序" value={status?.modelSettings.llmProviderOrder || "加载中"} />
+            <InfoRow label="TokenHub Base URL" value={status?.modelSettings.tencentTokenhubBaseUrl || "加载中"} />
+            <InfoRow label="免费/摘要模型" value={status?.modelSettings.tencentTokenhubFreeModel || "加载中"} />
+            <InfoRow label="付费深度模型" value={status?.modelSettings.tencentTokenhubPaidModel || "加载中"} />
+            <InfoRow label="Fallback 模型" value={status?.modelSettings.tencentTokenhubFallbackModel || "加载中"} />
+            <InfoRow label="系统护航助手 LLM" value={status ? `${status.modelSettings.supportChatLlmEnabled} · ${status.modelSettings.supportChatModel}` : "加载中"} />
+          </dl>
+          <div className="mt-4 border border-slate-200 bg-slate-50 p-3">
+            <span className="block text-xs font-bold uppercase tracking-[0.14em] text-slate-400">配置来源</span>
+            <ul className="mt-2 space-y-1 text-xs text-slate-600">
+              {(status?.modelSettings.configSources || ["加载中"]).map((source) => (
+                <li key={source} className="break-all">
+                  {source}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </article>
+
+        <article className="border border-slate-200 bg-white p-5">
+          <h3 className="text-lg font-bold text-slate-950">Prompt 设置</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            生产默认：{status?.promptSettings.defaultPromptVersion || "加载中"}；批测对照：{status?.promptSettings.batchPromptA || "加载中"} vs{" "}
+            {status?.promptSettings.batchPromptB || "加载中"}。
+          </p>
+          <div className="mt-4 grid gap-3">
+            {(status?.promptSettings.prompts || []).map((prompt) => (
+              <PromptCard key={prompt.version} prompt={prompt} />
+            ))}
+            {!status?.promptSettings.prompts?.length ? <p className="text-sm text-slate-500">Prompt 信息加载中。</p> : null}
+          </div>
+        </article>
+      </section>
+
       <article className="border border-slate-200 bg-white p-5">
         <h3 className="text-lg font-bold text-slate-950">固定操作</h3>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -419,6 +485,33 @@ function PathCard({ label, value, className = "" }: { label: string; value: stri
     <div className={`border border-slate-200 bg-slate-50 p-3 ${className}`}>
       <span className="block text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</span>
       <code className="mt-2 block break-all text-slate-900">{value}</code>
+    </div>
+  );
+}
+
+function PromptCard({
+  prompt,
+}: {
+  prompt: QualityStatusResponse["promptSettings"]["prompts"][number];
+}) {
+  return (
+    <div className={`border p-4 ${prompt.exists ? "border-slate-200 bg-slate-50" : "border-red-200 bg-red-50"}`}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="font-bold text-slate-950">{prompt.label}</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">{prompt.version}</p>
+        </div>
+        <span className={`w-fit px-2 py-1 text-xs font-bold ${prompt.exists ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
+          {prompt.exists ? "已找到" : "缺失"}
+        </span>
+      </div>
+      <dl className="mt-3 grid gap-2 text-xs text-slate-600 md:grid-cols-2">
+        <InfoRow label="文件" value={prompt.filePath} />
+        <InfoRow label="SHA256" value={prompt.sha256 || "暂无"} />
+        <InfoRow label="大小" value={prompt.sizeBytes === null ? "暂无" : `${prompt.sizeBytes} bytes`} />
+        <InfoRow label="更新时间" value={prompt.updatedAt ? formatDateTime(prompt.updatedAt) : "暂无"} />
+      </dl>
+      {prompt.preview ? <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{prompt.preview}</p> : null}
     </div>
   );
 }
