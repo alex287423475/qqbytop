@@ -10,6 +10,7 @@ from app.config import Settings
 from app.main import app
 from app.models.schemas import ESSAY_CREDIT_PACK_PRODUCT, GROUP_ESSAY_CREDIT_PACK_PRODUCT, FullReport
 from app.services.core import service
+from app.services.report_quality import GeneratedReportQualityError, score_generated_report_quality, validate_generated_report_quality
 
 client = TestClient(app)
 
@@ -267,6 +268,65 @@ def test_tencent_tokenhub_routes_paid_to_pro_then_flash_fallback() -> None:
     free_configs = router._provider_configs(tier="free")
     assert [config.model for config in free_configs] == ["deepseek-v4-flash"]
     assert free_configs[0].model_tier == "flash"
+
+
+def test_generated_report_quality_accepts_mock_report() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+
+    validate_generated_report_quality(ESSAY, free_summary, full_report)
+    quality = score_generated_report_quality(ESSAY, free_summary, full_report)
+
+    assert quality.schema_ok is True
+    assert quality.score >= 80
+
+
+def test_generated_report_quality_rejects_banned_terms() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    broken = full_report.model_copy(update={"disclaimer": "本报告保证提分。"})
+
+    with pytest.raises(GeneratedReportQualityError) as exc:
+        validate_generated_report_quality(ESSAY, free_summary, broken)
+
+    assert "banned terms found" in str(exc.value)
+
+
+def test_generated_report_quality_rejects_missing_aligned_original() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    spans = list(full_report.highlight_spans)
+    spans[0] = spans[0].model_copy(update={"original": "This sentence is not in the essay.", "position_status": "aligned"})
+    broken = full_report.model_copy(update={"highlight_spans": spans})
+
+    with pytest.raises(GeneratedReportQualityError) as exc:
+        validate_generated_report_quality(ESSAY, free_summary, broken)
+
+    assert "highlight original not found" in str(exc.value)
+
+
+def test_generated_report_quality_rejects_missing_dimensions() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    broken = full_report.model_copy()
+    broken.gaokao_dimensions = {"content": full_report.gaokao_dimensions["content"]}
+
+    with pytest.raises(GeneratedReportQualityError) as exc:
+        validate_generated_report_quality(ESSAY, free_summary, broken)
+
+    assert "missing dimensions" in str(exc.value)
 
 
 def test_support_llm_sanitizes_sensitive_input() -> None:

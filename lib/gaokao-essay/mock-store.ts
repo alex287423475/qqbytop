@@ -202,7 +202,7 @@ function buildFullReport(text: string): FullReport {
       { phrase: "improve our campus environment", explanation: "明确结果，能让观点更落地。" },
       { phrase: "a stronger sense of responsibility", explanation: "适合结尾升华，能把行动上升到品质培养。" },
     ],
-    disclaimer: "本报告为 AI 辅助诊断，不承诺高考提分或最终得分。",
+    disclaimer: "本报告为 AI 辅助诊断，仅供学习训练参考，不代表正式考试成绩。",
     diagnosis_meta: { ocr_artifacts: [], uncertain_ocr_spans: [] },
   };
 }

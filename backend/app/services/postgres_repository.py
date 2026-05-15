@@ -96,7 +96,7 @@ def normalize_legacy_full_report(value: dict) -> dict:
     rewrites.setdefault("safe_version", "历史报告未包含稳妥版范文。")
     rewrites.setdefault("advanced_version", "历史报告未包含进阶版范文。")
     normalized["rewrites"] = rewrites
-    normalized.setdefault("disclaimer", "本报告为 AI 辅助诊断，不承诺高考提分或最终得分。")
+    normalized.setdefault("disclaimer", "本报告为 AI 辅助诊断，仅供学习训练参考，不代表正式考试成绩。")
     return normalized
 
 

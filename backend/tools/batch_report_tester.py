@@ -20,10 +20,11 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.adapters.llm import LlmRouter, load_gaokao_system_prompt  # noqa: E402
 from app.config import Settings  # noqa: E402
+from app.services.report_quality import BANNED_REPORT_TERMS, REQUIRED_GAOKAO_DIMENSIONS, REQUIRED_HIGHLIGHT_FIELDS, score_generated_report_quality  # noqa: E402
 
-BANNED_TERMS = ["保证提分", "保分", "必得高分", "官方阅卷组", "人工逐篇批改", "官方阅卷老师", "最终得分"]
-REQUIRED_DIMENSIONS = ["content", "language", "structure", "cohesion", "format"]
-REQUIRED_SPAN_FIELDS = ["original", "category", "severity", "comment", "correction", "principle", "risk_note", "position_status"]
+BANNED_TERMS = BANNED_REPORT_TERMS
+REQUIRED_DIMENSIONS = sorted(REQUIRED_GAOKAO_DIMENSIONS)
+REQUIRED_SPAN_FIELDS = sorted(REQUIRED_HIGHLIGHT_FIELDS)
 SUMMARY_FIELDS = [
     "file",
     "mode",
@@ -71,9 +72,13 @@ def apply_env_file(path: Path) -> None:
         os.environ[key] = value
 
 
-def ensure_tokenhub_env() -> None:
+def has_real_tokenhub_key() -> bool:
     key = os.environ.get("TENCENT_TOKENHUB_API_KEY", "")
-    if not key or re.search(r"replace|your|<|>", key, re.IGNORECASE):
+    return bool(key) and not re.search(r"replace|your|<|>", key, re.IGNORECASE)
+
+
+def ensure_tokenhub_env() -> None:
+    if not has_real_tokenhub_key():
         raise RuntimeError("TENCENT_TOKENHUB_API_KEY is missing or still a placeholder. Fill backend/.env.local-deepseek first.")
 
 
@@ -134,65 +139,10 @@ def severity_counts(spans: list[dict[str, Any]]) -> dict[str, int]:
 
 def score_report(report: dict[str, Any]) -> dict[str, Any]:
     full_report = extract_full_report(report)
-    deductions: list[str] = []
-    score = 0
-
     if not full_report:
         return {"score": 0, "schema_ok": False, "deductions": ["missing full_report"]}
-
-    score += 10
-
-    dimensions = full_report.get("gaokao_dimensions") or {}
-    missing_dimensions = [key for key in REQUIRED_DIMENSIONS if key not in dimensions]
-    if missing_dimensions:
-        deductions.append(f"missing dimensions: {', '.join(missing_dimensions)}")
-    else:
-        score += 10
-
-    risks = full_report.get("fatal_risks") or []
-    if len(risks) == 3 and all(item.get("title") and item.get("explanation") for item in risks):
-        score += 10
-    else:
-        deductions.append("fatal_risks must contain exactly 3 complete items")
-
-    spans = full_report.get("highlight_spans") or []
-    if 3 <= len(spans) <= 8:
-        score += 10
-    else:
-        deductions.append("highlight_spans count must be 3 to 8")
-    complete_spans = sum(1 for span in spans if all(str(span.get(field, "")).strip() for field in REQUIRED_SPAN_FIELDS))
-    if spans and complete_spans == len(spans):
-        score += 20
-    else:
-        deductions.append("some highlight_spans miss red-green fields")
-
-    rewrites = full_report.get("rewrites") or {}
-    safe_len = len(str(rewrites.get("safe_version", "")).strip())
-    advanced_len = len(str(rewrites.get("advanced_version", "")).strip())
-    if safe_len >= 80 and advanced_len >= 100:
-        score += 15
-    else:
-        deductions.append("rewrites are too short or missing")
-
-    study_plan = full_report.get("study_plan") or []
-    if len(study_plan) >= 3 and all(item.get("skill") and item.get("exercise") for item in study_plan if isinstance(item, dict)):
-        score += 10
-    else:
-        deductions.append("study_plan must contain at least 3 executable items")
-
-    advanced_phrases = full_report.get("advanced_phrases") or []
-    if advanced_phrases:
-        score += 10
-    else:
-        deductions.append("advanced_phrases is empty")
-
-    banned_hits = [term for term in BANNED_TERMS if term in text_blob(full_report)]
-    if not banned_hits:
-        score += 15
-    else:
-        deductions.append(f"banned terms found: {', '.join(banned_hits)}")
-
-    return {"score": min(score, 100), "schema_ok": not deductions, "deductions": deductions}
+    quality = score_generated_report_quality(str(report.get("confirmed_text") or report.get("essay_text") or ""), report.get("free_summary") or {}, full_report)
+    return {"score": quality.score, "schema_ok": quality.schema_ok, "deductions": quality.deductions}
 
 
 def compact_report_for_judge(report: dict[str, Any]) -> dict[str, Any]:
@@ -364,8 +314,8 @@ def run_ab_case(
 
     free_a, full_a, _ = router.diagnose(essay_text=essay_text, word_count=count, source_type="text", tier="paid", system_prompt=prompt_a, prompt_version=prompt_a_name)
     free_b, full_b, _ = router.diagnose(essay_text=essay_text, word_count=count, source_type="text", tier="paid", system_prompt=prompt_b, prompt_version=prompt_b_name)
-    report_a = {"free_summary": free_a.model_dump(mode="json"), "full_report": full_a.model_dump(mode="json")}
-    report_b = {"free_summary": free_b.model_dump(mode="json"), "full_report": full_b.model_dump(mode="json")}
+    report_a = {"essay_text": essay_text, "free_summary": free_a.model_dump(mode="json"), "full_report": full_a.model_dump(mode="json")}
+    report_b = {"essay_text": essay_text, "free_summary": free_b.model_dump(mode="json"), "full_report": full_b.model_dump(mode="json")}
     diff = diff_reports(report_a, report_b)
     score_a = score_report(report_a)
     score_b = score_report(report_b)
@@ -412,6 +362,59 @@ def run_ab_case(
     }
 
 
+def run_local_case(settings: Settings, file_path: Path, essay_text: str, output_dir: Path, prompt_name: str) -> dict[str, Any]:
+    started = time.time()
+    provider_list = settings.llm_provider_list
+    if not any(provider_list) or not has_real_tokenhub_key():
+        router = LlmRouter(["mock"], None)
+    else:
+        ensure_tokenhub_env()
+        router = LlmRouter(provider_list, settings)
+    count = word_count(essay_text)
+    prompt = load_gaokao_system_prompt(prompt_name)
+    free_summary, full_report, provider = router.diagnose(
+        essay_text=essay_text,
+        word_count=count,
+        source_type="text",
+        tier="paid",
+        system_prompt=prompt,
+        prompt_version=prompt_name,
+    )
+    report = {
+        "essay_text": essay_text,
+        "free_summary": free_summary.model_dump(mode="json"),
+        "full_report": full_report.model_dump(mode="json"),
+    }
+    quality = score_report(report)
+    json_dump(output_dir / f"{file_path.stem}.local.report.json", report)
+    json_dump(output_dir / f"{file_path.stem}.local.quality.json", quality)
+    meta = report["full_report"].get("diagnosis_meta") or {}
+    return {
+        "file": file_path.name,
+        "mode": "local",
+        "status": "ok",
+        "report_id": "",
+        "order_id": "",
+        "local_case_id": file_path.stem,
+        "provider": meta.get("provider") or provider,
+        "model_name": meta.get("model_name"),
+        "model_degraded": meta.get("model_degraded"),
+        "prompt_a": prompt_name,
+        "prompt_b": "",
+        "rule_score": quality["score"],
+        "rule_score_a": "",
+        "rule_score_b": "",
+        "judge_score_a": "",
+        "judge_score_b": "",
+        "combined_score_a": "",
+        "combined_score_b": "",
+        "winner": "",
+        "schema_ok": quality["schema_ok"],
+        "elapsed_seconds": round(time.time() - started, 2),
+        "error": "",
+    }
+
+
 def write_batch_summary(output_dir: Path, rows: list[dict[str, Any]]) -> None:
     with (output_dir / "summary.csv").open("w", newline="", encoding="utf-8-sig") as handle:
         writer = csv.DictWriter(handle, fieldnames=SUMMARY_FIELDS)
@@ -425,9 +428,27 @@ def write_batch_summary(output_dir: Path, rows: list[dict[str, Any]]) -> None:
     (output_dir / "ab_winners.md").write_text("\n".join(winners), encoding="utf-8")
 
 
+def has_quality_failures(rows: list[dict[str, Any]], min_rule_score: int) -> bool:
+    for row in rows:
+        if row.get("status") not in ("ok", ""):
+            return True
+        if row.get("mode") == "ab":
+            for field in ("rule_score_a", "rule_score_b"):
+                value = row.get(field)
+                if value != "" and int(value) < min_rule_score:
+                    return True
+        else:
+            value = row.get("rule_score")
+            if value != "" and int(value) < min_rule_score:
+                return True
+        if str(row.get("schema_ok")).lower() not in ("true", "1"):
+            return True
+    return False
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Batch test Gaokao essay reports with pipeline or prompt A/B mode.")
-    parser.add_argument("--mode", choices=["pipeline", "ab"], default="pipeline")
+    parser.add_argument("--mode", choices=["pipeline", "ab", "local"], default="pipeline")
     parser.add_argument("--api-base", default="http://127.0.0.1:8000/api/v1")
     parser.add_argument("--input", default=str(ROOT_DIR / "test_inputs" / "gaokao_essays"))
     parser.add_argument("--output", default=str(ROOT_DIR / "test_outputs" / "gaokao_reports"))
@@ -438,6 +459,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-a", default="gaokao_default")
     parser.add_argument("--prompt-b", default="gaokao_experiment")
     parser.add_argument("--judge", action="store_true")
+    parser.add_argument("--min-rule-score", type=int, default=80)
     return parser.parse_args()
 
 
@@ -471,6 +493,8 @@ def main() -> int:
                 row = {"file": file_path.name, "mode": args.mode, "status": "skipped_empty", "elapsed_seconds": 0, "error": "empty file"}
             elif args.mode == "pipeline":
                 row = run_pipeline_case(args.api_base.rstrip("/"), file_path, essay_text, output_dir, index, args.payer_contact)
+            elif args.mode == "local":
+                row = run_local_case(settings, file_path, essay_text, output_dir, args.prompt_a)
             else:
                 row = run_ab_case(settings, file_path, essay_text, output_dir, args.prompt_a, args.prompt_b, args.judge)
             rows.append({field: row.get(field, "") for field in SUMMARY_FIELDS})
@@ -485,6 +509,10 @@ def main() -> int:
 
     write_batch_summary(output_dir, rows)
     print(f"Batch output: {output_dir}")
+    if has_quality_failures(rows, args.min_rule_score):
+        print(f"Quality gate failed. min_rule_score={args.min_rule_score}")
+        return 1
+    print(f"Quality gate passed. min_rule_score={args.min_rule_score}")
     return 0
 
 

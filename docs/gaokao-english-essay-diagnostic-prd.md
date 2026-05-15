@@ -1597,7 +1597,7 @@ LLM OCR 容错提示原则：
       "exercise": ""
     }
   ],
-  "disclaimer": "本报告为 AI 辅助诊断，不承诺高考提分或最终得分。"
+  "disclaimer": "本报告为 AI 辅助诊断，仅供学习训练参考，不代表正式考试成绩。"
 }
 ```
 
@@ -2054,6 +2054,8 @@ Serverless 限制：
 ### 14.2 工程验收
 
 - AI 输出 JSON 经过 schema 校验。
+- 首版不使用 RAG、pgvector 或向量库；报告质量依赖固定 Prompt 版本、Pydantic Schema、后端质量校验和样例批量回归。
+- `LLMRouter` 生成报告后必须写入 `prompt_version`、`provider`、`model_name`、`model_tier`，并在 Pydantic 校验通过后执行报告质量校验；质量失败必须重试或 fallback，不得直接展示半成品。
 - 支付 Webhook 幂等。
 - 后台任务失败可重试。
 - 关键状态变更写入审计日志。
@@ -2065,6 +2067,8 @@ Serverless 限制：
 - 创建草稿、上传意图、确认上传、诊断和订单接口必须校验登录态或短期 `draft_token`。
 - 至少有以下测试：
   - 高考诊断 JSON schema 校验测试。
+  - 生成报告质量校验测试，覆盖缺少三条风险、缺少高考维度、禁用词命中、荧光笔原文无法定位、范文为空等失败路径。
+  - `backend/tools/batch_report_tester.py` 样例回归测试，默认要求 Schema 通过率 100%、禁用词命中 0、单篇规则分不低于 80。
   - 纯文本输入直达诊断测试。
   - `confirmed_text_hash` 生成和免费摘要缓存复用测试。
   - 免费层展示边界测试。
@@ -2132,6 +2136,9 @@ Serverless 限制：
 - `merchant_code` 只包含小写字母、数字和下划线。
 - 订单过期任务和商户号每日额度重置任务已配置。
 - 报告轮询策略已按 3s/5s/10s 阶梯实现。
+- 每次修改生产 Prompt、模型、Schema 或质量规则后，已运行 `backend/tools/batch_report_tester.py` 样例回归并通过质量线。
+- 生产默认 Prompt 为 `backend/prompts/gaokao_default.md`；实验 Prompt 未经批测胜出不得切为生产默认。
+- 部署前至少执行 `npm run typecheck`、`npm run build`、`pytest` 和样例批量回归。
 - 至少配置 2 个商户号，其中 1 个可设置为 `DRAINING` 验证切换。
 - 支付平台后台已配置支付域名和 webhook 域名。
 - 已准备业务说明、退款规则、客服入口、支付/收款/退款主体说明。

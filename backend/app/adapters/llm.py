@@ -7,6 +7,7 @@ from typing import Literal
 
 from app.config import Settings
 from app.models.schemas import EssayScore, FreeSummary, FreeSummaryRisk, FullReport, GaokaoDimension, HighlightSpan, LogicMapItem
+from app.services.report_quality import validate_generated_report_quality
 
 DEFAULT_PROMPT_VERSION = "gaokao_default"
 PROMPTS_DIR = Path(__file__).resolve().parents[2] / "prompts"
@@ -215,6 +216,7 @@ class LlmRouter:
             "source_type": source_type,
             "prompt_version": prompt_version,
         }
+        validate_generated_report_quality(essay_text, free_summary, full_report)
         return free_summary, full_report, provider.name
 
     def _mock_diagnose(self, *, essay_text: str, word_count: int, source_type: str, prompt_version: str = DEFAULT_PROMPT_VERSION) -> tuple[FreeSummary, FullReport, str]:
@@ -337,7 +339,7 @@ class LlmRouter:
                 {"phrase": "be turned into daily routines", "explanation": "强调行动落地，比 simply do something 更正式。"},
                 {"phrase": "a shared responsibility", "explanation": "适合结尾升华，能把个人行动提升到集体责任。"},
             ],
-            disclaimer="本报告为 AI 辅助诊断，不承诺高考提分或最终得分。",
+            disclaimer="本报告为 AI 辅助诊断，仅供学习训练参考，不代表正式考试成绩。",
             diagnosis_meta={"provider": provider, "source_type": source_type, "prompt_version": prompt_version, "ocr_artifacts": []},
         )
         return free_summary, full_report, provider
