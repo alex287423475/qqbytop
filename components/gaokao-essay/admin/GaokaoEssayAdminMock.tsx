@@ -33,6 +33,12 @@ type QualityStatusResponse = {
   latestRun: QualityRunRecord | null;
   latestCheckpoint: string | null;
   latestBatchSummary: QualityBatchSummary | null;
+  paths: {
+    projectRoot: string;
+    sampleInputDir: string;
+    batchOutputRoot: string;
+    qualityRunRoot: string;
+  };
 };
 type QualityLogsResponse = {
   runId: string;
@@ -317,6 +323,18 @@ function QualityGatePanel() {
       </section>
 
       <article className="border border-slate-200 bg-white p-5">
+        <h3 className="text-lg font-bold text-slate-950">文件夹位置</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-500">质量闸门只读取固定样例目录，输出写入 test_outputs，不会把结果提交到 Git。</p>
+        <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
+          <PathCard label="项目根目录" value={status?.paths.projectRoot || "加载中"} />
+          <PathCard label="输入文件夹（样例作文）" value={status?.paths.sampleInputDir || "加载中"} />
+          <PathCard label="批测输出根目录" value={status?.paths.batchOutputRoot || "加载中"} />
+          <PathCard label="任务日志输出目录" value={status?.paths.qualityRunRoot || "加载中"} />
+          <PathCard label="最近一次批测输出" value={status?.latestBatchSummary?.outputDir || "暂无"} className="md:col-span-2" />
+        </div>
+      </article>
+
+      <article className="border border-slate-200 bg-white p-5">
         <h3 className="text-lg font-bold text-slate-950">固定操作</h3>
         <div className="mt-4 grid gap-3 md:grid-cols-3">
           {QUALITY_TASKS.map((task) => (
@@ -392,6 +410,15 @@ function InfoRow({ label, value }: { label: string; value: string }) {
     <div>
       <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</dt>
       <dd className="mt-1 break-all font-medium text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
+function PathCard({ label, value, className = "" }: { label: string; value: string; className?: string }) {
+  return (
+    <div className={`border border-slate-200 bg-slate-50 p-3 ${className}`}>
+      <span className="block text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</span>
+      <code className="mt-2 block break-all text-slate-900">{value}</code>
     </div>
   );
 }

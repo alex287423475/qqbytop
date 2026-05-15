@@ -34,6 +34,12 @@ export type QualityStatusResponse = {
   latestRun: QualityRunRecord | null;
   latestCheckpoint: string | null;
   latestBatchSummary: QualityBatchSummary | null;
+  paths: {
+    projectRoot: string;
+    sampleInputDir: string;
+    batchOutputRoot: string;
+    qualityRunRoot: string;
+  };
 };
 
 export class QualityConsoleError extends Error {
@@ -48,6 +54,7 @@ export class QualityConsoleError extends Error {
 const rootDir = process.cwd();
 const runsDir = path.join(rootDir, "test_outputs", "gaokao_quality_runs");
 const batchOutputsDir = path.join(rootDir, "test_outputs", "gaokao_reports");
+const sampleInputDir = path.join(rootDir, "test_inputs", "gaokao_essays");
 const backendDir = path.join(rootDir, "backend");
 
 let activeRunId: string | null = null;
@@ -70,6 +77,12 @@ export async function getQualityStatus(): Promise<QualityStatusResponse> {
     latestRun,
     latestCheckpoint: await getLatestCheckpoint(),
     latestBatchSummary: await getLatestBatchSummary(),
+    paths: {
+      projectRoot: rootDir,
+      sampleInputDir,
+      batchOutputRoot: batchOutputsDir,
+      qualityRunRoot: runsDir,
+    },
   };
 }
 
