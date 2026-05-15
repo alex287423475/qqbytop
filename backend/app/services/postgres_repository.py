@@ -5,6 +5,7 @@ from uuid import UUID
 import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from pydantic import ValidationError
 
 from app.models.schemas import (
     CreditLedgerRecord,
@@ -21,6 +22,14 @@ from app.models.schemas import (
 )
 from app.services.repository import DraftRecord, InMemoryRepository, StorageObjectRecord, UploadIntentRecord
 
+DIMENSION_ALIASES = {
+    "content": ["content", "content_relevance"],
+    "language": ["language", "grammar_accuracy", "vocabulary_expression"],
+    "structure": ["structure", "structure_logic"],
+    "cohesion": ["cohesion", "structure_logic"],
+    "format": ["format", "handwriting_or_format"],
+}
+
 
 def uuid_or_none(value: str | None) -> UUID | None:
     if not value:
@@ -29,6 +38,75 @@ def uuid_or_none(value: str | None) -> UUID | None:
         return UUID(value)
     except ValueError:
         return None
+
+
+def normalize_legacy_full_report(value: dict) -> dict:
+    normalized = dict(value)
+    spans = list(normalized.get("highlight_spans") or [])
+    normalized_spans: list[dict] = []
+    for span in spans[:8]:
+        item = dict(span)
+        item.setdefault("comment", item.get("explanation") or item.get("suggestion") or "该处表达需要结合上下文优化。")
+        item.setdefault("correction", item.get("suggestion") or item.get("original") or "建议改写为更清晰、正式的高考作文表达。")
+        item.setdefault("principle", item.get("explanation") or item.get("comment") or "通过明确主干、补足因果关系和提升正式度来增强得分稳定性。")
+        item.setdefault("risk_note", "该问题可能影响阅卷者对语言准确性、逻辑完整度或内容支撑度的判断。")
+        item.setdefault("position_status", item.get("positionStatus") or "unresolved")
+        normalized_spans.append(item)
+    while len(normalized_spans) < 3:
+        normalized_spans.append(
+            {
+                "start": 0,
+                "end": 0,
+                "original": "legacy report item",
+                "severity": "minor",
+                "category": "legacy",
+                "comment": "历史报告数据缺少新版逐句字段，已按兼容规则降级展示。",
+                "correction": "建议按新版报告重新生成，可获得更完整的精改替换句。",
+                "principle": "兼容旧报告时保留可读性，避免因 schema 升级导致已生成报告不可查看。",
+                "risk_note": "该兼容项不作为新的高风险扣分判断。",
+                "position_status": "unresolved",
+            }
+        )
+    normalized["highlight_spans"] = normalized_spans
+
+    raw_dimensions = dict(normalized.get("gaokao_dimensions") or {})
+    dimensions: dict[str, dict] = {}
+    for target_key, aliases in DIMENSION_ALIASES.items():
+        source = next((raw_dimensions[key] for key in aliases if key in raw_dimensions), None)
+        dimensions[target_key] = source or {"score": 3, "max": 5, "comment": "历史报告未包含该维度，新版报告将补齐。"}
+    normalized["gaokao_dimensions"] = dimensions
+
+    normalized.setdefault("overall_review", "这是一份历史完整报告，系统已按新版报告结构做兼容展示。")
+    normalized.setdefault(
+        "fatal_risks",
+        [
+            {"title": "历史报告兼容项", "severity": "minor", "explanation": "该报告生成于新版深度报告 Schema 之前。"},
+            {"title": "建议查看逐句批改", "severity": "minor", "explanation": "新版报告会展示精改替换、提分原理和扣分风险。"},
+            {"title": "可重新生成新版报告", "severity": "minor", "explanation": "后续诊断将直接使用新版震撼级完整报告结构。"},
+        ],
+    )
+    normalized.setdefault("advanced_phrases", [])
+
+    study_plan = list(normalized.get("study_plan") or [])
+    while len(study_plan) < 3:
+        study_plan.append({"priority": len(study_plan) + 1, "skill": "新版训练项", "exercise": "建议使用新版报告重新生成更完整的 7 天训练计划。"})
+    normalized["study_plan"] = study_plan
+
+    rewrites = dict(normalized.get("rewrites") or {})
+    rewrites.setdefault("safe_version", "历史报告未包含稳妥版范文。")
+    rewrites.setdefault("advanced_version", "历史报告未包含进阶版范文。")
+    normalized["rewrites"] = rewrites
+    normalized.setdefault("disclaimer", "本报告为 AI 辅助诊断，不承诺高考提分或最终得分。")
+    return normalized
+
+
+def load_full_report(value: dict | None) -> FullReport | None:
+    if not value:
+        return None
+    try:
+        return FullReport.model_validate(value)
+    except ValidationError:
+        return FullReport.model_validate(normalize_legacy_full_report(value))
 
 
 class PostgresRepository(InMemoryRepository):
@@ -151,7 +229,7 @@ class PostgresRepository(InMemoryRepository):
             cursor.execute("select * from diagnosis_reports")
             for row in cursor.fetchall():
                 free_summary = FreeSummary.model_validate(row["free_summary"]) if row["free_summary"] else None
-                full_report = FullReport.model_validate(row["full_report"]) if row["full_report"] else None
+                full_report = load_full_report(row["full_report"])
                 if free_summary:
                     self.free_summary_cache[row["confirmed_text_hash"]] = free_summary
                 if full_report:

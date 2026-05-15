@@ -9,6 +9,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+!backend/.env.local-deepseek.example
 .vercel/
 public/static/backup/
 local-brain/.env
@@ -20,4 +21,5 @@ local-brain/rejected/
 local-brain/reports/
 local-brain/status/pipeline.runtime.json
 local-brain/status/pipeline.runtime.corrupt-*.json
+test_outputs/
 docs/高考英语作文真实服务配置清单.md

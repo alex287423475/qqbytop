@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 EssaySourceType = Literal["text", "image"]
 DraftStatus = Literal["TEXT_CREATED", "IMAGE_DRAFT_CREATED", "OCR_PENDING", "OCR_COMPLETED", "OCR_FAILED", "TEXT_CONFIRMED"]
@@ -120,8 +120,8 @@ class RecognitionResponse(BaseModel):
 
 
 class EssayScore(BaseModel):
-    estimated: int
-    max: int = 25
+    estimated: int = Field(ge=0, le=25)
+    max: int = Field(default=25, ge=1, le=25)
     confidence: Literal["low", "medium", "high"] = "medium"
     reason: str
 
@@ -146,12 +146,15 @@ class HighlightSpan(BaseModel):
     severity: Severity
     category: str
     comment: str
+    correction: str = Field(min_length=1)
+    principle: str = Field(min_length=1)
+    risk_note: str = Field(min_length=1)
     position_status: Literal["aligned", "fuzzy_aligned", "unresolved"]
 
 
 class GaokaoDimension(BaseModel):
-    score: int
-    max: int = 5
+    score: int = Field(ge=0, le=5)
+    max: int = Field(default=5, ge=1, le=5)
     comment: str
 
 
@@ -162,14 +165,63 @@ class LogicMapItem(BaseModel):
     suggestion: str
 
 
+class FatalRisk(BaseModel):
+    title: str = Field(min_length=1)
+    severity: Severity
+    explanation: str = Field(min_length=1)
+
+
+class AdvancedPhrase(BaseModel):
+    phrase: str = Field(min_length=1)
+    explanation: str = Field(min_length=1)
+
+
 class FullReport(BaseModel):
+    overall_review: str = Field(min_length=1)
+    fatal_risks: list[FatalRisk]
     gaokao_dimensions: dict[str, GaokaoDimension]
     highlight_spans: list[HighlightSpan]
     logic_map: list[LogicMapItem]
     rewrites: dict[str, str]
     study_plan: list[dict[str, Any]]
+    advanced_phrases: list[AdvancedPhrase] = Field(default_factory=list)
     disclaimer: str
     diagnosis_meta: dict[str, Any] | None = None
+
+    @field_validator("fatal_risks")
+    @classmethod
+    def validate_fatal_risks(cls, value: list[FatalRisk]) -> list[FatalRisk]:
+        if len(value) != 3:
+            raise ValueError("fatal_risks must contain exactly 3 items")
+        return value
+
+    @field_validator("highlight_spans")
+    @classmethod
+    def validate_highlight_spans(cls, value: list[HighlightSpan]) -> list[HighlightSpan]:
+        if len(value) < 3 or len(value) > 8:
+            raise ValueError("highlight_spans must contain 3 to 8 items")
+        return value
+
+    @field_validator("study_plan")
+    @classmethod
+    def validate_study_plan(cls, value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if len(value) < 3:
+            raise ValueError("study_plan must contain at least 3 items")
+        return value
+
+    @model_validator(mode="after")
+    def validate_report_quality(self) -> FullReport:
+        required_dimensions = {"content", "language", "structure", "cohesion", "format"}
+        missing_dimensions = required_dimensions - set(self.gaokao_dimensions)
+        if missing_dimensions:
+            raise ValueError(f"missing gaokao dimensions: {', '.join(sorted(missing_dimensions))}")
+
+        safe_version = str(self.rewrites.get("safe_version", "")).strip()
+        advanced_version = str(self.rewrites.get("advanced_version", "")).strip()
+        if not safe_version or not advanced_version:
+            raise ValueError("rewrites.safe_version and rewrites.advanced_version are required")
+
+        return self
 
 
 class CreateReportRequest(BaseModel):

@@ -2,12 +2,13 @@ from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from app.adapters.llm import LlmRouter
 from app.adapters.support_llm import SupportAssistantLLM
 from app.config import Settings
 from app.main import app
-from app.models.schemas import ESSAY_CREDIT_PACK_PRODUCT, GROUP_ESSAY_CREDIT_PACK_PRODUCT
+from app.models.schemas import ESSAY_CREDIT_PACK_PRODUCT, GROUP_ESSAY_CREDIT_PACK_PRODUCT, FullReport
 from app.services.core import service
 
 client = TestClient(app)
@@ -64,6 +65,15 @@ def test_text_report_order_unlock_and_refund_rule() -> None:
     unlocked_report = unlocked_res.json()
     assert unlocked_report["is_unlocked"] is True
     assert unlocked_report["full_report"] is not None
+    full_report = unlocked_report["full_report"]
+    assert full_report["overall_review"]
+    assert len(full_report["fatal_risks"]) == 3
+    assert 3 <= len(full_report["highlight_spans"]) <= 8
+    assert all(span["correction"] and span["principle"] and span["risk_note"] for span in full_report["highlight_spans"])
+    assert full_report["rewrites"]["safe_version"]
+    assert full_report["rewrites"]["advanced_version"]
+    assert len(full_report["study_plan"]) >= 3
+    assert full_report["advanced_phrases"]
 
     refund_res = client.post(f"/api/v1/orders/{order['order_id']}/refund-request", json={"reason": "user_clicked"})
     assert refund_res.status_code == 200
@@ -75,6 +85,43 @@ def test_text_report_order_unlock_and_refund_rule() -> None:
     assert credit_unlock_res.json()["credit_remaining"] == 18
     report_2_unlocked = client.get(f"/api/v1/reports/{report_2}").json()
     assert report_2_unlocked["is_unlocked"] is True
+
+
+def test_full_report_schema_rejects_incomplete_deep_report() -> None:
+    with pytest.raises(ValidationError):
+        FullReport.model_validate(
+            {
+                "overall_review": "整体评价",
+                "fatal_risks": [
+                    {"title": "风险一", "severity": "major", "explanation": "说明"},
+                    {"title": "风险二", "severity": "major", "explanation": "说明"},
+                    {"title": "风险三", "severity": "minor", "explanation": "说明"},
+                ],
+                "gaokao_dimensions": {
+                    "content": {"score": 4, "max": 5, "comment": "ok"},
+                    "language": {"score": 3, "max": 5, "comment": "ok"},
+                    "structure": {"score": 4, "max": 5, "comment": "ok"},
+                    "cohesion": {"score": 3, "max": 5, "comment": "ok"},
+                    "format": {"score": 4, "max": 5, "comment": "ok"},
+                },
+                "highlight_spans": [
+                    {
+                        "start": 0,
+                        "end": 4,
+                        "original": "test",
+                        "severity": "major",
+                        "category": "logic",
+                        "comment": "missing correction and principle",
+                        "position_status": "aligned",
+                    }
+                ],
+                "logic_map": [],
+                "rewrites": {"safe_version": "safe", "advanced_version": "advanced"},
+                "study_plan": [{"priority": 1, "skill": "skill", "exercise": "exercise"}],
+                "advanced_phrases": [],
+                "disclaimer": "AI report",
+            }
+        )
 
 
 def test_image_upload_ocr_confirm_report_path() -> None:

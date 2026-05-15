@@ -1628,6 +1628,16 @@ OCR 容错诊断规则：
 - 若 `original` 仍无法匹配，降级为段落级提示或不高亮该 span，并在结果中标记 `position_status = "unresolved"`。
 - 前端遇到 `position_status = "unresolved"` 时显示“此问题位置未精确定位”。
 
+完整报告升级要求（首版单次 LLM 调用实现）：
+
+- `full_report` 必须保留兼容字段：`gaokao_dimensions`、`highlight_spans`、`logic_map`、`rewrites`、`study_plan`、`disclaimer`、`diagnosis_meta`。
+- `full_report` 必须新增并返回：
+  - `overall_review`：综合评价，说明当前作文最主要的得分瓶颈和优先处理方向。
+  - `fatal_risks`：恰好 3 条最影响得分的问题，每条包含 `title`、`severity`、`explanation`。
+  - `advanced_phrases`：进阶版范文中的高级词汇/句式标注，每条包含 `phrase`、`explanation`。
+- `highlight_spans` 必须按“原文片段 -> 错误类型 -> 精改替换 -> 提分原理 -> 扣分风险”输出，每条至少包含 `original`、`category`、`severity`、`comment`、`correction`、`principle`、`risk_note`、`position_status`。
+- 后端 QA 校验：`score.estimated` 必须在 0-25；`highlight_spans` 为 3-8 条；两版范文不能为空；`study_plan` 至少 3 条；缺字段或 JSON 解析失败时同 provider 重试一次，仍失败则进入 fallback provider。
+
 ## 10. 前端展示要求
 
 ### 10.1 输入页
@@ -1662,12 +1672,14 @@ OCR 容错诊断规则：
   - 最多 1 个不超过 20 个英文词的短原文片段。
   - 不展示具体修改建议、替换句、完整解释、范文、逻辑图或 AI 演算母题库。
 - 付费层：
+  - 诊断仪表盘：预估分、风险等级、3 个致命风险摘要、五维评分条。
   - 高考评分维度拆解。
-  - 全文荧光笔标注。
-  - 逐条解释。
-  - 逻辑脉络图。
+  - 逐句批改手术台：原文片段、精改替换、提分原理、扣分风险。
+  - 段落逻辑/结构脉络图。
   - 稳健版范文。
   - 进阶版范文。
+  - 进阶表达标注。
+  - 7 天练习计划。
   - AI 演算母题库。
 
 ### 10.4 支付页

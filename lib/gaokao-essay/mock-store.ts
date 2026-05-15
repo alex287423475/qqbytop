@@ -120,6 +120,13 @@ function buildFullReport(text: string): FullReport {
   const start = text.indexOf(firstLongSentence);
 
   return {
+    overall_review:
+      "这篇作文主题方向明确，能围绕任务给出基本观点，但目前最影响分数的是例证不够具体、句式层次不够丰富。完整报告会把关键扣分点定位到句子，并给出可直接模仿的改写路径。",
+    fatal_risks: [
+      { title: "论证支撑偏弱", severity: "major", explanation: "观点已经出现，但缺少具体校园场景或行动结果，内容分上限会被压低。" },
+      { title: "句式变化不足", severity: "major", explanation: "简单句较多，缺少从句、非谓语或强调结构，语言亮点不足。" },
+      { title: "结尾升华不够", severity: "minor", explanation: "结尾能回扣主题，但没有把个人行动上升到校园责任或社会意义。" },
+    ],
     gaokao_dimensions: {
       content: { score: 4, max: 5, comment: "主题贴合任务，观点明确，但例证可以进一步具体化。" },
       language: { score: 4, max: 5, comment: "基础语法较稳定，可以增加更自然的复合句和高级表达。" },
@@ -135,6 +142,9 @@ function buildFullReport(text: string): FullReport {
         severity: "major",
         category: "logic",
         comment: "这一句承载信息较多，建议拆分为观点句和解释句。",
+        correction: "This activity is meaningful because small daily habits, such as sorting waste and saving electricity, can gradually improve our campus environment.",
+        principle: "把泛泛观点拆成“动作 + 结果”，能让阅卷者看到论证支撑，而不只是口号。",
+        risk_note: "如果主体段只有抽象判断，容易被判定为内容展开不足。",
         position_status: start >= 0 ? "aligned" : "fuzzy_aligned",
       },
       {
@@ -144,7 +154,22 @@ function buildFullReport(text: string): FullReport {
         severity: "minor",
         category: "position",
         comment: "此 mock 问题用于验证 unresolved 高亮降级展示。",
+        correction: "Although the exact phrase cannot be located, this point should be rewritten with a clearer cause-and-effect structure.",
+        principle: "无法精确定位时仍给出结构性改写方向，避免前端白屏或遗漏建议。",
+        risk_note: "定位失败不会影响报告生成，但该问题会以列表形式提示。",
         position_status: "unresolved",
+      },
+      {
+        start: 0,
+        end: Math.min(24, text.length),
+        original: text.slice(0, Math.min(24, text.length)) || "opening sentence",
+        severity: "minor",
+        category: "language",
+        comment: "开头可以更快点明任务背景，避免进入主题过慢。",
+        correction: "Recently, our school has launched a meaningful campaign to encourage greener daily habits.",
+        principle: "用 launched a meaningful campaign 快速交代背景，比普通开头更符合高考应用文语气。",
+        risk_note: "开头不清晰通常不会重扣，但会影响第一印象和结构分。",
+        position_status: text.length > 0 ? "aligned" : "unresolved",
       },
     ],
     logic_map: [
@@ -170,6 +195,12 @@ function buildFullReport(text: string): FullReport {
     study_plan: [
       { priority: 1, skill: "例证展开", exercise: "每天用 one action + one reason + one result 写 3 组句子。" },
       { priority: 2, skill: "衔接推进", exercise: "练习 however / therefore / as a result 的句间逻辑。" },
+      { priority: 3, skill: "结尾升华", exercise: "用 responsibility / campus / future 三个关键词各写 2 个结尾句。" },
+    ],
+    advanced_phrases: [
+      { phrase: "daily habits", explanation: "比 simple things 更自然，适合环保、校园倡议类话题。" },
+      { phrase: "improve our campus environment", explanation: "明确结果，能让观点更落地。" },
+      { phrase: "a stronger sense of responsibility", explanation: "适合结尾升华，能把行动上升到品质培养。" },
     ],
     disclaimer: "本报告为 AI 辅助诊断，不承诺高考提分或最终得分。",
     diagnosis_meta: { ocr_artifacts: [], uncertain_ocr_spans: [] },

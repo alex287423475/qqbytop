@@ -40,6 +40,9 @@ export type HighlightSpan = {
   severity: Severity;
   category: string;
   comment: string;
+  correction: string;
+  principle: string;
+  risk_note: string;
   position_status: "aligned" | "fuzzy_aligned" | "unresolved";
 };
 
@@ -67,6 +70,17 @@ export type StudyPlanItem = {
   exercise: string;
 };
 
+export type FatalRisk = {
+  title: string;
+  severity: Severity;
+  explanation: string;
+};
+
+export type AdvancedPhrase = {
+  phrase: string;
+  explanation: string;
+};
+
 export type DiagnosisMeta = {
   ocr_artifacts?: string[];
   uncertain_ocr_spans?: Array<{
@@ -76,11 +90,14 @@ export type DiagnosisMeta = {
 };
 
 export type FullReport = {
+  overall_review: string;
+  fatal_risks: FatalRisk[];
   gaokao_dimensions: Record<string, GaokaoDimension>;
   highlight_spans: HighlightSpan[];
   logic_map: LogicMapItem[];
   rewrites: RewriteVersions;
   study_plan: StudyPlanItem[];
+  advanced_phrases: AdvancedPhrase[];
   disclaimer: string;
   diagnosis_meta?: DiagnosisMeta;
 };
