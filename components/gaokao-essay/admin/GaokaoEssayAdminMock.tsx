@@ -5,11 +5,48 @@ import { listLocalReports } from "@/lib/gaokao-essay/api";
 import { formatCny, GAOKAO_ESSAY_USE_BACKEND } from "@/lib/gaokao-essay/constants";
 import type { AdminExceptionItem, FunnelResponse } from "@/lib/gaokao-essay/types";
 
+type AdminTab = "funnel" | "exceptions" | "quality";
+type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "typecheck" | "build" | "full_gate";
+type QualityRunStatus = "running" | "passed" | "failed";
+type QualityBatchSummary = {
+  outputDir: string;
+  total: number;
+  passed: number;
+  failed: number;
+  minRuleScore: number | null;
+};
+type QualityRunRecord = {
+  runId: string;
+  taskType: QualityTaskType;
+  status: QualityRunStatus;
+  currentStep: string;
+  steps: string[];
+  startedAt: string;
+  finishedAt?: string;
+  error?: string;
+  outputDir: string;
+  batchSummary?: QualityBatchSummary | null;
+};
+type QualityStatusResponse = {
+  enabled: boolean;
+  activeRunId: string | null;
+  latestRun: QualityRunRecord | null;
+  latestCheckpoint: string | null;
+  latestBatchSummary: QualityBatchSummary | null;
+};
+type QualityLogsResponse = {
+  runId: string;
+  record: QualityRunRecord | null;
+  stdout: string;
+  stderr: string;
+};
+
 export function GaokaoEssayAdminMock() {
   const [tick, setTick] = useState(0);
   const [backendFunnel, setBackendFunnel] = useState<FunnelResponse | null>(null);
   const [backendExceptions, setBackendExceptions] = useState<AdminExceptionItem[]>([]);
   const [backendMessage, setBackendMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("funnel");
 
   const reports = useMemo(() => listLocalReports(), [tick]);
   const completed = reports.filter((report) => report.status === "COMPLETED").length;
@@ -77,68 +114,285 @@ export function GaokaoEssayAdminMock() {
           {backendMessage ? <p className="mt-3 border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{backendMessage}</p> : null}
         </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          {[
-            ["草稿数", funnel.drafts],
-            ["报告完成", funnel.reports_completed],
-            ["已支付订单", funnel.paid_orders],
-            ["退款数", funnel.refunds],
-          ].map(([label, value]) => (
-            <article key={label} className="border border-slate-200 bg-white p-5">
-              <span className="text-sm text-slate-500">{label}</span>
-              <strong className="mt-2 block text-3xl text-slate-950">{value}</strong>
-            </article>
-          ))}
-        </section>
+        <AdminTabs activeTab={activeTab} onChange={setActiveTab} />
+        {activeTab === "funnel" ? <FunnelPanel funnel={funnel} /> : null}
+        {activeTab === "exceptions" ? <ExceptionsPanel exceptions={backendExceptions} /> : null}
+        {activeTab === "quality" ? <QualityGatePanel /> : null}
+      </div>
+    </main>
+  );
+}
 
-        <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <article className="border border-slate-200 bg-white p-5">
-            <h2 className="text-xl font-bold text-slate-950">转化漏斗</h2>
-            <div className="mt-4 space-y-3">
-              <FunnelBar label="访问" value={funnel.visits} max={Math.max(funnel.visits, 1)} />
-              <FunnelBar label="草稿" value={funnel.drafts} max={Math.max(funnel.visits, funnel.drafts, 1)} />
-              <FunnelBar label="报告完成" value={funnel.reports_completed} max={Math.max(funnel.drafts, 1)} />
-              <FunnelBar label="点击解锁" value={funnel.unlock_clicks} max={Math.max(funnel.reports_completed, 1)} />
-              <FunnelBar label="支付订单" value={funnel.paid_orders} max={Math.max(funnel.unlock_clicks, 1)} />
-            </div>
-            <p className="mt-4 text-sm text-slate-500">
-              总收入：{formatCny(funnel.gross_revenue_cents)}；净收入：{formatCny(funnel.net_revenue_cents)}。
-            </p>
-          </article>
+function AdminTabs({ activeTab, onChange }: { activeTab: AdminTab; onChange: (tab: AdminTab) => void }) {
+  const tabs: Array<[AdminTab, string]> = [
+    ["funnel", "运营漏斗"],
+    ["exceptions", "异常订单"],
+    ["quality", "质量闸门"],
+  ];
+  return (
+    <nav className="flex flex-wrap gap-2 border border-slate-200 bg-white p-2">
+      {tabs.map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => onChange(value)}
+          className={`px-4 py-2 text-sm font-semibold ${
+            activeTab === value ? "bg-blue-700 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
 
-          <article className="border border-slate-200 bg-white p-5">
-            <h2 className="text-xl font-bold text-slate-950">异常优先级</h2>
-            {backendExceptions.length > 0 ? (
-              <ul className="mt-4 space-y-3 text-sm text-slate-700">
-                {backendExceptions.map((item) => (
-                  <li key={`${item.kind}-${item.id}`} className="border border-slate-200 p-3">
-                    <strong>{item.kind}</strong>
-                    <p className="mt-1">{item.message}</p>
-                    <p className="mt-1 text-xs text-slate-500">{item.id}</p>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <ul className="mt-4 space-y-3 text-sm text-slate-700">
-                <li className="border border-slate-200 p-3">REFUND_FAILED：退款失败，需要最高优先级处理。</li>
-                <li className="border border-slate-200 p-3">PAID_NOT_UNLOCKED：支付成功但未解锁，优先触发补偿。</li>
-                <li className="border border-slate-200 p-3">UPLOAD_INCOMPLETE：上传未完成或 OCR 失败，提示重拍或文本输入。</li>
-                <li className="border border-slate-200 p-3">MERCHANT_DISABLED：商户号异常或额度不足，暂停该商户。</li>
-              </ul>
-            )}
+function FunnelPanel({ funnel }: { funnel: FunnelResponse }) {
+  return (
+    <>
+      <section className="grid gap-4 md:grid-cols-4">
+        {[
+          ["草稿数", funnel.drafts],
+          ["报告完成", funnel.reports_completed],
+          ["已支付订单", funnel.paid_orders],
+          ["退款数", funnel.refunds],
+        ].map(([label, value]) => (
+          <article key={label} className="border border-slate-200 bg-white p-5">
+            <span className="text-sm text-slate-500">{label}</span>
+            <strong className="mt-2 block text-3xl text-slate-950">{value}</strong>
           </article>
-        </section>
+        ))}
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+        <article className="border border-slate-200 bg-white p-5">
+          <h2 className="text-xl font-bold text-slate-950">转化漏斗</h2>
+          <div className="mt-4 space-y-3">
+            <FunnelBar label="访问" value={funnel.visits} max={Math.max(funnel.visits, 1)} />
+            <FunnelBar label="草稿" value={funnel.drafts} max={Math.max(funnel.visits, funnel.drafts, 1)} />
+            <FunnelBar label="报告完成" value={funnel.reports_completed} max={Math.max(funnel.drafts, 1)} />
+            <FunnelBar label="点击解锁" value={funnel.unlock_clicks} max={Math.max(funnel.reports_completed, 1)} />
+            <FunnelBar label="支付订单" value={funnel.paid_orders} max={Math.max(funnel.unlock_clicks, 1)} />
+          </div>
+          <p className="mt-4 text-sm text-slate-500">
+            总收入：{formatCny(funnel.gross_revenue_cents)}；净收入：{formatCny(funnel.net_revenue_cents)}。
+          </p>
+        </article>
 
         <section className="border border-slate-200 bg-white p-5">
           <h2 className="text-xl font-bold text-slate-950">渠道漏斗指标</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3">
             <Metric label="访问 → 提交作文" value={percent(funnel.drafts, funnel.visits)} />
             <Metric label="报告 → 点击解锁" value={percent(funnel.unlock_clicks, funnel.reports_completed)} />
             <Metric label="退款率" value={percent(funnel.refunds, funnel.paid_orders)} />
           </div>
         </section>
-      </div>
-    </main>
+      </section>
+    </>
+  );
+}
+
+function ExceptionsPanel({ exceptions }: { exceptions: AdminExceptionItem[] }) {
+  return (
+    <article className="border border-slate-200 bg-white p-5">
+      <h2 className="text-xl font-bold text-slate-950">异常优先级</h2>
+      {exceptions.length > 0 ? (
+        <ul className="mt-4 space-y-3 text-sm text-slate-700">
+          {exceptions.map((item) => (
+            <li key={`${item.kind}-${item.id}`} className="border border-slate-200 p-3">
+              <strong>{item.kind}</strong>
+              <p className="mt-1">{item.message}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.id}</p>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="mt-4 grid gap-3 text-sm text-slate-700 md:grid-cols-2">
+          <li className="border border-slate-200 p-3">REFUND_FAILED：退款失败，需要最高优先级处理。</li>
+          <li className="border border-slate-200 p-3">PAID_NOT_UNLOCKED：支付成功但未解锁，优先触发补偿。</li>
+          <li className="border border-slate-200 p-3">UPLOAD_INCOMPLETE：上传未完成或 OCR 失败，提示重拍或文本输入。</li>
+          <li className="border border-slate-200 p-3">MERCHANT_DISABLED：商户号异常或额度不足，暂停该商户。</li>
+        </ul>
+      )}
+    </article>
+  );
+}
+
+function QualityGatePanel() {
+  const [status, setStatus] = useState<QualityStatusResponse | null>(null);
+  const [logs, setLogs] = useState<QualityLogsResponse | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadStatus() {
+    const response = await fetch("/api/admin/gaokao-essay/quality/status", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || `质量状态接口返回 ${response.status}`);
+    setStatus(data as QualityStatusResponse);
+    return data as QualityStatusResponse;
+  }
+
+  async function loadLogs(runId: string) {
+    const response = await fetch(`/api/admin/gaokao-essay/quality/logs?runId=${encodeURIComponent(runId)}`, { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || `质量日志接口返回 ${response.status}`);
+    setLogs(data as QualityLogsResponse);
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    loadStatus().catch((error) => {
+      if (!cancelled) setMessage(error instanceof Error ? error.message : "质量状态加载失败");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const runId = status?.activeRunId || status?.latestRun?.runId;
+    if (!runId) return;
+    loadLogs(runId).catch((error) => setMessage(error instanceof Error ? error.message : "质量日志加载失败"));
+    if (status?.latestRun?.status !== "running" && !status?.activeRunId) return;
+    const timer = window.setInterval(async () => {
+      try {
+        const nextStatus = await loadStatus();
+        const nextRunId = nextStatus.activeRunId || nextStatus.latestRun?.runId;
+        if (nextRunId) await loadLogs(nextRunId);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "质量任务轮询失败");
+      }
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [status?.activeRunId, status?.latestRun?.runId, status?.latestRun?.status]);
+
+  async function runTask(taskType: QualityTaskType) {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/gaokao-essay/quality/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskType }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || `质量任务启动失败 ${response.status}`);
+      setStatus((await loadStatus()) as QualityStatusResponse);
+      await loadLogs((data as QualityRunRecord).runId);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "质量任务启动失败");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const run = status?.latestRun ?? null;
+  const running = loading || run?.status === "running" || Boolean(status?.activeRunId);
+
+  return (
+    <section className="space-y-5">
+      <article className="border border-blue-100 bg-white p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-blue-700">Quality Gate</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">报告质量闸门控制台</h2>
+            <p className="mt-3 max-w-3xl leading-7 text-slate-600">
+              固定命令执行，不开放任意 Shell。质量线：Schema 100%、规则分 ≥ 80、禁用词命中 0。真实 TokenHub 批测仍建议命令行手动执行。
+            </p>
+          </div>
+          <StatusPill status={run?.status} enabled={status?.enabled} />
+        </div>
+        {!status?.enabled ? (
+          <p className="mt-4 border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            执行按钮当前关闭。需要在 Next.js 运行环境中配置 <code>GAOKAO_QUALITY_CONSOLE_ENABLED=true</code> 后重启服务。
+          </p>
+        ) : null}
+        {message ? <p className="mt-4 border border-red-200 bg-red-50 p-3 text-sm text-red-800">{message}</p> : null}
+      </article>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <Metric label="最近节点" value={status?.latestCheckpoint || "暂无"} />
+        <Metric label="当前步骤" value={run?.currentStep || "空闲"} />
+        <Metric label="最近批测" value={formatBatchSummary(status?.latestBatchSummary)} />
+      </section>
+
+      <article className="border border-slate-200 bg-white p-5">
+        <h3 className="text-lg font-bold text-slate-950">固定操作</h3>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {QUALITY_TASKS.map((task) => (
+            <button
+              key={task.type}
+              type="button"
+              disabled={!status?.enabled || running}
+              onClick={() => runTask(task.type)}
+              className="border border-slate-200 bg-slate-950 px-4 py-3 text-left text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+            >
+              <span className="block">{task.label}</span>
+              <span className="mt-1 block text-xs font-normal text-slate-300">{task.description}</span>
+            </button>
+          ))}
+        </div>
+      </article>
+
+      <article className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+        <div className="border border-slate-200 bg-white p-5">
+          <h3 className="text-lg font-bold text-slate-950">最近任务</h3>
+          {run ? (
+            <dl className="mt-4 space-y-3 text-sm text-slate-700">
+              <InfoRow label="Run ID" value={run.runId} />
+              <InfoRow label="任务" value={taskLabel(run.taskType)} />
+              <InfoRow label="状态" value={run.status} />
+              <InfoRow label="开始" value={formatDateTime(run.startedAt)} />
+              <InfoRow label="结束" value={run.finishedAt ? formatDateTime(run.finishedAt) : "运行中"} />
+              <InfoRow label="输出目录" value={run.outputDir} />
+              {run.error ? <InfoRow label="错误" value={run.error} /> : null}
+            </dl>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">暂无质量任务记录。</p>
+          )}
+        </div>
+
+        <div className="border border-slate-200 bg-slate-950 p-5 text-slate-100">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-lg font-bold">实时日志</h3>
+            {run?.runId ? (
+              <button type="button" onClick={() => loadLogs(run.runId)} className="bg-white/10 px-3 py-1 text-xs font-semibold hover:bg-white/20">
+                刷新
+              </button>
+            ) : null}
+          </div>
+          <pre className="mt-4 max-h-[520px] overflow-auto whitespace-pre-wrap text-xs leading-5 text-slate-200">
+            {logs ? [logs.stdout, logs.stderr ? `\n\n[stderr]\n${logs.stderr}` : ""].join("") : "暂无日志。"}
+          </pre>
+        </div>
+      </article>
+    </section>
+  );
+}
+
+const QUALITY_TASKS: Array<{ type: QualityTaskType; label: string; description: string }> = [
+  { type: "checkpoint", label: "保存节点", description: "创建 Git checkpoint" },
+  { type: "pytest", label: "跑后端测试", description: "uv run pytest" },
+  { type: "batch_mock", label: "跑样例批测", description: "11 篇样例质量闸门" },
+  { type: "typecheck", label: "跑 TypeScript", description: "npm run typecheck" },
+  { type: "build", label: "跑生产构建", description: "npm run build" },
+  { type: "full_gate", label: "一键完整质量闸门", description: "节点 + 测试 + 批测 + 构建" },
+];
+
+function StatusPill({ status, enabled }: { status?: QualityRunStatus; enabled?: boolean }) {
+  if (!enabled) return <span className="bg-slate-100 px-4 py-2 text-sm font-bold text-slate-500">未启用</span>;
+  if (status === "running") return <span className="bg-blue-100 px-4 py-2 text-sm font-bold text-blue-800">运行中</span>;
+  if (status === "passed") return <span className="bg-emerald-100 px-4 py-2 text-sm font-bold text-emerald-800">通过</span>;
+  if (status === "failed") return <span className="bg-red-100 px-4 py-2 text-sm font-bold text-red-800">失败</span>;
+  return <span className="bg-slate-100 px-4 py-2 text-sm font-bold text-slate-700">空闲</span>;
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</dt>
+      <dd className="mt-1 break-all font-medium text-slate-800">{value}</dd>
+    </div>
   );
 }
 
@@ -168,4 +422,18 @@ function Metric({ label, value }: { label: string; value: string }) {
 function percent(numerator: number, denominator: number) {
   if (!denominator) return "暂无";
   return `${Math.round((numerator / denominator) * 100)}%`;
+}
+
+function taskLabel(taskType: QualityTaskType) {
+  return QUALITY_TASKS.find((task) => task.type === taskType)?.label || taskType;
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
+}
+
+function formatBatchSummary(summary?: QualityBatchSummary | null) {
+  if (!summary) return "暂无";
+  const minScore = summary.minRuleScore === null ? "无" : summary.minRuleScore;
+  return `${summary.passed}/${summary.total} 通过，最低 ${minScore}`;
 }

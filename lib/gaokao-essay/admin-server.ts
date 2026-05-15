@@ -1,16 +1,12 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { getAdminSessionError } from "./admin-auth";
 import { getGaokaoBackendApiBase } from "./server-proxy";
 
 export async function proxyGaokaoAdminGet(path: string) {
-  const expectedSession = process.env.ADMIN_SESSION_TOKEN;
   const adminApiToken = process.env.ADMIN_API_TOKEN;
-  const cookieStore = await cookies();
-  const currentSession = cookieStore.get("admin_session_token")?.value;
+  const authError = await getAdminSessionError();
 
-  if (!expectedSession || currentSession !== expectedSession) {
-    return NextResponse.json({ message: "未登录后台或会话已过期。" }, { status: 401 });
-  }
+  if (authError) return authError;
 
   if (!adminApiToken) {
     return NextResponse.json({ message: "后台 API Token 未配置。" }, { status: 500 });
