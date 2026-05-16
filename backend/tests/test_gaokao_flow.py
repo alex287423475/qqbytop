@@ -441,6 +441,12 @@ def test_gaokao_payload_includes_error_taxonomy() -> None:
     assert "forced_advanced_expression" in taxonomy["expression_level"]
     assert "vague_basic_vocabulary" in taxonomy["expression_level"]
     assert "mechanical_advanced_wording" in taxonomy["expression_level"]
+    assert "invitation_letter_missing_details" in taxonomy["task_type_specific"]
+    assert "speech_no_audience_address" in taxonomy["task_type_specific"]
+    assert "continuation_plot_incoherence" in taxonomy["task_type_specific"]
+    assert "band_0_10_structure_collapse" in taxonomy["score_calibration"]
+    assert "band_19_21_plain_but_correct" in taxonomy["score_calibration"]
+    assert "guardrail_underlength_or_offtopic" in taxonomy["score_calibration"]
     assert any("known error_taxonomy ids" in item for item in payload["quality_requirements"])
 
 
@@ -457,6 +463,10 @@ def test_gaokao_error_taxonomy_file_captures_common_student_errors() -> None:
     assert "open the TV" in taxonomy
     assert "good/bad/important" in taxonomy
     assert "伪高级表达" in taxonomy
+    assert "邀请信未明确发出邀请" in taxonomy
+    assert "读后续写情节" in taxonomy
+    assert "band_19_21_plain_but_correct" in taxonomy
+    assert "题型专项错误应结合" in taxonomy
 
 
 def test_gaokao_writing_checklist_file_captures_actionable_advice() -> None:

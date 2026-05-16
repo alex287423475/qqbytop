@@ -56,9 +56,32 @@
 - weak_register：应用文语气不合适，邀请、求助、感谢、建议等功能句不够自然。
 - tone_inappropriateness：正式/非正式语气错位，礼貌程度、情绪强度或立场表达不符合任务对象。
 
+## 题型专项错误
+
+- invitation_letter_missing_invite：邀请信未明确发出邀请，或只介绍活动却没有表达邀请意图。
+- invitation_letter_missing_details：邀请信缺少时间、地点、活动内容、参加方式或期待回复等关键信息。
+- suggestion_letter_weak_advice：建议信只有空泛鼓励，没有具体、可执行的建议步骤。
+- speech_no_audience_address：演讲稿缺少面向听众的开场、号召或互动语气。
+- notice_missing_action_info：通知缺少参与对象、时间地点、报名/集合方式或注意事项。
+- article_or_submission_weak_title_focus：投稿/短文主题不集中，标题、开头和主体内容不能形成统一中心。
+- traditional_culture_superficial：传统文化类作文只罗列 festival/food/history，缺少活动意义、个人体验或文化价值。
+- continuation_plot_incoherence：读后续写情节与原文人物、时间线、冲突或情感走向不一致。
+- continuation_emotion_flat：读后续写只有动作推进，缺少心理、环境、细节描写和情感转折。
+
+## 评分校准标签
+
+- band_0_10_structure_collapse：碎词拼接、主谓宾结构崩塌、语义难以连贯，不应强行脑补为完整作文。
+- band_11_14_chinglish_dense：中式英语和基础语法错误密集，虽然能看出大意，但多处影响理解。
+- band_15_18_complex_attempt_failure：尝试复杂句、从句或连接词，但 There be、Although/but、Because/so 等错误频繁。
+- band_19_21_plain_but_correct：语法基本正确、任务完成度较好，但词汇和句式平淡，缺少高分表达层级。
+- band_21_25_minor_flaws_only：内容完整、语言自然、结构紧凑，仅有少量不影响理解的小错。
+- guardrail_underlength_or_offtopic：字数明显不足、严重跑题或混入无关抄写句时，优先触发风控而不是正常深批。
+
 ## 诊断输出要求
 
 - `highlight_spans.category` 应优先使用以上类别或其中文等价表达，避免泛泛写成“语法问题”。
 - 每条高亮必须给出：错误片段、错误类型、为什么扣分、如何改写、对应提分原理。
 - 对低分作文要果断识别结构崩塌和离题风险，不要替学生补全不存在的内容。
 - 对语法基本正确但表达平庸的作文，不应只说“没有大错”，必须指出句式单一、表达层级不足和可升级路径。
+- 题型专项错误应结合 `task_context.task_prompt` 使用；没有题目时不要凭空判断某个应用文要点缺失。
+- 评分校准标签用于校准 `score.estimated` 和 `fatal_risks`，不得作为对用户展示的机械标签堆砌。
