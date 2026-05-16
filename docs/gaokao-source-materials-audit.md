@@ -37,8 +37,18 @@
 - 词汇搭配层：新增介词误用、拼写错误、词义不准、固定短语误用。
 - 语法准确层：新增从句结构错误、动词句型错误、汉语句式迁移、标点大小写错误。
 - 表达层级层：新增基础词贫乏、机械高级词、语气错位。
+- 分段校准层：新增极低分结构崩塌、不及格中式英语、及格复杂句翻车、良好但表达平庸等分段标签。
+- 题目上下文层：新增题目相关诊断信号，覆盖审题、要点、格式、对象语气和跑题风险。
 
-这些分类已同步进生产诊断 payload，用于约束 `highlight_spans.category` 和质量闸门测试；它们是内部诊断标签，不作为对外营销承诺。
+这些分类已同步进生产诊断 payload，用于约束 `free_summary.top_risks.type`、`highlight_spans.category` 和质量闸门测试；它们是内部诊断标签，不作为对外营销承诺。
+
+2026-05-16 已完成质量闸门接入：
+
+- 后端 `report_quality.py` 已把 taxonomy 从“建议标签”升级为硬性质量项。
+- 泛化标签如 `misc_issue`、`语法问题` 会导致质量校验失败。
+- 如果诊断请求带有 `task_context`，报告必须体现任务相关诊断信号。
+- 如果模型输出分段校准标签，该标签必须与 `score.estimated` 所在分段一致。
+- 相关单元测试覆盖在 `backend/tests/test_gaokao_flow.py` 和 `backend/tests/test_gaokao_task_extraction.py`。
 
 ## 使用边界
 
@@ -62,3 +72,21 @@ uv run python tools\batch_report_tester.py --task-bank-only --output ..\test_out
 - `task_coverage.csv`：逐题机器可读清单，便于后台或表格检查。
 
 这一步只验证题型覆盖，不会调用真实大模型，也不会把真题原文注入生产诊断请求。
+
+完整本地质量闸门建议命令：
+
+```powershell
+cd D:\projects\北京全球博译翻译官网\next-vercel\backend
+uv run pytest tests\test_gaokao_flow.py tests\test_gaokao_task_extraction.py
+```
+
+确定性 mock 批测示例：
+
+```powershell
+$emptyEnv = Join-Path $env:TEMP "gaokao-empty.env"
+Set-Content -Path $emptyEnv -Value "LLM_PROVIDER_ORDER=mock" -Encoding UTF8
+cd D:\projects\北京全球博译翻译官网\next-vercel\backend
+uv run python tools\batch_report_tester.py --mode local --env-file $emptyEnv --input ..\test_inputs\gaokao_essays --task-bank ..\test_inputs\gaokao_tasks\gaokao_writing_tasks.jsonl --output ..\test_outputs\gaokao_reports --delay 0 --limit 5 --min-rule-score 80
+```
+
+该批测会验证 Schema、规则分、禁用词、taxonomy 分类、题目上下文信号和分段校准一致性；真实 DeepSeek 批测仍应通过命令行显式执行，避免后台误触发真实费用。
