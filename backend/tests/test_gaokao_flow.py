@@ -553,6 +553,10 @@ def test_gaokao_writing_checklist_file_captures_actionable_advice() -> None:
     assert "篇章结构" in checklist
     assert "important -> vital" in checklist
     assert "审题 3 分钟" in checklist
+    assert "范文生成质量控制" in checklist
+    assert "稳妥版范文" in checklist
+    assert "进阶版范文" in checklist
+    assert "不得原文复用" in checklist
     assert "不得把“使用 5 个高级词汇”“至少 3 种从句”当作硬性评分规则" in checklist
 
 
