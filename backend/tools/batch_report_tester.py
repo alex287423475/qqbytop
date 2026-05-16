@@ -57,6 +57,17 @@ SUMMARY_FIELDS = [
     "error",
 ]
 
+TASK_COVERAGE_FIELDS = [
+    "id",
+    "year",
+    "paper",
+    "task_type",
+    "expected_word_count",
+    "test_focus",
+    "source_use",
+    "task_prompt_preview",
+]
+
 
 def read_env_file(path: Path) -> dict[str, str]:
     values: dict[str, str] = {}
@@ -97,6 +108,106 @@ def timestamp_dir(base: Path) -> Path:
 
 def json_dump(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+
+def load_task_bank(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            row = json.loads(stripped)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Invalid task bank JSONL at {path}:{line_no}: {exc}") from exc
+        if not isinstance(row, dict):
+            raise RuntimeError(f"Invalid task bank row at {path}:{line_no}: expected object")
+        rows.append(row)
+    return rows
+
+
+def validate_task_bank(tasks: list[dict[str, Any]]) -> list[str]:
+    required = {
+        "id",
+        "year",
+        "paper",
+        "task_type",
+        "expected_word_count",
+        "task_prompt",
+        "test_focus",
+        "source_file",
+        "source_use",
+    }
+    errors: list[str] = []
+    seen_ids: set[str] = set()
+    for index, task in enumerate(tasks, 1):
+        missing = sorted(required - set(task))
+        if missing:
+            errors.append(f"row {index} missing fields: {', '.join(missing)}")
+        task_id = str(task.get("id") or "")
+        if not task_id:
+            errors.append(f"row {index} has empty id")
+        elif task_id in seen_ids:
+            errors.append(f"duplicate task id: {task_id}")
+        seen_ids.add(task_id)
+        if task.get("source_use") != "internal_quality_gate_only":
+            errors.append(f"{task_id or f'row {index}'} source_use must be internal_quality_gate_only")
+        if not isinstance(task.get("test_focus"), list) or not task.get("test_focus"):
+            errors.append(f"{task_id or f'row {index}'} test_focus must be a non-empty list")
+        if len(str(task.get("task_prompt") or "").strip()) < 20:
+            errors.append(f"{task_id or f'row {index}'} task_prompt is too short")
+    return errors
+
+
+def summarize_task_bank(tasks: list[dict[str, Any]]) -> dict[str, Any]:
+    by_type: dict[str, int] = {}
+    by_paper: dict[str, int] = {}
+    years: set[int] = set()
+    for task in tasks:
+        task_type = str(task.get("task_type") or "unknown")
+        paper = str(task.get("paper") or "unknown")
+        by_type[task_type] = by_type.get(task_type, 0) + 1
+        by_paper[paper] = by_paper.get(paper, 0) + 1
+        try:
+            years.add(int(task.get("year")))
+        except (TypeError, ValueError):
+            pass
+    return {
+        "count": len(tasks),
+        "years": sorted(years),
+        "task_types": dict(sorted(by_type.items())),
+        "papers": dict(sorted(by_paper.items())),
+        "validation_errors": validate_task_bank(tasks),
+    }
+
+
+def write_task_coverage(output_dir: Path, task_bank_path: Path, tasks: list[dict[str, Any]]) -> None:
+    summary = summarize_task_bank(tasks)
+    json_dump(
+        output_dir / "task_coverage.json",
+        {
+            "task_bank": str(task_bank_path),
+            **summary,
+        },
+    )
+    with (output_dir / "task_coverage.csv").open("w", newline="", encoding="utf-8-sig") as handle:
+        writer = csv.DictWriter(handle, fieldnames=TASK_COVERAGE_FIELDS)
+        writer.writeheader()
+        for task in tasks:
+            writer.writerow(
+                {
+                    "id": task.get("id", ""),
+                    "year": task.get("year", ""),
+                    "paper": task.get("paper", ""),
+                    "task_type": task.get("task_type", ""),
+                    "expected_word_count": task.get("expected_word_count", ""),
+                    "test_focus": ";".join(str(item) for item in task.get("test_focus", [])),
+                    "source_use": task.get("source_use", ""),
+                    "task_prompt_preview": str(task.get("task_prompt", ""))[:120],
+                }
+            )
 
 
 def json_post(url: str, body: dict[str, Any], headers: dict[str, str] | None = None, timeout: int = 180) -> dict[str, Any]:
@@ -182,7 +293,16 @@ def detect_expected_guardrails(essay_text: str, case: dict[str, Any] | None) -> 
     triggered: list[str] = []
     if "WORD_COUNT_TOO_LOW" in expected and word_count(essay_text) < 41:
         triggered.append("WORD_COUNT_TOO_LOW")
-    off_topic_needles = ("basketball", "mother", "dinner", "river", "forest", "animals")
+    off_topic_needles = (
+        "basketball",
+        "mother",
+        "dinner",
+        "forest",
+        "animals",
+        "science and technology",
+        "protect the environment",
+        "environment",
+    )
     if "OFF_TOPIC_RISK" in expected and any(needle in essay_text.lower() for needle in off_topic_needles):
         triggered.append("OFF_TOPIC_RISK")
     return triggered
@@ -580,15 +700,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-rule-score", type=int, default=80)
     parser.add_argument("--require-real-provider", action="store_true")
     parser.add_argument("--manifest-only", action="store_true")
+    parser.add_argument("--task-bank", default=str(ROOT_DIR / "test_inputs" / "gaokao_tasks" / "gaokao_writing_tasks.jsonl"))
+    parser.add_argument("--task-bank-only", action="store_true")
+    parser.add_argument("--require-task-bank", action="store_true")
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     input_dir = Path(args.input).resolve()
+    task_bank_path = Path(args.task_bank).resolve()
     base_output_dir = Path(args.output).resolve()
     output_dir = timestamp_dir(base_output_dir)
     rows: list[dict[str, Any]] = []
+    tasks = load_task_bank(task_bank_path)
+    if tasks:
+        write_task_coverage(output_dir, task_bank_path, tasks)
+        task_errors = validate_task_bank(tasks)
+        if task_errors and (args.task_bank_only or args.require_task_bank):
+            raise RuntimeError("Task bank validation failed: " + "; ".join(task_errors))
+        print(f"Task coverage output: {output_dir / 'task_coverage.json'}")
+    elif args.task_bank_only or args.require_task_bank:
+        raise RuntimeError(f"Task bank not found or empty: {task_bank_path}")
+
+    if args.task_bank_only:
+        print(f"Task bank coverage passed. tasks={len(tasks)}")
+        return 0
 
     if not input_dir.exists():
         raise RuntimeError(f"Input directory does not exist: {input_dir}")

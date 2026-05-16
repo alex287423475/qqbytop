@@ -6,7 +6,7 @@ import { formatCny, GAOKAO_ESSAY_USE_BACKEND } from "@/lib/gaokao-essay/constant
 import type { AdminExceptionItem, FunnelResponse } from "@/lib/gaokao-essay/types";
 
 type AdminTab = "funnel" | "exceptions" | "quality";
-type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
+type QualityTaskType = "checkpoint" | "pytest" | "task_bank" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
 type QualityRunStatus = "running" | "passed" | "failed";
 type QualityBatchSummary = {
   outputDir: string;
@@ -14,6 +14,13 @@ type QualityBatchSummary = {
   passed: number;
   failed: number;
   minRuleScore: number | null;
+};
+type QualityTaskCoverageSummary = {
+  outputDir: string;
+  total: number;
+  taskTypes: Record<string, number>;
+  papers: Record<string, number>;
+  validationErrors: string[];
 };
 type QualityRunRecord = {
   runId: string;
@@ -33,9 +40,11 @@ type QualityStatusResponse = {
   latestRun: QualityRunRecord | null;
   latestCheckpoint: string | null;
   latestBatchSummary: QualityBatchSummary | null;
+  latestTaskCoverage: QualityTaskCoverageSummary | null;
   paths: {
     projectRoot: string;
     sampleInputDir: string;
+    taskBankPath: string;
     batchOutputRoot: string;
     qualityRunRoot: string;
   };
@@ -505,10 +514,11 @@ function QualityGatePanel() {
         {message ? <p className="mt-4 border border-red-200 bg-red-50 p-3 text-sm text-red-800">{message}</p> : null}
       </article>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <Metric label="最近节点" value={status?.latestCheckpoint || "暂无"} />
         <Metric label="当前步骤" value={run?.currentStep || "空闲"} />
         <Metric label="最近批测" value={formatBatchSummary(status?.latestBatchSummary)} />
+        <Metric label="真题覆盖" value={formatTaskCoverage(status?.latestTaskCoverage)} />
       </section>
 
       <article className="border border-slate-200 bg-white p-5">
@@ -517,9 +527,11 @@ function QualityGatePanel() {
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
           <PathCard label="项目根目录" value={status?.paths.projectRoot || "加载中"} />
           <PathCard label="输入文件夹（样例作文）" value={status?.paths.sampleInputDir || "加载中"} />
+          <PathCard label="真题任务库" value={status?.paths.taskBankPath || "加载中"} />
           <PathCard label="批测输出根目录" value={status?.paths.batchOutputRoot || "加载中"} />
           <PathCard label="任务日志输出目录" value={status?.paths.qualityRunRoot || "加载中"} />
           <PathCard label="最近一次批测输出" value={status?.latestBatchSummary?.outputDir || "暂无"} className="md:col-span-2" />
+          <PathCard label="最近一次真题覆盖输出" value={status?.latestTaskCoverage?.outputDir || "暂无"} className="md:col-span-2" />
         </div>
       </article>
 
@@ -641,11 +653,12 @@ function QualityGatePanel() {
 const QUALITY_TASKS: Array<{ type: QualityTaskType; label: string; description: string; realCost?: boolean }> = [
   { type: "checkpoint", label: "保存节点", description: "创建 Git checkpoint" },
   { type: "pytest", label: "跑后端测试", description: "uv run pytest" },
+  { type: "task_bank", label: "检查真题任务库", description: "题型/年份/试卷覆盖报告" },
   { type: "batch_mock", label: "跑样例批测", description: "11 篇样例质量闸门" },
   { type: "batch_real", label: "真实 API 批测", description: "调用 TokenHub DeepSeek，会消耗额度", realCost: true },
   { type: "typecheck", label: "跑 TypeScript", description: "npm run typecheck" },
   { type: "build", label: "跑生产构建", description: "npm run build" },
-  { type: "full_gate", label: "一键完整质量闸门", description: "节点 + 测试 + 批测 + 构建" },
+  { type: "full_gate", label: "一键完整质量闸门", description: "节点 + 测试 + 题库 + 批测 + 构建" },
 ];
 
 function StatusPill({ status, enabled }: { status?: QualityRunStatus; enabled?: boolean }) {
@@ -986,4 +999,12 @@ function formatBatchSummary(summary?: QualityBatchSummary | null) {
   if (!summary) return "暂无";
   const minScore = summary.minRuleScore === null ? "无" : summary.minRuleScore;
   return `${summary.passed}/${summary.total} 通过，最低 ${minScore}`;
+}
+
+function formatTaskCoverage(summary?: QualityTaskCoverageSummary | null) {
+  if (!summary) return "暂无";
+  const typeCount = Object.keys(summary.taskTypes || {}).length;
+  const paperCount = Object.keys(summary.papers || {}).length;
+  const errorText = summary.validationErrors?.length ? `，${summary.validationErrors.length} 错误` : "";
+  return `${summary.total} 题，${typeCount} 类，${paperCount} 卷${errorText}`;
 }

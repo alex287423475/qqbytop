@@ -5,36 +5,79 @@
     {
       "filename": "student_01_type1.txt",
       "type": "type1_extremely_low_fragmented",
-      "target_score_band": [0, 10],
-      "expected_word_count_range": [100, 120],
-      "expected_errors": ["fragmented_syntax", "spelling_errors", "logic_collapse", "chinese_pinyin_mixed"],
+      "target_score_band": [
+        0,
+        10
+      ],
+      "expected_word_count_range": [
+        100,
+        120
+      ],
+      "expected_errors": [
+        "fragmented_syntax",
+        "spelling_errors",
+        "logic_collapse",
+        "chinese_pinyin_mixed"
+      ],
       "should_trigger_guardrail": [],
       "expected_engine_behavior": "Give a very low score, identify sentence-structure collapse and spelling breakdown, and do not infer missing logic beyond the text."
     },
     {
       "filename": "student_02_type2.txt",
       "type": "type2_chinglish_failing",
-      "target_score_band": [11, 14],
-      "expected_word_count_range": [100, 120],
-      "expected_errors": ["chinglish", "literal_translation", "connector_overuse", "basic_sentence_errors"],
+      "target_score_band": [
+        11,
+        14
+      ],
+      "expected_word_count_range": [
+        100,
+        120
+      ],
+      "expected_errors": [
+        "chinglish",
+        "literal_translation",
+        "connector_overuse",
+        "basic_sentence_errors"
+      ],
       "should_trigger_guardrail": [],
       "expected_engine_behavior": "Identify Chinglish and literal translation such as I very like, open our eyes, my heart will be very happy, and friendship more better."
     },
     {
       "filename": "student_03_type3.txt",
       "type": "type3_passing_complex_sentence_failures",
-      "target_score_band": [15, 18],
-      "expected_word_count_range": [100, 120],
-      "expected_errors": ["there_be_verb_error", "although_but", "because_so", "relative_clause_error"],
+      "target_score_band": [
+        15,
+        18
+      ],
+      "expected_word_count_range": [
+        100,
+        120
+      ],
+      "expected_errors": [
+        "there_be_verb_error",
+        "although_but",
+        "because_so",
+        "relative_clause_error"
+      ],
       "should_trigger_guardrail": [],
       "expected_engine_behavior": "Return a passing but limited score, catch There are many students want, Although...but, Because...so, and unstable complex sentence attempts."
     },
     {
       "filename": "student_04_type4.txt",
       "type": "type4_good_plain_low_variety",
-      "target_score_band": [19, 21],
-      "expected_word_count_range": [100, 120],
-      "expected_errors": ["plain_vocabulary", "simple_sentence_overuse", "low_expression_variety"],
+      "target_score_band": [
+        19,
+        21
+      ],
+      "expected_word_count_range": [
+        100,
+        120
+      ],
+      "expected_errors": [
+        "plain_vocabulary",
+        "simple_sentence_overuse",
+        "low_expression_variety"
+      ],
       "should_trigger_guardrail": [],
       "expected_engine_behavior": "Do not over-penalize grammar; identify that the essay is correct but plain, and provide advanced restructuring suggestions."
     },
@@ -42,9 +85,121 @@
       "filename": "student_05_edge_short_offtopic.txt",
       "type": "edge_short_offtopic",
       "target_score_band": null,
-      "expected_word_count_range": [35, 45],
-      "expected_errors": ["too_short", "off_topic", "logic_break"],
-      "should_trigger_guardrail": ["WORD_COUNT_TOO_LOW", "OFF_TOPIC_RISK"],
+      "expected_word_count_range": [
+        35,
+        45
+      ],
+      "expected_errors": [
+        "too_short",
+        "off_topic",
+        "logic_break"
+      ],
+      "should_trigger_guardrail": [
+        "WORD_COUNT_TOO_LOW",
+        "OFF_TOPIC_RISK"
+      ],
+      "expected_engine_behavior": "Do not run normal paid deep critique first; flag word-count risk and off-topic/logical-break risk."
+    },
+    {
+      "filename": "student_06.txt",
+      "type": "type2_low_chinglish_and_basic_grammar",
+      "target_score_band": [
+        11,
+        14
+      ],
+      "expected_word_count_range": [
+        80,
+        95
+      ],
+      "expected_errors": [
+        "missing_infinitive_to",
+        "wrong_preposition",
+        "sentence_fragment",
+        "spelling_error",
+        "chinglish"
+      ],
+      "should_trigger_guardrail": [],
+      "expected_engine_behavior": "Return a low but scorable report, catch want invite, in next Friday, Because fragment, no come, and pool/poor spelling without over-inflating the score."
+    },
+    {
+      "filename": "student_07.txt",
+      "type": "type3_low_passing_chinglish",
+      "target_score_band": [
+        15,
+        18
+      ],
+      "expected_word_count_range": [
+        90,
+        100
+      ],
+      "expected_errors": [
+        "chinglish",
+        "literal_translation",
+        "i_very_like",
+        "make_me_exciting",
+        "verb_agreement_error"
+      ],
+      "should_trigger_guardrail": [],
+      "expected_engine_behavior": "Identify I very like, make me exciting, it let us remember, and literal expressions; return a low-passing score rather than failing purely on Chinglish."
+    },
+    {
+      "filename": "student_08.txt",
+      "type": "type3_complex_sentence_failures",
+      "target_score_band": [
+        15,
+        18
+      ],
+      "expected_word_count_range": [
+        85,
+        95
+      ],
+      "expected_errors": [
+        "although_but",
+        "there_are_students_want",
+        "because_so",
+        "grammar_connection_errors"
+      ],
+      "should_trigger_guardrail": [],
+      "expected_engine_behavior": "Return a passing but limited score and catch Although...but, There are many students want, and Because...so."
+    },
+    {
+      "filename": "student_09.txt",
+      "type": "type4_plain_but_grammatically_acceptable",
+      "target_score_band": [
+        19,
+        21
+      ],
+      "expected_word_count_range": [
+        85,
+        100
+      ],
+      "expected_errors": [
+        "plain_vocabulary",
+        "simple_sentence_overuse",
+        "low_content_depth",
+        "low_expression_variety"
+      ],
+      "should_trigger_guardrail": [],
+      "expected_engine_behavior": "Do not over-penalize grammar; identify that the essay is correct but plain, and provide advanced restructuring suggestions."
+    },
+    {
+      "filename": "student_10.txt",
+      "type": "edge_short_offtopic",
+      "target_score_band": null,
+      "expected_word_count_range": [
+        35,
+        45
+      ],
+      "expected_errors": [
+        "too_short",
+        "off_topic",
+        "logic_break",
+        "copied_unrelated_sentences"
+      ],
+      "should_trigger_guardrail": [
+        "WORD_COUNT_TOO_LOW",
+        "OFF_TOPIC_RISK"
+      ],
       "expected_engine_behavior": "Do not run normal paid deep critique first; flag word-count risk and off-topic/logical-break risk."
     }
   ]

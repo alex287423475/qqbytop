@@ -114,6 +114,7 @@ class PostgresRepository(InMemoryRepository):
         super().__init__()
         self.database_url = database_url
         self._ensure_credit_tables()
+        self._ensure_task_context_columns()
         self._ensure_merchants(merchant_codes)
         self._load()
 
@@ -133,6 +134,16 @@ class PostgresRepository(InMemoryRepository):
                     """,
                     (code, "wechat_alipay", 100_000_000),
                 )
+            conn.commit()
+
+    def _ensure_task_context_columns(self) -> None:
+        with self._connect() as conn, conn.cursor() as cursor:
+            cursor.execute("alter table essay_drafts add column if not exists task_prompt text")
+            cursor.execute("alter table essay_drafts add column if not exists task_type text")
+            cursor.execute("alter table essay_drafts add column if not exists expected_word_count text")
+            cursor.execute("alter table diagnosis_reports add column if not exists task_prompt text")
+            cursor.execute("alter table diagnosis_reports add column if not exists task_type text")
+            cursor.execute("alter table diagnosis_reports add column if not exists expected_word_count text")
             conn.commit()
 
     def _ensure_credit_tables(self) -> None:
@@ -194,6 +205,9 @@ class PostgresRepository(InMemoryRepository):
                     confirmed_text=row["confirmed_text"],
                     confirmed_text_hash=row["confirmed_text_hash"],
                     word_count=row["word_count"],
+                    task_prompt=row.get("task_prompt"),
+                    task_type=row.get("task_type"),
+                    expected_word_count=row.get("expected_word_count"),
                     ocr_result=OcrResult.model_validate(row["ocr_result"]) if row["ocr_result"] else None,
                     original_image_object_id=row["original_image_object_id"],
                     created_at=row["created_at"],
@@ -234,6 +248,7 @@ class PostgresRepository(InMemoryRepository):
                     self.free_summary_cache[row["confirmed_text_hash"]] = free_summary
                 if full_report:
                     self.full_report_cache[row["confirmed_text_hash"]] = full_report
+                    self.full_report_cache[str(row["id"])] = full_report
                 self.reports[row["id"]] = ReportResponse(
                     id=row["id"],
                     draft_id=row["draft_id"],
@@ -242,6 +257,9 @@ class PostgresRepository(InMemoryRepository):
                     confirmed_text=row["confirmed_text"],
                     confirmed_text_hash=row["confirmed_text_hash"],
                     word_count=row["word_count"],
+                    task_prompt=row.get("task_prompt"),
+                    task_type=row.get("task_type"),
+                    expected_word_count=row.get("expected_word_count"),
                     free_summary=free_summary,
                     full_report=None,
                     is_unlocked=row["is_unlocked"],
@@ -326,8 +344,9 @@ class PostgresRepository(InMemoryRepository):
                 """
                 insert into essay_drafts
                   (id, session_id, attribution_id, source_type, draft_status, raw_input_text, confirmed_text,
-                   confirmed_text_hash, word_count, ocr_result, original_image_object_id, created_at, updated_at)
-                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   confirmed_text_hash, word_count, task_prompt, task_type, expected_word_count,
+                   ocr_result, original_image_object_id, created_at, updated_at)
+                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 """,
                 (
                     record.id,
@@ -339,6 +358,9 @@ class PostgresRepository(InMemoryRepository):
                     record.confirmed_text,
                     record.confirmed_text_hash,
                     record.word_count,
+                    record.task_prompt,
+                    record.task_type,
+                    record.expected_word_count,
                     Jsonb(record.ocr_result.model_dump(mode="json")) if record.ocr_result else None,
                     record.original_image_object_id,
                     record.created_at,
@@ -368,16 +390,20 @@ class PostgresRepository(InMemoryRepository):
 
     def upsert_report(self, report: ReportResponse) -> ReportResponse:
         result = super().upsert_report(report)
-        full_report = self.full_report_cache.get(report.confirmed_text_hash)
+        full_report = self.full_report_cache.get(str(report.id)) or self.full_report_cache.get(report.confirmed_text_hash)
         with self._connect() as conn, conn.cursor() as cursor:
             cursor.execute(
                 """
                 insert into diagnosis_reports
                   (id, draft_id, source_type, status, confirmed_text, confirmed_text_hash, word_count,
-                   free_summary, full_report, is_unlocked, retry_count, last_retry_at, created_at, updated_at)
-                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   task_prompt, task_type, expected_word_count, free_summary, full_report, is_unlocked,
+                   retry_count, last_retry_at, created_at, updated_at)
+                values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 on conflict (id) do update set
                   status = excluded.status,
+                  task_prompt = excluded.task_prompt,
+                  task_type = excluded.task_type,
+                  expected_word_count = excluded.expected_word_count,
                   free_summary = excluded.free_summary,
                   full_report = excluded.full_report,
                   is_unlocked = excluded.is_unlocked,
@@ -393,6 +419,9 @@ class PostgresRepository(InMemoryRepository):
                     report.confirmed_text,
                     report.confirmed_text_hash,
                     report.word_count,
+                    report.task_prompt,
+                    report.task_type,
+                    report.expected_word_count,
                     Jsonb(report.free_summary.model_dump(mode="json")) if report.free_summary else None,
                     Jsonb(full_report.model_dump(mode="json")) if full_report else None,
                     report.is_unlocked,
@@ -509,6 +538,7 @@ class PostgresRepository(InMemoryRepository):
                     """
                     update essay_drafts set
                       draft_status=%s, confirmed_text=%s, confirmed_text_hash=%s, word_count=%s,
+                      task_prompt=%s, task_type=%s, expected_word_count=%s,
                       ocr_result=%s, original_image_object_id=%s, updated_at=%s
                     where id=%s
                     """,
@@ -517,6 +547,9 @@ class PostgresRepository(InMemoryRepository):
                         draft.confirmed_text,
                         draft.confirmed_text_hash,
                         draft.word_count,
+                        draft.task_prompt,
+                        draft.task_type,
+                        draft.expected_word_count,
                         Jsonb(draft.ocr_result.model_dump(mode="json")) if draft.ocr_result else None,
                         draft.original_image_object_id,
                         draft.updated_at,
@@ -536,11 +569,12 @@ class PostgresRepository(InMemoryRepository):
                     (obj.id, obj.upload_intent_id, obj.draft_id, obj.bucket, obj.object_key, obj.mime_type, obj.size_bytes, obj.sha256),
                 )
             for report in self.reports.values():
-                full_report = self.full_report_cache.get(report.confirmed_text_hash)
+                full_report = self.full_report_cache.get(str(report.id)) or self.full_report_cache.get(report.confirmed_text_hash)
                 cursor.execute(
                     """
                     update diagnosis_reports set
                       status=%s, free_summary=%s, full_report=%s, is_unlocked=%s,
+                      task_prompt=%s, task_type=%s, expected_word_count=%s,
                       retry_count=%s, last_retry_at=%s, updated_at=%s
                     where id=%s
                     """,
@@ -549,6 +583,9 @@ class PostgresRepository(InMemoryRepository):
                         Jsonb(report.free_summary.model_dump(mode="json")) if report.free_summary else None,
                         Jsonb(full_report.model_dump(mode="json")) if full_report else None,
                         report.is_unlocked,
+                        report.task_prompt,
+                        report.task_type,
+                        report.expected_word_count,
                         report.retry_count,
                         report.last_retry_at,
                         report.updated_at,

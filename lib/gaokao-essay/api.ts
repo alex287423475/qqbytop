@@ -60,14 +60,16 @@ async function postJson<TResponse>(url: string, body: unknown, extraHeaders?: Re
 
 export function createLocalTextReport(input: {
   text: string;
+  taskPrompt?: string | null;
   strategy?: CreateReportRequest["mock_strategy"];
   attribution?: MarketingAttribution | null;
 }) {
-  return createMockDraftAndReport(input.text, { strategy: input.strategy, attribution: input.attribution });
+  return createMockDraftAndReport(input.text, { strategy: input.strategy, attribution: input.attribution, taskPrompt: input.taskPrompt });
 }
 
 export async function createTextReport(input: {
   text: string;
+  taskPrompt?: string | null;
   strategy?: CreateReportRequest["mock_strategy"];
   attribution?: MarketingAttribution | null;
 }) {
@@ -78,6 +80,9 @@ export async function createTextReport(input: {
   const draft = await postJson<CreateDraftResponse>(GAOKAO_ESSAY_BFF_ENDPOINTS.drafts, {
     source_type: "text",
     raw_input_text: input.text,
+    task_prompt: input.taskPrompt?.trim() || undefined,
+    task_type: input.taskPrompt?.trim() ? "application_writing" : undefined,
+    expected_word_count: input.taskPrompt?.trim() ? "80-120 words" : undefined,
     attribution_id: input.attribution?.attribution_id,
   });
   saveDraftToken(draft.draft_id, draft.draft_token);

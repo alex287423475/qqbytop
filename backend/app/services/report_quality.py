@@ -39,6 +39,20 @@ def _normalize_for_match(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip().lower()
 
 
+def _original_is_locatable(essay_normalized: str, original: str) -> bool:
+    normalized = _normalize_for_match(original)
+    if not normalized:
+        return False
+    if normalized in essay_normalized:
+        return True
+    if "..." not in normalized and "…" not in normalized:
+        return False
+
+    parts = [part.strip(" .…") for part in re.split(r"\.{3,}|…", normalized)]
+    meaningful_parts = [part for part in parts if len(part) >= 8]
+    return bool(meaningful_parts) and all(part in essay_normalized for part in meaningful_parts)
+
+
 def _as_dict(value: Any) -> dict[str, Any]:
     if hasattr(value, "model_dump"):
         return value.model_dump(mode="json")
@@ -95,7 +109,7 @@ def score_generated_report_quality(essay_text: str, free_summary: FreeSummary | 
             complete_spans += 1
         if span.get("position_status") == "aligned":
             original = str(span.get("original", "")).strip()
-            if original and _normalize_for_match(original) not in essay_normalized:
+            if original and not _original_is_locatable(essay_normalized, original):
                 missing_aligned_originals.append(f"span-{index}:{original[:40]}")
     if spans and complete_spans == len(spans):
         score += 15

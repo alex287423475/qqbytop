@@ -7,6 +7,9 @@ However, some students believe one person cannot change much. In my opinion, if 
 Yours,
 Li Hua`;
 
+export const sampleGaokaoTaskPrompt =
+  "假设你是李华，请写邮件邀请外教 Mr. Smith 参加学校端午节文化活动。内容包括：活动时间地点、主要内容、邀请理由。";
+
 export const lockedFullReportSections = [
   "逐句荧光笔：定位语法、词汇、逻辑和格式风险",
   "高考维度拆解：内容、语言、结构、衔接、格式",

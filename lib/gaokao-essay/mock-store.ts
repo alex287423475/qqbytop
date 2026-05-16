@@ -207,7 +207,10 @@ function buildFullReport(text: string): FullReport {
   };
 }
 
-export function createMockDraftAndReport(text: string, options?: { strategy?: CreateReportRequest["mock_strategy"]; attribution?: MarketingAttribution | null }) {
+export function createMockDraftAndReport(
+  text: string,
+  options?: { strategy?: CreateReportRequest["mock_strategy"]; attribution?: MarketingAttribution | null; taskPrompt?: string | null },
+) {
   const normalized = normalizeEssayText(text);
   const wordCount = countEnglishWords(normalized);
   const textHash = createConfirmedTextHash(normalized);
@@ -225,6 +228,9 @@ export function createMockDraftAndReport(text: string, options?: { strategy?: Cr
     confirmed_text: normalized,
     confirmed_text_hash: textHash,
     word_count: wordCount,
+    task_prompt: options?.taskPrompt?.trim() || null,
+    task_type: options?.taskPrompt?.trim() ? "application_writing" : null,
+    expected_word_count: options?.taskPrompt?.trim() ? "80-120 words" : null,
     created_at: timestamp,
     updated_at: timestamp,
   };
@@ -237,6 +243,9 @@ export function createMockDraftAndReport(text: string, options?: { strategy?: Cr
     confirmed_text: normalized,
     confirmed_text_hash: textHash,
     word_count: wordCount,
+    task_prompt: options?.taskPrompt?.trim() || null,
+    task_type: options?.taskPrompt?.trim() ? "application_writing" : null,
+    expected_word_count: options?.taskPrompt?.trim() ? "80-120 words" : null,
     free_summary: strategy === "failed" ? null : buildFreeSummary(normalized, wordCount),
     full_report: null,
     is_unlocked: false,

@@ -72,6 +72,18 @@ class GaokaoEssayService:
     def _payer_key(payer_contact: str) -> str:
         return payer_contact.strip().lower()
 
+    @staticmethod
+    def _diagnosis_cache_key(draft: DraftRecord) -> str:
+        task_context = "\n".join(
+            [
+                draft.confirmed_text_hash or "",
+                draft.task_prompt or "",
+                draft.task_type or "",
+                draft.expected_word_count or "",
+            ]
+        )
+        return confirmed_text_hash(task_context)
+
     def verify_draft_access(self, draft_id: UUID, token: str | None) -> None:
         if not token:
             raise PermissionError("draft_token is required.")
@@ -85,6 +97,9 @@ class GaokaoEssayService:
                 draft_status="IMAGE_DRAFT_CREATED",
                 session_id=session_id,
                 attribution_id=request.attribution_id,
+                task_prompt=request.task_prompt,
+                task_type=request.task_type,
+                expected_word_count=request.expected_word_count,
             )
             self.repo.create_draft(draft)
             token = sign_draft_token(
@@ -107,6 +122,9 @@ class GaokaoEssayService:
             confirmed_text=normalized,
             confirmed_text_hash=text_hash,
             word_count=word_count,
+            task_prompt=request.task_prompt,
+            task_type=request.task_type,
+            expected_word_count=request.expected_word_count,
         )
         self.repo.create_draft(draft)
         token = sign_draft_token(
@@ -186,13 +204,21 @@ class GaokaoEssayService:
         free_summary = None
         full_report = None
         if status != "FAILED":
-            if draft.confirmed_text_hash in self.repo.free_summary_cache:
-                free_summary = self.repo.free_summary_cache[draft.confirmed_text_hash]
-                full_report = self.repo.full_report_cache[draft.confirmed_text_hash]
+            cache_key = self._diagnosis_cache_key(draft)
+            if cache_key in self.repo.free_summary_cache:
+                free_summary = self.repo.free_summary_cache[cache_key]
+                full_report = self.repo.full_report_cache[cache_key]
             else:
-                free_summary, full_report, _ = self.llm.diagnose(essay_text=draft.confirmed_text, word_count=draft.word_count, source_type=draft.source_type)
-                self.repo.free_summary_cache[draft.confirmed_text_hash] = free_summary
-                self.repo.full_report_cache[draft.confirmed_text_hash] = full_report
+                free_summary, full_report, _ = self.llm.diagnose(
+                    essay_text=draft.confirmed_text,
+                    word_count=draft.word_count,
+                    source_type=draft.source_type,
+                    task_prompt=draft.task_prompt,
+                    task_type=draft.task_type,
+                    expected_word_count=draft.expected_word_count,
+                )
+                self.repo.free_summary_cache[cache_key] = free_summary
+                self.repo.full_report_cache[cache_key] = full_report
 
         report = ReportResponse(
             id=report_id,
@@ -202,15 +228,18 @@ class GaokaoEssayService:
             confirmed_text=draft.confirmed_text,
             confirmed_text_hash=draft.confirmed_text_hash,
             word_count=draft.word_count,
+            task_prompt=draft.task_prompt,
+            task_type=draft.task_type,
+            expected_word_count=draft.expected_word_count,
             free_summary=free_summary,
             full_report=None,
             is_unlocked=False,
             created_at=utcnow(),
             updated_at=utcnow(),
         )
-        self.repo.upsert_report(report)
         if full_report:
-            self.repo.full_report_cache[draft.confirmed_text_hash] = full_report
+            self.repo.full_report_cache[str(report_id)] = full_report
+        self.repo.upsert_report(report)
         return CreateReportResponse(report_id=report_id, status=status, queue_position=1 if status == "QUEUED" else None)
 
     def get_report(self, report_id: UUID) -> ReportResponse:
@@ -218,7 +247,7 @@ class GaokaoEssayService:
         if not report:
             raise ValueError("Report does not exist.")
         if report.is_unlocked:
-            full_report = self.repo.full_report_cache.get(report.confirmed_text_hash)
+            full_report = self.repo.full_report_cache.get(str(report_id)) or self.repo.full_report_cache.get(report.confirmed_text_hash)
             if full_report:
                 report.full_report = full_report
         else:
@@ -473,8 +502,11 @@ class GaokaoEssayService:
                 essay_text=report.confirmed_text,
                 word_count=report.word_count,
                 source_type=report.source_type,
+                task_prompt=report.task_prompt,
+                task_type=report.task_type,
+                expected_word_count=report.expected_word_count,
             )
-            self.repo.full_report_cache[report.confirmed_text_hash] = full_report
+            self.repo.full_report_cache[str(report.id)] = full_report
             self.repo.add_support_action("REPORT_RETRY_TRIGGERED", report_id=report_id)
             self.repo.persist_all()
             return SmartAppealResponse(

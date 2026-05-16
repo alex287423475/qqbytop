@@ -33,6 +33,9 @@ class DraftRecord:
     confirmed_text: str | None = None
     confirmed_text_hash: str | None = None
     word_count: int | None = None
+    task_prompt: str | None = None
+    task_type: str | None = None
+    expected_word_count: str | None = None
     ocr_result: OcrResult | None = None
     original_image_object_id: UUID | None = None
     created_at: object = field(default_factory=utcnow)

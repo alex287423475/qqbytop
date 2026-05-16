@@ -28,11 +28,33 @@ class CreateDraftTextRequest(BaseModel):
     source_type: Literal["text"]
     raw_input_text: str
     attribution_id: str | None = None
+    task_prompt: str | None = Field(default=None, max_length=800)
+    task_type: str | None = Field(default=None, max_length=80)
+    expected_word_count: str | None = Field(default=None, max_length=80)
+
+    @field_validator("task_prompt", "task_type", "expected_word_count", mode="before")
+    @classmethod
+    def normalize_optional_task_context(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
 
 
 class CreateDraftImageRequest(BaseModel):
     source_type: Literal["image"]
     attribution_id: str | None = None
+    task_prompt: str | None = Field(default=None, max_length=800)
+    task_type: str | None = Field(default=None, max_length=80)
+    expected_word_count: str | None = Field(default=None, max_length=80)
+
+    @field_validator("task_prompt", "task_type", "expected_word_count", mode="before")
+    @classmethod
+    def normalize_optional_task_context(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = str(value).strip()
+        return normalized or None
 
 
 CreateDraftRequest = CreateDraftTextRequest | CreateDraftImageRequest
@@ -243,6 +265,9 @@ class ReportResponse(BaseModel):
     confirmed_text: str
     confirmed_text_hash: str
     word_count: int
+    task_prompt: str | None = None
+    task_type: str | None = None
+    expected_word_count: str | None = None
     free_summary: FreeSummary | None = None
     full_report: FullReport | None = None
     is_unlocked: bool = False

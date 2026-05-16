@@ -4,7 +4,7 @@ import { createWriteStream, existsSync } from "fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
 import path from "path";
 
-export type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
+export type QualityTaskType = "checkpoint" | "pytest" | "task_bank" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
 export type QualityRunStatus = "running" | "passed" | "failed";
 
 export type QualityRunRecord = {
@@ -29,15 +29,25 @@ export type QualityBatchSummary = {
   minRuleScore: number | null;
 };
 
+export type QualityTaskCoverageSummary = {
+  outputDir: string;
+  total: number;
+  taskTypes: Record<string, number>;
+  papers: Record<string, number>;
+  validationErrors: string[];
+};
+
 export type QualityStatusResponse = {
   enabled: boolean;
   activeRunId: string | null;
   latestRun: QualityRunRecord | null;
   latestCheckpoint: string | null;
   latestBatchSummary: QualityBatchSummary | null;
+  latestTaskCoverage: QualityTaskCoverageSummary | null;
   paths: {
     projectRoot: string;
     sampleInputDir: string;
+    taskBankPath: string;
     batchOutputRoot: string;
     qualityRunRoot: string;
   };
@@ -126,7 +136,9 @@ export class QualityConsoleError extends Error {
 const rootDir = process.cwd();
 const runsDir = path.join(rootDir, "test_outputs", "gaokao_quality_runs");
 const batchOutputsDir = path.join(rootDir, "test_outputs", "gaokao_reports");
+const taskCoverageOutputsDir = path.join(rootDir, "test_outputs", "gaokao_task_coverage");
 const sampleInputDir = path.join(rootDir, "test_inputs", "gaokao_essays");
+const taskBankPath = path.join(rootDir, "test_inputs", "gaokao_tasks", "gaokao_writing_tasks.jsonl");
 const backendDir = path.join(rootDir, "backend");
 const promptsDir = path.join(backendDir, "prompts");
 const editableBackendEnvPath = path.join(backendDir, ".env.local-deepseek");
@@ -151,9 +163,11 @@ export async function getQualityStatus(): Promise<QualityStatusResponse> {
     latestRun,
     latestCheckpoint: await getLatestCheckpoint(),
     latestBatchSummary: await getLatestBatchSummary(),
+    latestTaskCoverage: await getLatestTaskCoverage(),
     paths: {
       projectRoot: rootDir,
       sampleInputDir,
+      taskBankPath,
       batchOutputRoot: batchOutputsDir,
       qualityRunRoot: runsDir,
     },
@@ -402,6 +416,21 @@ function getStepCommand(step: string, runId: string) {
         ],
         cwd: backendDir,
       };
+    case "task_bank":
+      return {
+        cmd: uv,
+        args: [
+          "run",
+          "python",
+          "tools/batch_report_tester.py",
+          "--task-bank-only",
+          "--task-bank",
+          "../test_inputs/gaokao_tasks/gaokao_writing_tasks.jsonl",
+          "--output",
+          "../test_outputs/gaokao_task_coverage",
+        ],
+        cwd: backendDir,
+      };
     case "batch_real":
       return {
         cmd: uv,
@@ -436,12 +465,12 @@ function getStepCommand(step: string, runId: string) {
 }
 
 function getTaskSteps(taskType: QualityTaskType) {
-  if (taskType === "full_gate") return ["checkpoint", "pytest", "batch_mock", "typecheck", "build"];
+  if (taskType === "full_gate") return ["checkpoint", "pytest", "task_bank", "batch_mock", "typecheck", "build"];
   return [taskType];
 }
 
 function isKnownTask(taskType: string): taskType is QualityTaskType {
-  return ["checkpoint", "pytest", "batch_mock", "batch_real", "typecheck", "build", "full_gate"].includes(taskType);
+  return ["checkpoint", "pytest", "task_bank", "batch_mock", "batch_real", "typecheck", "build", "full_gate"].includes(taskType);
 }
 
 function createRunId(taskType: QualityTaskType) {
@@ -780,6 +809,34 @@ async function getLatestBatchSummary(): Promise<QualityBatchSummary | null> {
         passed: rows.length - failed,
         failed,
         minRuleScore: scores.length ? Math.min(...scores) : null,
+      };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function getLatestTaskCoverage(): Promise<QualityTaskCoverageSummary | null> {
+  try {
+    if (!existsSync(taskCoverageOutputsDir)) return null;
+    const names = await readdir(taskCoverageOutputsDir, { withFileTypes: true });
+    const dirs = names.filter((item) => item.isDirectory()).map((item) => item.name).sort().reverse();
+    for (const dir of dirs) {
+      const coveragePath = path.join(taskCoverageOutputsDir, dir, "task_coverage.json");
+      if (!existsSync(coveragePath)) continue;
+      const payload = JSON.parse(await readFile(coveragePath, "utf-8")) as {
+        count?: number;
+        task_types?: Record<string, number>;
+        papers?: Record<string, number>;
+        validation_errors?: string[];
+      };
+      return {
+        outputDir: path.join(taskCoverageOutputsDir, dir),
+        total: Number(payload.count || 0),
+        taskTypes: payload.task_types || {},
+        papers: payload.papers || {},
+        validationErrors: payload.validation_errors || [],
       };
     }
   } catch {

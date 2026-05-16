@@ -4,7 +4,13 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.adapters.llm import LlmRouter
+from app.adapters.llm import (
+    LlmRouter,
+    build_gaokao_diagnosis_payload,
+    load_gaokao_error_taxonomy,
+    load_gaokao_system_prompt,
+    load_gaokao_writing_checklist,
+)
 from app.adapters.support_llm import SupportAssistantLLM
 from app.config import Settings
 from app.main import app
@@ -314,6 +320,21 @@ def test_generated_report_quality_rejects_missing_aligned_original() -> None:
     assert "highlight original not found" in str(exc.value)
 
 
+def test_generated_report_quality_accepts_ellipsis_fuzzy_original() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    spans = list(full_report.highlight_spans)
+    spans[0] = spans[0].model_copy(update={"original": "small habits can make a real difference...", "position_status": "aligned"})
+    adjusted = full_report.model_copy(update={"highlight_spans": spans})
+
+    quality = score_generated_report_quality(ESSAY, free_summary, adjusted)
+
+    assert quality.schema_ok is True
+
+
 def test_generated_report_quality_rejects_missing_dimensions() -> None:
     free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
         essay_text=ESSAY,
@@ -327,6 +348,126 @@ def test_generated_report_quality_rejects_missing_dimensions() -> None:
         validate_generated_report_quality(ESSAY, free_summary, broken)
 
     assert "missing dimensions" in str(exc.value)
+
+
+def test_gaokao_prompt_includes_production_scoring_rubric() -> None:
+    prompt = load_gaokao_system_prompt()
+
+    assert "25 分制五档锚点" in prompt
+    assert "21-25 分" in prompt
+    assert "16-20 分" in prompt
+    assert "100-120 词" in prompt
+    assert "读后续写" in prompt
+    assert "不得由 `gaokao_dimensions` 简单相加" in prompt
+    assert "高考常见错误 Taxonomy" in prompt
+    assert "chinglish_literal_translation" in prompt
+    assert "forced_advanced_expression" in prompt
+    assert "高考写作诊断 Checklist" in prompt
+    assert "审题 3 分钟" in prompt
+    assert "不得把“使用 5 个高级词汇”" in prompt
+
+
+def test_gaokao_payload_includes_structured_scoring_rubric() -> None:
+    payload = build_gaokao_diagnosis_payload(
+        provider_name="mock",
+        essay_text=ESSAY,
+        word_count=len(ESSAY.split()),
+        source_type="text",
+        prompt_version="gaokao_default",
+    )
+
+    rubric = payload["scoring_rubric"]
+    assert rubric["max_score"] == 25
+    assert rubric["score_bands"][0]["range"] == "21-25"
+    assert rubric["score_bands"][-1]["range"] == "1-5"
+    assert rubric["word_count_rules"]["traditional_single_essay_target"] == "100-120 words"
+    assert rubric["word_count_rules"]["new_gaokao_application_target"] == "about 80 words"
+    assert rubric["word_count_rules"]["new_gaokao_continuation_target"] == "about 150 words"
+    assert any("five-band scoring_rubric" in item for item in payload["quality_requirements"])
+    checklist = payload["writing_checklist"]
+    assert checklist["diagnosis_priority"] == ["content_key_points", "language_quality", "essay_structure"]
+    assert checklist["exam_time_advice"]["plan_minutes"] == 3
+    assert "subject-verb agreement" in checklist["exam_time_advice"]["check_targets"]
+    assert any("writing_checklist" in item for item in payload["quality_requirements"])
+
+
+def test_gaokao_payload_accepts_optional_task_context() -> None:
+    task_prompt = "假设你是李华，请写邮件邀请外教 Mr. Smith 参加学校端午节文化活动。内容包括：活动时间地点、主要内容、邀请理由。"
+    payload = build_gaokao_diagnosis_payload(
+        provider_name="mock",
+        essay_text=ESSAY,
+        word_count=len(ESSAY.split()),
+        source_type="text",
+        prompt_version="gaokao_default",
+        task_prompt=task_prompt,
+        task_type="application_writing",
+        expected_word_count="80-120 words",
+    )
+
+    assert payload["task_context"]["provided"] is True
+    assert payload["task_context"]["task_prompt"] == task_prompt
+    assert payload["task_context"]["task_type"] == "application_writing"
+    assert payload["task_context"]["expected_word_count"] == "80-120 words"
+    assert any("task_context.task_prompt" in item for item in payload["quality_requirements"])
+    meta_schema = payload["required_schema"]["full_report"]["diagnosis_meta"]
+    assert meta_schema["task_context_provided"] is True
+    assert meta_schema["task_type"] == "application_writing"
+
+
+def test_gaokao_payload_includes_error_taxonomy() -> None:
+    payload = build_gaokao_diagnosis_payload(
+        provider_name="mock",
+        essay_text=ESSAY,
+        word_count=len(ESSAY.split()),
+        source_type="text",
+        prompt_version="gaokao_default",
+    )
+
+    taxonomy = payload["error_taxonomy"]
+    assert "task_deviation" in taxonomy["task_and_content"]
+    assert "format_element_missing" in taxonomy["task_and_content"]
+    assert "audience_register_mismatch" in taxonomy["task_and_content"]
+    assert "connector_misuse" in taxonomy["structure_and_cohesion"]
+    assert "topic_sentence_missing" in taxonomy["structure_and_cohesion"]
+    assert "template_stacking" in taxonomy["structure_and_cohesion"]
+    assert "chinglish_literal_translation" in taxonomy["lexis_and_collocation"]
+    assert "preposition_error" in taxonomy["lexis_and_collocation"]
+    assert "spelling_error" in taxonomy["lexis_and_collocation"]
+    assert "word_choice_imprecision" in taxonomy["lexis_and_collocation"]
+    assert "subject_verb_agreement" in taxonomy["grammar_accuracy"]
+    assert "clause_structure_error" in taxonomy["grammar_accuracy"]
+    assert "verb_pattern_error" in taxonomy["grammar_accuracy"]
+    assert "punctuation_capitalization_error" in taxonomy["grammar_accuracy"]
+    assert "forced_advanced_expression" in taxonomy["expression_level"]
+    assert "vague_basic_vocabulary" in taxonomy["expression_level"]
+    assert "mechanical_advanced_wording" in taxonomy["expression_level"]
+    assert any("known error_taxonomy ids" in item for item in payload["quality_requirements"])
+
+
+def test_gaokao_error_taxonomy_file_captures_common_student_errors() -> None:
+    taxonomy = load_gaokao_error_taxonomy()
+
+    assert "审题草率" in taxonomy
+    assert "Although/but" in taxonomy
+    assert "introduce ... for" in taxonomy
+    assert "my heart is very pain" in taxonomy
+    assert "称呼、署名" in taxonomy
+    assert "主题句" in taxonomy
+    assert "enjoy to do" in taxonomy
+    assert "open the TV" in taxonomy
+    assert "good/bad/important" in taxonomy
+    assert "伪高级表达" in taxonomy
+
+
+def test_gaokao_writing_checklist_file_captures_actionable_advice() -> None:
+    checklist = load_gaokao_writing_checklist()
+
+    assert "内容要点" in checklist
+    assert "语言质量" in checklist
+    assert "篇章结构" in checklist
+    assert "important -> vital" in checklist
+    assert "审题 3 分钟" in checklist
+    assert "不得把“使用 5 个高级词汇”“至少 3 种从句”当作硬性评分规则" in checklist
 
 
 def test_support_llm_sanitizes_sensitive_input() -> None:

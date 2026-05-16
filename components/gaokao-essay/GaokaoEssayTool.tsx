@@ -13,7 +13,7 @@ import {
   GAOKAO_ESSAY_TOOL_BASE_PATH,
   GAOKAO_ESSAY_WORD_LIMITS,
 } from "@/lib/gaokao-essay/constants";
-import { sampleGaokaoEssay } from "@/lib/gaokao-essay/mock-data";
+import { sampleGaokaoEssay, sampleGaokaoTaskPrompt } from "@/lib/gaokao-essay/mock-data";
 import { validateEssayText } from "@/lib/gaokao-essay/schemas";
 import type { CreateReportRequest, MarketingAttribution } from "@/lib/gaokao-essay/types";
 import { AiServiceNotice } from "./AiServiceNotice";
@@ -36,6 +36,7 @@ export function GaokaoEssayTool() {
   const router = useRouter();
   const [mode, setMode] = useState<InputMode>("text");
   const [essay, setEssay] = useState("");
+  const [taskPrompt, setTaskPrompt] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -56,6 +57,7 @@ export function GaokaoEssayTool() {
       const strategy = (new URLSearchParams(window.location.search).get("mock") || "instant") as CreateReportRequest["mock_strategy"];
       const { reportHref } = await createTextReport({
         text: validation.normalized,
+        taskPrompt,
         strategy: ["instant", "delayed", "failed"].includes(strategy || "") ? strategy : "instant",
         attribution,
       });
@@ -132,13 +134,16 @@ export function GaokaoEssayTool() {
             {mode === "text" ? (
               <TextInputPanel
                 essay={essay}
+                taskPrompt={taskPrompt}
                 touched={touched}
                 progress={progress}
                 submitting={submitting}
                 validation={validation}
                 onEssayChange={setEssay}
+                onTaskPromptChange={setTaskPrompt}
                 onTouched={() => setTouched(true)}
                 onFillSample={() => {
+                  setTaskPrompt(sampleGaokaoTaskPrompt);
                   setEssay(sampleGaokaoEssay);
                   setTouched(true);
                 }}
@@ -185,21 +190,25 @@ function ModeButton({ active, children, onClick }: { active: boolean; children: 
 
 function TextInputPanel({
   essay,
+  taskPrompt,
   touched,
   progress,
   submitting,
   validation,
   onEssayChange,
+  onTaskPromptChange,
   onTouched,
   onFillSample,
   onSubmit,
 }: {
   essay: string;
+  taskPrompt: string;
   touched: boolean;
   progress: number;
   submitting: boolean;
   validation: ReturnType<typeof validateEssayText>;
   onEssayChange: (value: string) => void;
+  onTaskPromptChange: (value: string) => void;
   onTouched: () => void;
   onFillSample: () => void;
   onSubmit: () => void;
@@ -222,6 +231,19 @@ function TextInputPanel({
       <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
         推荐流程：拍照或保存作文图片后，在微信聊天或文件传输助手中<span className="font-bold text-blue-950">长按图片</span>，选择“<span className="font-bold text-blue-950">提取文字</span>”，<span className="font-bold text-blue-950">校对后复制</span>到这里。这样通常比网页 OCR 更快，也能减少手写误识别。
       </div>
+
+      <label className="mb-5 block">
+        <span className="mb-2 block text-sm font-bold text-slate-800">作文题目/任务要求（选填）</span>
+        <textarea
+          value={taskPrompt}
+          onChange={(event) => onTaskPromptChange(event.target.value)}
+          rows={3}
+          maxLength={800}
+          className="w-full resize-y rounded-2xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+          placeholder="例如：假设你是李华，请写邮件邀请外教 Mr. Smith 参加学校端午节文化活动，内容包括时间地点、主要内容、邀请理由。"
+        />
+        <span className="mt-2 block text-xs leading-5 text-slate-500">不填也可生成通用诊断；填写后会重点检查要点完整、格式、语气和跑题风险。</span>
+      </label>
 
       <label className="block">
         <span className="sr-only">高考英语作文正文</span>

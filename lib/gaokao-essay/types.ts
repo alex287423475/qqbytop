@@ -87,6 +87,10 @@ export type DiagnosisMeta = {
     text: string;
     reason: string;
   }>;
+  task_context_provided?: boolean;
+  task_prompt?: string | null;
+  task_type?: string | null;
+  expected_word_count?: string | null;
 };
 
 export type FullReport = {
@@ -118,6 +122,9 @@ export type GaokaoEssayReport = {
   confirmed_text: string;
   confirmed_text_hash: string;
   word_count: number;
+  task_prompt?: string | null;
+  task_type?: string | null;
+  expected_word_count?: string | null;
   free_summary: FreeSummary | null;
   full_report: FullReport | null;
   is_unlocked: boolean;
@@ -135,6 +142,9 @@ export type Draft = {
   confirmed_text?: string | null;
   confirmed_text_hash?: string | null;
   word_count?: number | null;
+  task_prompt?: string | null;
+  task_type?: string | null;
+  expected_word_count?: string | null;
   ocr_result?: OcrResult | null;
   created_at: string;
   updated_at: string;
@@ -183,7 +193,9 @@ export type ConversionEvent = {
   ad_platform?: string | null;
 };
 
-export type CreateDraftRequest = { source_type: "text"; raw_input_text: string } | { source_type: "image" };
+export type CreateDraftRequest =
+  | { source_type: "text"; raw_input_text: string; task_prompt?: string | null; task_type?: string | null; expected_word_count?: string | null }
+  | { source_type: "image"; task_prompt?: string | null; task_type?: string | null; expected_word_count?: string | null };
 export type CreateDraftResponse = {
   draft_id: string;
   draft_token: string;
