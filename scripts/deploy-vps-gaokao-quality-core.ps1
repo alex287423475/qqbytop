@@ -13,6 +13,7 @@ $files = @(
   "backend/prompts/gaokao_error_taxonomy.md",
   "backend/prompts/gaokao_scoring_rubric.md",
   "backend/prompts/gaokao_writing_checklist.md",
+  "backend/app/config.py",
   "backend/app/services/report_quality.py",
   "backend/app/adapters/llm.py",
   "backend/app/models/schemas.py",

@@ -375,6 +375,48 @@ class LlmRouter:
                     continue
         raise RuntimeError("All LLM providers failed. " + " | ".join(errors))
 
+    def summarize_free(
+        self,
+        *,
+        essay_text: str,
+        word_count: int,
+        source_type: str,
+        task_prompt: str | None = None,
+        task_type: str | None = None,
+        expected_word_count: str | None = None,
+        prompt_version: str = DEFAULT_PROMPT_VERSION,
+    ) -> FreeSummary:
+        if not self.settings or any(provider.startswith("mock") for provider in self.providers):
+            free_summary, _, _ = self._mock_diagnose(
+                essay_text=essay_text,
+                word_count=word_count,
+                source_type=source_type,
+                prompt_version=prompt_version,
+                task_prompt=task_prompt,
+                task_type=task_type,
+                expected_word_count=expected_word_count,
+            )
+            return free_summary
+
+        errors: list[str] = []
+        for provider in self._provider_configs(tier="free"):
+            for attempt in range(2):
+                try:
+                    return self._call_openai_compatible_free_summary(
+                        provider,
+                        essay_text=essay_text,
+                        word_count=word_count,
+                        source_type=source_type,
+                        task_prompt=task_prompt,
+                        task_type=task_type,
+                        expected_word_count=expected_word_count,
+                        prompt_version=prompt_version,
+                    )
+                except Exception as exc:  # noqa: BLE001 - free summary must fail over like full diagnosis.
+                    errors.append(f"{provider.name}/{provider.model}/free-summary/attempt-{attempt + 1}: {exc}")
+                    continue
+        raise RuntimeError("All LLM providers failed. " + " | ".join(errors))
+
     def _provider_configs(self, *, tier: Literal["free", "paid"] = "paid") -> list[LlmProviderConfig]:
         if not self.settings:
             return []
@@ -425,7 +467,8 @@ class LlmRouter:
         from openai import OpenAI
 
         prompt = system_prompt or load_gaokao_system_prompt(prompt_version)
-        client = OpenAI(api_key=provider.api_key, base_url=provider.base_url)
+        timeout_seconds = self.settings.llm_request_timeout_seconds if self.settings else 25
+        client = OpenAI(api_key=provider.api_key, base_url=provider.base_url, timeout=timeout_seconds, max_retries=0)
         response = client.chat.completions.create(
             model=provider.model,
             temperature=0.2,
@@ -472,6 +515,73 @@ class LlmRouter:
         }
         validate_generated_report_quality(essay_text, free_summary, full_report)
         return free_summary, full_report, provider.name
+
+    def _call_openai_compatible_free_summary(
+        self,
+        provider: LlmProviderConfig,
+        *,
+        essay_text: str,
+        word_count: int,
+        source_type: str,
+        task_prompt: str | None,
+        task_type: str | None,
+        expected_word_count: str | None,
+        prompt_version: str,
+    ) -> FreeSummary:
+        from openai import OpenAI
+
+        timeout_seconds = self.settings.llm_request_timeout_seconds if self.settings else 25
+        client = OpenAI(api_key=provider.api_key, base_url=provider.base_url, timeout=timeout_seconds, max_retries=0)
+        response = client.chat.completions.create(
+            model=provider.model,
+            temperature=0.1,
+            max_tokens=700,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "你是高考英语作文免费摘要引擎。只返回严格 JSON，不要 Markdown。"
+                        "免费层只能暴露问题类型，不能返回原文片段、具体改写、范文、训练计划或逐句建议。"
+                        "按 25 分制估分，必须返回 exactly 3 个 top_risks。"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "prompt_version": prompt_version,
+                            "source_type": source_type,
+                            "word_count": word_count,
+                            "task_prompt": task_prompt,
+                            "task_type": task_type,
+                            "expected_word_count": expected_word_count,
+                            "essay_text": essay_text,
+                            "required_json_schema": {
+                                "score": {
+                                    "estimated": "integer 0-25",
+                                    "max": 25,
+                                    "confidence": "low|medium|high",
+                                    "reason": "short Chinese reason without detailed rewrite",
+                                },
+                                "top_risks": [
+                                    {"type": "grammar|vocabulary|logic|content|format", "severity": "minor|major|critical", "label": "short Chinese risk type"}
+                                ],
+                                "locked_sections": ["逐句定位扣分点", "两版范文重写", "段落逻辑拆解", "7 天练习计划"],
+                                "notice": "提示：您的作文存在 3 处核心扣分风险，建议解锁完整报告查看。",
+                            },
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+        )
+        content = response.choices[0].message.content or "{}"
+        payload = json.loads(content)
+        free_summary = FreeSummary.model_validate(payload)
+        if len(free_summary.top_risks) != 3:
+            raise ValueError("free_summary.top_risks must contain exactly 3 items")
+        return free_summary
 
     def _mock_diagnose(
         self,

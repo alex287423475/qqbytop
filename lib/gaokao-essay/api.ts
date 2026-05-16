@@ -45,17 +45,29 @@ function draftAuthHeaders(draftId: string) {
   return token ? { authorization: `Bearer ${token}` } : undefined;
 }
 
-async function postJson<TResponse>(url: string, body: unknown, extraHeaders?: Record<string, string>): Promise<TResponse> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...extraHeaders },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(payload.message || payload.detail || response.statusText);
+async function postJson<TResponse>(url: string, body: unknown, extraHeaders?: Record<string, string>, timeoutMs = 90000): Promise<TResponse> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...extraHeaders },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(payload.message || payload.detail || response.statusText);
+    }
+    return (await response.json()) as TResponse;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("诊断生成超时。请稍后重试，或减少作文内容后再次提交。");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return (await response.json()) as TResponse;
 }
 
 export function createLocalTextReport(input: {

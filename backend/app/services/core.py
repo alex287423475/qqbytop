@@ -207,9 +207,9 @@ class GaokaoEssayService:
             cache_key = self._diagnosis_cache_key(draft)
             if cache_key in self.repo.free_summary_cache:
                 free_summary = self.repo.free_summary_cache[cache_key]
-                full_report = self.repo.full_report_cache[cache_key]
+                full_report = self.repo.full_report_cache.get(cache_key)
             else:
-                free_summary, full_report, _ = self.llm.diagnose(
+                free_summary = self.llm.summarize_free(
                     essay_text=draft.confirmed_text,
                     word_count=draft.word_count,
                     source_type=draft.source_type,
@@ -218,7 +218,6 @@ class GaokaoEssayService:
                     expected_word_count=draft.expected_word_count,
                 )
                 self.repo.free_summary_cache[cache_key] = free_summary
-                self.repo.full_report_cache[cache_key] = full_report
 
         report = ReportResponse(
             id=report_id,
@@ -241,6 +240,23 @@ class GaokaoEssayService:
             self.repo.full_report_cache[str(report_id)] = full_report
         self.repo.upsert_report(report)
         return CreateReportResponse(report_id=report_id, status=status, queue_position=1 if status == "QUEUED" else None)
+
+    def _ensure_full_report(self, report: ReportResponse) -> None:
+        if self.repo.full_report_cache.get(str(report.id)) or self.repo.full_report_cache.get(report.confirmed_text_hash):
+            return
+        free_summary, full_report, _ = self.llm.diagnose(
+            essay_text=report.confirmed_text,
+            word_count=report.word_count,
+            source_type=report.source_type,
+            task_prompt=report.task_prompt,
+            task_type=report.task_type,
+            expected_word_count=report.expected_word_count,
+            tier="paid",
+        )
+        report.free_summary = free_summary
+        self.repo.free_summary_cache[report.confirmed_text_hash] = free_summary
+        self.repo.full_report_cache[report.confirmed_text_hash] = full_report
+        self.repo.full_report_cache[str(report.id)] = full_report
 
     def get_report(self, report_id: UUID) -> ReportResponse:
         report = self.repo.reports.get(report_id)
@@ -374,6 +390,7 @@ class GaokaoEssayService:
             return account
         if account.remaining_credits <= 0:
             raise ValueError("No diagnosis credits remaining.")
+        self._ensure_full_report(report)
         report.is_unlocked = True
         report.updated_at = utcnow()
         account.used_credits += 1
@@ -505,6 +522,7 @@ class GaokaoEssayService:
                 task_prompt=report.task_prompt,
                 task_type=report.task_type,
                 expected_word_count=report.expected_word_count,
+                tier="free",
             )
             self.repo.full_report_cache[str(report.id)] = full_report
             self.repo.add_support_action("REPORT_RETRY_TRIGGERED", report_id=report_id)

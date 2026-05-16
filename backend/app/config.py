@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     support_chat_llm_enabled: bool = False
     support_chat_llm_max_input_chars: int = 500
     support_chat_llm_timeout_seconds: int = 8
+    llm_request_timeout_seconds: int = 25
     admin_api_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
