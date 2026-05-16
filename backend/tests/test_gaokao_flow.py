@@ -14,7 +14,7 @@ from app.adapters.llm import (
 from app.adapters.support_llm import SupportAssistantLLM
 from app.config import Settings
 from app.main import app
-from app.models.schemas import ESSAY_CREDIT_PACK_PRODUCT, GROUP_ESSAY_CREDIT_PACK_PRODUCT, FullReport
+from app.models.schemas import ESSAY_CREDIT_PACK_PRODUCT, GROUP_ESSAY_CREDIT_PACK_PRODUCT, FatalRisk, FullReport
 from app.services.core import service
 from app.services.report_quality import GeneratedReportQualityError, score_generated_report_quality, validate_generated_report_quality
 
@@ -348,6 +348,82 @@ def test_generated_report_quality_rejects_missing_dimensions() -> None:
         validate_generated_report_quality(ESSAY, free_summary, broken)
 
     assert "missing dimensions" in str(exc.value)
+
+
+def test_generated_report_quality_rejects_vague_taxonomy_category() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    spans = list(full_report.highlight_spans)
+    spans[0] = spans[0].model_copy(update={"category": "misc_issue"})
+    broken = full_report.model_copy(update={"highlight_spans": spans})
+
+    with pytest.raises(GeneratedReportQualityError) as exc:
+        validate_generated_report_quality(ESSAY, free_summary, broken)
+
+    assert "taxonomy ids or precise Chinese equivalents" in str(exc.value)
+    assert "misc_issue" in str(exc.value)
+
+
+def test_generated_report_quality_requires_task_context_signal_when_task_is_provided() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    task_meta = {
+        **(full_report.diagnosis_meta or {}),
+        "task_context_provided": True,
+        "task_prompt": "Invite Mr. Smith to a Dragon Boat Festival activity.",
+        "task_type": "application_writing",
+    }
+    neutral_spans = [
+        span.model_copy(
+            update={
+                "category": "simple_sentence_overuse",
+                "comment": "General sentence-level issue.",
+                "correction": "Use a more complete and natural sentence.",
+                "principle": "Improve expression level without adding task facts.",
+                "risk_note": "Plain expression can limit the language band.",
+            }
+        )
+        for span in full_report.highlight_spans
+    ]
+    neutral_fatal_risks = [
+        FatalRisk(title="Plain expression", severity="major", explanation="The report only discusses generic expression quality."),
+        FatalRisk(title="Weak sentence variety", severity="major", explanation="The report only discusses generic sentence variety."),
+        FatalRisk(title="Limited vocabulary", severity="minor", explanation="The report only discusses generic vocabulary range."),
+    ]
+    neutral_update = {"diagnosis_meta": task_meta, "highlight_spans": neutral_spans, "fatal_risks": neutral_fatal_risks, "overall_review": "Generic language-quality review.", "logic_map": []}
+    broken = full_report.model_copy(update=neutral_update)
+
+    with pytest.raises(GeneratedReportQualityError) as exc:
+        validate_generated_report_quality(ESSAY, free_summary, broken)
+
+    assert "task_context was provided" in str(exc.value)
+
+    spans = list(neutral_spans)
+    spans[0] = spans[0].model_copy(update={"category": "invitation_letter_missing_details"})
+    fixed = full_report.model_copy(update={**neutral_update, "highlight_spans": spans})
+    validate_generated_report_quality(ESSAY, free_summary, fixed)
+
+
+def test_generated_report_quality_rejects_mismatched_score_calibration_tag() -> None:
+    free_summary, full_report, _ = LlmRouter(["mock"]).diagnose(
+        essay_text=ESSAY,
+        word_count=70,
+        source_type="text",
+    )
+    risks = list(free_summary.top_risks)
+    risks[0] = risks[0].model_copy(update={"type": "band_0_10_structure_collapse"})
+    broken_free = free_summary.model_copy(update={"top_risks": risks})
+
+    with pytest.raises(GeneratedReportQualityError) as exc:
+        validate_generated_report_quality(ESSAY, broken_free, full_report)
+
+    assert "score calibration tag band_0_10_structure_collapse mismatches" in str(exc.value)
 
 
 def test_gaokao_prompt_includes_production_scoring_rubric() -> None:
