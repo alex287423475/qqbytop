@@ -186,6 +186,7 @@ function AdminTabs({ activeTab, onChange }: { activeTab: AdminTab; onChange: (ta
   const tabs: Array<[AdminTab, string]> = [
     ["funnel", "运营漏斗"],
     ["exceptions", "异常订单"],
+    ["preview", "报告预览"],
     ["quality", "质量闸门"],
   ];
   return (
@@ -281,27 +282,27 @@ function ExceptionsPanel({ exceptions }: { exceptions: AdminExceptionItem[] }) {
 function AdminFullReportPreviewPanel() {
   const [reportId, setReportId] = useState("");
   const [status, setStatus] = useState<"idle" | "running" | "done" | "failed">("idle");
-  const [message, setMessage] = useState("?????? report_id???????????????????????????????????????????????");
+  const [message, setMessage] = useState("粘贴已完成免费摘要的 report_id，后台会调用真实模型生成完整报告预览。");
   const [fullReport, setFullReport] = useState<FullReport | null>(null);
 
   async function handlePreview() {
     const trimmed = reportId.trim();
     if (!trimmed) {
       setStatus("failed");
-      setMessage("???? report_id?");
+      setMessage("请先填写 report_id。");
       return;
     }
     setStatus("running");
-    setMessage("????????????????????? 20-90 ??????????");
+    setMessage("正在调用真实 DeepSeek/TokenHub 生成完整报告，通常需要 20-90 秒。");
     setFullReport(null);
     try {
       const payload = await previewFullReportWithRealModel(trimmed);
       setFullReport(payload.full_report);
       setStatus("done");
-      setMessage(payload.is_unlocked ? "????????????????????????" : "?????????????????????");
+      setMessage(payload.is_unlocked ? "完整报告预览已生成；该报告原本已经解锁。" : "完整报告预览已生成；前台用户仍保持未解锁状态。");
     } catch (error) {
       setStatus("failed");
-      setMessage(error instanceof Error ? error.message : "???????????");
+      setMessage(error instanceof Error ? error.message : "完整报告预览生成失败。");
     }
   }
 
@@ -309,16 +310,16 @@ function AdminFullReportPreviewPanel() {
     <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
       <article className="border border-amber-200 bg-white p-5">
         <p className="text-sm font-black uppercase tracking-[0.18em] text-amber-700">Real Model Preview</p>
-        <h2 className="mt-2 text-2xl font-black text-slate-950">????????</h2>
+        <h2 className="mt-2 text-2xl font-black text-slate-950">完整报告预览</h2>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          ????????????? DeepSeek/TokenHub ??????????????????????
+          仅管理员可用。会调用真实 DeepSeek/TokenHub 生成完整报告，但不会解锁前台报告，也不会扣除用户额度。
         </p>
         <label className="mt-5 block">
           <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Report ID</span>
           <input
             value={reportId}
             onChange={(event) => setReportId(event.target.value)}
-            placeholder="?? report_id??? 550e8400-e29b-41d4-a716-446655440000"
+            placeholder="粘贴 report_id，例如 550e8400-e29b-41d4-a716-446655440000"
             className="mt-2 w-full border border-slate-200 px-3 py-3 text-sm text-slate-900 outline-none focus:border-amber-400"
           />
         </label>
@@ -328,7 +329,7 @@ function AdminFullReportPreviewPanel() {
           disabled={status === "running"}
           className="mt-4 w-full bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:bg-slate-300 disabled:text-slate-500"
         >
-          {status === "running" ? "?????..." : "??????????"}
+          {status === "running" ? "生成中..." : "生成完整报告预览"}
         </button>
         <p
           className={`mt-4 border p-3 text-sm leading-6 ${
@@ -346,12 +347,12 @@ function AdminFullReportPreviewPanel() {
       <article className="border border-slate-200 bg-white p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h3 className="text-xl font-bold text-slate-950">????</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">??????????????? JSON ???????????????</p>
+            <h3 className="text-xl font-bold text-slate-950">预览结果</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">这里展示结构化摘要，同时保留完整 JSON 便于排查字段质量。</p>
           </div>
-          <span className="w-fit bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">???</span>
+          <span className="w-fit bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">后台可见</span>
         </div>
-        {fullReport ? <AdminFullReportPreviewResult fullReport={fullReport} /> : <p className="mt-6 text-sm text-slate-500">???????</p>}
+        {fullReport ? <AdminFullReportPreviewResult fullReport={fullReport} /> : <p className="mt-6 text-sm text-slate-500">尚未生成预览。</p>}
       </article>
     </section>
   );
@@ -362,7 +363,7 @@ function AdminFullReportPreviewResult({ fullReport }: { fullReport: FullReport }
   return (
     <div className="mt-5 space-y-5">
       <section className="border border-slate-200 bg-slate-50 p-4">
-        <h4 className="font-bold text-slate-950">??</h4>
+        <h4 className="font-bold text-slate-950">总体评价</h4>
         <p className="mt-2 text-sm leading-6 text-slate-700">{fullReport.overall_review}</p>
       </section>
       <section className="grid gap-3 md:grid-cols-3">
@@ -384,16 +385,16 @@ function AdminFullReportPreviewResult({ fullReport }: { fullReport: FullReport }
       </section>
       <section className="grid gap-3 md:grid-cols-2">
         <div className="border border-slate-200 p-4">
-          <h4 className="font-bold text-slate-950">?????</h4>
+          <h4 className="font-bold text-slate-950">稳妥版范文</h4>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{fullReport.rewrites?.safe_version}</p>
         </div>
         <div className="border border-slate-200 p-4">
-          <h4 className="font-bold text-slate-950">?????</h4>
+          <h4 className="font-bold text-slate-950">进阶版范文</h4>
           <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{fullReport.rewrites?.advanced_version}</p>
         </div>
       </section>
       <details className="border border-slate-200 bg-slate-950 p-4 text-slate-100">
-        <summary className="cursor-pointer text-sm font-bold">???? JSON</summary>
+        <summary className="cursor-pointer text-sm font-bold">完整 JSON</summary>
         <pre className="mt-4 max-h-[520px] overflow-auto whitespace-pre-wrap text-xs leading-5">{JSON.stringify(fullReport, null, 2)}</pre>
       </details>
     </div>
