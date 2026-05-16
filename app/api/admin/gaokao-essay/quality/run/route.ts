@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   try {
-    const body = (await request.json()) as { taskType?: QualityTaskType };
-    const record = await startQualityRun(String(body.taskType || "") as QualityTaskType);
+    const body = (await request.json()) as { taskType?: QualityTaskType; confirmRealCost?: boolean };
+    const record = await startQualityRun(String(body.taskType || "") as QualityTaskType, { confirmRealCost: body.confirmRealCost === true });
     return NextResponse.json(record);
   } catch (error) {
     if (error instanceof QualityConsoleError) {

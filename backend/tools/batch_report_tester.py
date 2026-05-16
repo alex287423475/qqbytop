@@ -462,9 +462,19 @@ def run_ab_case(
     }
 
 
-def run_local_case(settings: Settings, file_path: Path, essay_text: str, output_dir: Path, prompt_name: str) -> dict[str, Any]:
+def run_local_case(
+    settings: Settings,
+    file_path: Path,
+    essay_text: str,
+    output_dir: Path,
+    prompt_name: str,
+    *,
+    require_real_provider: bool = False,
+) -> dict[str, Any]:
     started = time.time()
     provider_list = settings.llm_provider_list
+    if require_real_provider and (not any(provider_list) or not has_real_tokenhub_key()):
+        raise RuntimeError("Real TokenHub batch requires LLM_PROVIDER_ORDER and TENCENT_TOKENHUB_API_KEY in the selected env file.")
     if not any(provider_list) or not has_real_tokenhub_key():
         router = LlmRouter(["mock"], None)
     else:
@@ -568,6 +578,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prompt-b", default="gaokao_experiment")
     parser.add_argument("--judge", action="store_true")
     parser.add_argument("--min-rule-score", type=int, default=80)
+    parser.add_argument("--require-real-provider", action="store_true")
+    parser.add_argument("--manifest-only", action="store_true")
     return parser.parse_args()
 
 
@@ -580,12 +592,17 @@ def main() -> int:
 
     if not input_dir.exists():
         raise RuntimeError(f"Input directory does not exist: {input_dir}")
-    files = sorted(input_dir.glob("*.txt"))
+    manifest_cases = load_golden_manifest(input_dir)
+    if args.manifest_only:
+        if not manifest_cases:
+            raise RuntimeError(f"--manifest-only requires golden_manifest.json in {input_dir}")
+        files = [input_dir / name for name in sorted(manifest_cases)]
+    else:
+        files = sorted(input_dir.glob("*.txt"))
     if args.limit and args.limit > 0:
         files = files[: args.limit]
     if not files:
         raise RuntimeError(f"No .txt essay files found in {input_dir}")
-    manifest_cases = load_golden_manifest(input_dir)
 
     apply_env_file(Path(args.env_file))
     settings = Settings()
@@ -615,7 +632,7 @@ def main() -> int:
             elif args.mode == "pipeline":
                 row = run_pipeline_case(args.api_base.rstrip("/"), file_path, essay_text, output_dir, index, args.payer_contact)
             elif args.mode == "local":
-                row = run_local_case(settings, file_path, essay_text, output_dir, args.prompt_a)
+                row = run_local_case(settings, file_path, essay_text, output_dir, args.prompt_a, require_real_provider=args.require_real_provider)
             else:
                 row = run_ab_case(settings, file_path, essay_text, output_dir, args.prompt_a, args.prompt_b, args.judge)
             row.update(validate_manifest_expectation(essay_text=essay_text, row=row, case=manifest_case, guardrails=expected_guardrails))

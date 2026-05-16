@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import { listLocalReports } from "@/lib/gaokao-essay/api";
@@ -6,7 +6,7 @@ import { formatCny, GAOKAO_ESSAY_USE_BACKEND } from "@/lib/gaokao-essay/constant
 import type { AdminExceptionItem, FunnelResponse } from "@/lib/gaokao-essay/types";
 
 type AdminTab = "funnel" | "exceptions" | "quality";
-type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "typecheck" | "build" | "full_gate";
+type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
 type QualityRunStatus = "running" | "passed" | "failed";
 type QualityBatchSummary = {
   outputDir: string;
@@ -339,13 +339,18 @@ function QualityGatePanel() {
   }, [status?.activeRunId, status?.latestRun?.runId, status?.latestRun?.status]);
 
   async function runTask(taskType: QualityTaskType) {
+    const task = QUALITY_TASKS.find((item) => item.type === taskType);
+    const confirmRealCost =
+      taskType !== "batch_real" ||
+      window.confirm("确认启动真实 TokenHub DeepSeek 批测？这会调用真实 API 并消耗额度。建议只在 Prompt/模型调整后执行。");
+    if (!confirmRealCost) return;
     setLoading(true);
     setMessage(null);
     try {
       const response = await fetch("/api/admin/gaokao-essay/quality/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType }),
+        body: JSON.stringify({ taskType, confirmRealCost: task?.realCost === true }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || `质量任务启动失败 ${response.status}`);
@@ -633,10 +638,11 @@ function QualityGatePanel() {
   );
 }
 
-const QUALITY_TASKS: Array<{ type: QualityTaskType; label: string; description: string }> = [
+const QUALITY_TASKS: Array<{ type: QualityTaskType; label: string; description: string; realCost?: boolean }> = [
   { type: "checkpoint", label: "保存节点", description: "创建 Git checkpoint" },
   { type: "pytest", label: "跑后端测试", description: "uv run pytest" },
   { type: "batch_mock", label: "跑样例批测", description: "11 篇样例质量闸门" },
+  { type: "batch_real", label: "真实 API 批测", description: "调用 TokenHub DeepSeek，会消耗额度", realCost: true },
   { type: "typecheck", label: "跑 TypeScript", description: "npm run typecheck" },
   { type: "build", label: "跑生产构建", description: "npm run build" },
   { type: "full_gate", label: "一键完整质量闸门", description: "节点 + 测试 + 批测 + 构建" },

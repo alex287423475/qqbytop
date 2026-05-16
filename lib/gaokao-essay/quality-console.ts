@@ -4,7 +4,7 @@ import { createWriteStream, existsSync } from "fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
 import path from "path";
 
-export type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "typecheck" | "build" | "full_gate";
+export type QualityTaskType = "checkpoint" | "pytest" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
 export type QualityRunStatus = "running" | "passed" | "failed";
 
 export type QualityRunRecord = {
@@ -245,12 +245,15 @@ export async function restoreQualityCheckpoint(ref: string): Promise<RestoreChec
   return previewQualityCheckpointRestore(checkpoint.ref);
 }
 
-export async function startQualityRun(taskType: QualityTaskType): Promise<QualityRunRecord> {
+export async function startQualityRun(taskType: QualityTaskType, options: { confirmRealCost?: boolean } = {}): Promise<QualityRunRecord> {
   if (!isQualityConsoleEnabled()) {
     throw new QualityConsoleError(403, "质量保障控制台未启用。请配置 GAOKAO_QUALITY_CONSOLE_ENABLED=true。");
   }
   if (!isKnownTask(taskType)) {
     throw new QualityConsoleError(400, "不支持的质量任务。");
+  }
+  if (taskType === "batch_real" && !options.confirmRealCost) {
+    throw new QualityConsoleError(400, "真实 TokenHub 批测会消耗 API 额度，请确认后再启动。");
   }
   const current = await getQualityStatus();
   if (current.activeRunId || current.latestRun?.status === "running") {
@@ -399,6 +402,30 @@ function getStepCommand(step: string, runId: string) {
         ],
         cwd: backendDir,
       };
+    case "batch_real":
+      return {
+        cmd: uv,
+        args: [
+          "run",
+          "python",
+          "tools/batch_report_tester.py",
+          "--mode",
+          "local",
+          "--input",
+          "../test_inputs/gaokao_essays",
+          "--output",
+          "../test_outputs/gaokao_reports",
+          "--delay",
+          "0",
+          "--min-rule-score",
+          "80",
+          "--env-file",
+          ".env.local-deepseek",
+          "--require-real-provider",
+          "--manifest-only",
+        ],
+        cwd: backendDir,
+      };
     case "typecheck":
       return { cmd: npm, args: ["run", "typecheck"], cwd: rootDir };
     case "build":
@@ -414,7 +441,7 @@ function getTaskSteps(taskType: QualityTaskType) {
 }
 
 function isKnownTask(taskType: string): taskType is QualityTaskType {
-  return ["checkpoint", "pytest", "batch_mock", "typecheck", "build", "full_gate"].includes(taskType);
+  return ["checkpoint", "pytest", "batch_mock", "batch_real", "typecheck", "build", "full_gate"].includes(taskType);
 }
 
 function createRunId(taskType: QualityTaskType) {
