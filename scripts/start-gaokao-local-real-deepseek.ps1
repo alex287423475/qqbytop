@@ -1,6 +1,8 @@
 param(
   [int]$BackendPort = 8000,
   [int]$FrontendPort = 3000,
+  [switch]$EnableQualityConsole,
+  [switch]$RestartFrontend,
   [switch]$NoOpen
 )
 
@@ -27,6 +29,17 @@ function Test-CommandAvailable {
 function Test-PortListening {
   param([int]$Port)
   return [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+}
+
+function Stop-PortListeners {
+  param([int]$Port)
+  $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
+  foreach ($connection in $connections) {
+    $process = Get-Process -Id $connection.OwningProcess -ErrorAction SilentlyContinue
+    if (-not $process) { continue }
+    Write-Host "Stopping process on port ${Port}: PID $($connection.OwningProcess) $($process.ProcessName)" -ForegroundColor Yellow
+    Stop-Process -Id $connection.OwningProcess -Force
+  }
 }
 
 function Read-DotEnv {
@@ -138,13 +151,20 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port $BackendPort --reload
 }
 
 Write-Step "Starting Next.js frontend"
+if ($RestartFrontend -and (Test-PortListening $FrontendPort)) {
+  Stop-PortListeners $FrontendPort
+  Start-Sleep -Seconds 2
+}
 if (Test-PortListening $FrontendPort) {
   Write-Host "Port $FrontendPort is already listening. Reusing existing frontend process." -ForegroundColor Yellow
 } else {
+  $qualityConsoleValue = if ($EnableQualityConsole) { "true" } else { $env:GAOKAO_QUALITY_CONSOLE_ENABLED }
+  if (-not $qualityConsoleValue) { $qualityConsoleValue = "false" }
   $frontendCommand = @"
 `$ErrorActionPreference = "Stop"
 Set-Location $(ConvertTo-PowerShellLiteral $Root)
 `$env:GAOKAO_ESSAY_BACKEND_API_BASE = $(ConvertTo-PowerShellLiteral $BackendApiBase)
+`$env:GAOKAO_QUALITY_CONSOLE_ENABLED = $(ConvertTo-PowerShellLiteral $qualityConsoleValue)
 if (-not (Test-Path "node_modules")) { npm install }
 Write-Host "Next.js local frontend: http://127.0.0.1:$FrontendPort" -ForegroundColor Green
 npm run dev -- --hostname 127.0.0.1 --port $FrontendPort
@@ -165,4 +185,3 @@ Write-Host "Warning: generating a report now calls Tencent TokenHub DeepSeek and
 if (-not $NoOpen) {
   Start-Process $ToolUrl
 }
-

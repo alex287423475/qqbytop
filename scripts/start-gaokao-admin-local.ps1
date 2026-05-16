@@ -14,7 +14,7 @@ if (-not (Test-Path $Launcher)) {
   throw "Launcher not found: $Launcher"
 }
 
-& $Launcher -BackendPort $BackendPort -FrontendPort $FrontendPort -NoOpen
+& $Launcher -BackendPort $BackendPort -FrontendPort $FrontendPort -EnableQualityConsole -RestartFrontend -NoOpen
 
 Write-Host ""
 Write-Host "Gaokao admin console:" -ForegroundColor Green
