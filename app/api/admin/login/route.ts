@@ -6,6 +6,15 @@ function safeNextPath(value: FormDataEntryValue | null) {
   return raw;
 }
 
+function adminRedirectUrl(request: NextRequest, path: string) {
+  const configuredOrigin = process.env.ADMIN_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_SITE_URL;
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto") || "https";
+  const host = forwardedHost || request.headers.get("host");
+  const origin = configuredOrigin || (host ? `${forwardedProto}://${host}` : request.nextUrl.origin);
+  return new URL(path, origin);
+}
+
 function isLocalPasswordlessAllowed(request: NextRequest) {
   const host = request.nextUrl.hostname;
   return process.env.ADMIN_PASSWORDLESS_LOCAL === "true" && process.env.NODE_ENV !== "production" && (host === "127.0.0.1" || host === "localhost" || host === "::1");
@@ -23,10 +32,10 @@ export async function POST(request: NextRequest) {
   }
 
   if (!isLocalPasswordlessAllowed(request) && password !== expectedPassword) {
-    return NextResponse.redirect(new URL(`/admin/login?next=${encodeURIComponent(next)}`, request.url), 303);
+    return NextResponse.redirect(adminRedirectUrl(request, `/admin/login?next=${encodeURIComponent(next)}`), 303);
   }
 
-  const response = NextResponse.redirect(new URL(next, request.url), 303);
+  const response = NextResponse.redirect(adminRedirectUrl(request, next), 303);
   response.cookies.set("admin_session_token", sessionToken, {
     httpOnly: true,
     sameSite: "lax",
