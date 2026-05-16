@@ -10,7 +10,7 @@ import {
   listMockReports,
   unlockMockReport,
 } from "./mock-store";
-import { GAOKAO_ESSAY_BFF_ENDPOINTS, GAOKAO_ESSAY_PRODUCT_TYPES, GAOKAO_ESSAY_TOOL_BASE_PATH, GAOKAO_ESSAY_USE_BACKEND } from "./constants";
+import { GAOKAO_ESSAY_ADMIN_ENDPOINTS, GAOKAO_ESSAY_BFF_ENDPOINTS, GAOKAO_ESSAY_PRODUCT_TYPES, GAOKAO_ESSAY_TOOL_BASE_PATH, GAOKAO_ESSAY_USE_BACKEND } from "./constants";
 import type {
   CompleteUploadResponse,
   ConfirmTextResponse,
@@ -20,6 +20,7 @@ import type {
   CreateReportResponse,
   CreateUploadIntentResponse,
   Draft,
+  FullReportPreviewResponse,
   GaokaoEssayReport,
   MarketingAttribution,
   OcrResult,
@@ -220,6 +221,20 @@ export async function getReport(reportId: string) {
   const response = await fetch(GAOKAO_ESSAY_BFF_ENDPOINTS.report(reportId), { cache: "no-store" });
   if (!response.ok) return null;
   return (await response.json()) as GaokaoEssayReport;
+}
+
+export async function previewFullReportWithRealModel(reportId: string) {
+  const response = await fetch(GAOKAO_ESSAY_ADMIN_ENDPOINTS.fullReportPreview(reportId), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "{}",
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ message: response.statusText }));
+    throw new Error(payload.message || payload.detail || response.statusText);
+  }
+  return (await response.json()) as FullReportPreviewResponse;
 }
 
 export function unlockLocalReport(reportId: string) {

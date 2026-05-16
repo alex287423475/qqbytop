@@ -42,6 +42,7 @@ export const GAOKAO_ESSAY_USE_BACKEND = process.env.NEXT_PUBLIC_GAOKAO_ESSAY_USE
 
 export const GAOKAO_ESSAY_IMAGE_OCR_ENABLED = process.env.NEXT_PUBLIC_GAOKAO_ESSAY_IMAGE_OCR_ENABLED !== "false";
 
+
 export const GAOKAO_ESSAY_BFF_ENDPOINTS = {
   drafts: "/api/tools/gaokao-english-essay-diagnosis/drafts",
   uploadIntents: "/api/tools/gaokao-english-essay-diagnosis/uploads/intents",
@@ -57,6 +58,10 @@ export const GAOKAO_ESSAY_BFF_ENDPOINTS = {
   officialAssist: (groupBuyId: string) => `/api/tools/gaokao-english-essay-diagnosis/groups/${groupBuyId}/official-assist`,
   refundRequest: (orderId: string) => `/api/tools/gaokao-english-essay-diagnosis/orders/${orderId}/refund-request`,
   supportChat: "/api/tools/gaokao-english-essay-diagnosis/support/chat",
+} as const;
+
+export const GAOKAO_ESSAY_ADMIN_ENDPOINTS = {
+  fullReportPreview: (reportId: string) => `/api/admin/gaokao-essay/reports/${reportId}/full-report-preview`,
 } as const;
 
 export const GAOKAO_ESSAY_BACKEND_ENDPOINTS = {

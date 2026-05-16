@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { listLocalReports } from "@/lib/gaokao-essay/api";
+import { listLocalReports, previewFullReportWithRealModel } from "@/lib/gaokao-essay/api";
 import { formatCny, GAOKAO_ESSAY_USE_BACKEND } from "@/lib/gaokao-essay/constants";
-import type { AdminExceptionItem, FunnelResponse } from "@/lib/gaokao-essay/types";
+import type { AdminExceptionItem, FullReport, FunnelResponse } from "@/lib/gaokao-essay/types";
 
-type AdminTab = "funnel" | "exceptions" | "quality";
+type AdminTab = "funnel" | "exceptions" | "quality" | "preview";
 type QualityTaskType = "checkpoint" | "pytest" | "task_bank" | "batch_mock" | "batch_real" | "typecheck" | "build" | "full_gate";
 type QualityRunStatus = "running" | "passed" | "failed";
 type QualityBatchSummary = {
@@ -176,6 +176,7 @@ export function GaokaoEssayAdminMock() {
         {activeTab === "funnel" ? <FunnelPanel funnel={funnel} /> : null}
         {activeTab === "exceptions" ? <ExceptionsPanel exceptions={backendExceptions} /> : null}
         {activeTab === "quality" ? <QualityGatePanel /> : null}
+        {activeTab === "preview" ? <AdminFullReportPreviewPanel /> : null}
       </div>
     </main>
   );
@@ -273,6 +274,129 @@ function ExceptionsPanel({ exceptions }: { exceptions: AdminExceptionItem[] }) {
         </ul>
       )}
     </article>
+  );
+}
+
+
+function AdminFullReportPreviewPanel() {
+  const [reportId, setReportId] = useState("");
+  const [status, setStatus] = useState<"idle" | "running" | "done" | "failed">("idle");
+  const [message, setMessage] = useState("?????? report_id???????????????????????????????????????????????");
+  const [fullReport, setFullReport] = useState<FullReport | null>(null);
+
+  async function handlePreview() {
+    const trimmed = reportId.trim();
+    if (!trimmed) {
+      setStatus("failed");
+      setMessage("???? report_id?");
+      return;
+    }
+    setStatus("running");
+    setMessage("????????????????????? 20-90 ??????????");
+    setFullReport(null);
+    try {
+      const payload = await previewFullReportWithRealModel(trimmed);
+      setFullReport(payload.full_report);
+      setStatus("done");
+      setMessage(payload.is_unlocked ? "????????????????????????" : "?????????????????????");
+    } catch (error) {
+      setStatus("failed");
+      setMessage(error instanceof Error ? error.message : "???????????");
+    }
+  }
+
+  return (
+    <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+      <article className="border border-amber-200 bg-white p-5">
+        <p className="text-sm font-black uppercase tracking-[0.18em] text-amber-700">Real Model Preview</p>
+        <h2 className="mt-2 text-2xl font-black text-slate-950">????????</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          ????????????? DeepSeek/TokenHub ??????????????????????
+        </p>
+        <label className="mt-5 block">
+          <span className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Report ID</span>
+          <input
+            value={reportId}
+            onChange={(event) => setReportId(event.target.value)}
+            placeholder="?? report_id??? 550e8400-e29b-41d4-a716-446655440000"
+            className="mt-2 w-full border border-slate-200 px-3 py-3 text-sm text-slate-900 outline-none focus:border-amber-400"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={handlePreview}
+          disabled={status === "running"}
+          className="mt-4 w-full bg-amber-500 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-amber-400 disabled:cursor-wait disabled:bg-slate-300 disabled:text-slate-500"
+        >
+          {status === "running" ? "?????..." : "??????????"}
+        </button>
+        <p
+          className={`mt-4 border p-3 text-sm leading-6 ${
+            status === "failed"
+              ? "border-red-200 bg-red-50 text-red-800"
+              : status === "done"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-slate-200 bg-slate-50 text-slate-600"
+          }`}
+        >
+          {message}
+        </p>
+      </article>
+
+      <article className="border border-slate-200 bg-white p-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-xl font-bold text-slate-950">????</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">??????????????? JSON ???????????????</p>
+          </div>
+          <span className="w-fit bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">???</span>
+        </div>
+        {fullReport ? <AdminFullReportPreviewResult fullReport={fullReport} /> : <p className="mt-6 text-sm text-slate-500">???????</p>}
+      </article>
+    </section>
+  );
+}
+
+function AdminFullReportPreviewResult({ fullReport }: { fullReport: FullReport }) {
+  const dimensions = Object.entries(fullReport.gaokao_dimensions || {});
+  return (
+    <div className="mt-5 space-y-5">
+      <section className="border border-slate-200 bg-slate-50 p-4">
+        <h4 className="font-bold text-slate-950">??</h4>
+        <p className="mt-2 text-sm leading-6 text-slate-700">{fullReport.overall_review}</p>
+      </section>
+      <section className="grid gap-3 md:grid-cols-3">
+        {(fullReport.fatal_risks || []).map((risk) => (
+          <div key={risk.title} className="border border-red-100 bg-red-50 p-3">
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-red-600">{risk.severity}</span>
+            <strong className="mt-1 block text-slate-950">{risk.title}</strong>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{risk.explanation}</p>
+          </div>
+        ))}
+      </section>
+      <section className="grid gap-3 md:grid-cols-2">
+        {dimensions.map(([key, value]) => (
+          <div key={key} className="border border-blue-100 bg-blue-50 p-3">
+            <strong className="text-slate-950">{key}: {value.score}/{value.max}</strong>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{value.comment}</p>
+          </div>
+        ))}
+      </section>
+      <section className="grid gap-3 md:grid-cols-2">
+        <div className="border border-slate-200 p-4">
+          <h4 className="font-bold text-slate-950">?????</h4>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{fullReport.rewrites?.safe_version}</p>
+        </div>
+        <div className="border border-slate-200 p-4">
+          <h4 className="font-bold text-slate-950">?????</h4>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{fullReport.rewrites?.advanced_version}</p>
+        </div>
+      </section>
+      <details className="border border-slate-200 bg-slate-950 p-4 text-slate-100">
+        <summary className="cursor-pointer text-sm font-bold">???? JSON</summary>
+        <pre className="mt-4 max-h-[520px] overflow-auto whitespace-pre-wrap text-xs leading-5">{JSON.stringify(fullReport, null, 2)}</pre>
+      </details>
+    </div>
   );
 }
 

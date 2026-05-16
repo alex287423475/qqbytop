@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from dataclasses import dataclass
@@ -71,10 +71,7 @@ def load_gaokao_system_prompt(prompt_version: str = DEFAULT_PROMPT_VERSION) -> s
     scoring_rubric = load_gaokao_scoring_rubric()
     error_taxonomy = load_gaokao_error_taxonomy()
     writing_checklist = load_gaokao_writing_checklist()
-    if not prompt_path.exists():
-        base_prompt = FALLBACK_SYSTEM_PROMPT
-    else:
-        base_prompt = prompt_path.read_text(encoding="utf-8").strip()
+    base_prompt = FALLBACK_SYSTEM_PROMPT if not prompt_path.exists() else prompt_path.read_text(encoding="utf-8").strip()
     return (
         f"{base_prompt}\n\n【生产评分 Rubric】\n{scoring_rubric}"
         f"\n\n【高考常见错误 Taxonomy】\n{error_taxonomy}"

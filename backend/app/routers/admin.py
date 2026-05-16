@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.config import get_settings
-from app.models.schemas import AdminExceptionItem, FunnelResponse, MerchantAccount
+from app.models.schemas import AdminExceptionItem, FullReportPreviewResponse, FunnelResponse, MerchantAccount
 from app.services.core import service
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
@@ -39,3 +39,11 @@ def exceptions(_: None = Depends(require_admin)) -> list[AdminExceptionItem]:
 @router.get("/funnel", response_model=FunnelResponse)
 def funnel(_: None = Depends(require_admin)) -> FunnelResponse:
     return service.funnel()
+
+
+@router.post("/reports/{report_id}/full-report-preview", response_model=FullReportPreviewResponse)
+def preview_full_report(report_id: UUID, _: None = Depends(require_admin)) -> FullReportPreviewResponse:
+    try:
+        return service.preview_full_report(report_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -277,6 +277,13 @@ class ReportResponse(BaseModel):
     updated_at: datetime
 
 
+class FullReportPreviewResponse(BaseModel):
+    report_id: UUID
+    is_preview: bool = True
+    is_unlocked: bool = False
+    full_report: FullReport
+
+
 class CreateOrderRequest(BaseModel):
     report_id: UUID
     product_type: str

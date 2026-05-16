@@ -218,6 +218,12 @@ export type ConfirmTextResponse = { draft_id: string; confirmed: boolean; word_c
 export type CreateReportRequest = { draft_id: string; mock_strategy?: "instant" | "delayed" | "failed" };
 export type CreateReportResponse = { report_id: string; status: ReportStatus; queue_position?: number };
 export type GetReportResponse = GaokaoEssayReport;
+export type FullReportPreviewResponse = {
+  report_id: string;
+  is_preview: true;
+  is_unlocked: boolean;
+  full_report: FullReport;
+};
 export type CreateOrderRequest = { report_id: string; product_type: ProductType; quantity?: number; group_buy_id?: string; payer_contact?: string };
 export type CreateOrderResponse = {
   order_id: string;

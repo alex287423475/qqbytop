@@ -1,7 +1,7 @@
 import json
 
-from tools.extract_gaokao_tasks import extract_tasks
 from tools.batch_report_tester import load_task_bank, summarize_task_bank, validate_task_bank
+from tools.extract_gaokao_tasks import extract_tasks
 
 
 def test_extract_gaokao_tasks_from_source_text(tmp_path) -> None:

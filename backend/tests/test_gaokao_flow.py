@@ -200,6 +200,23 @@ def _create_completed_report() -> tuple[str, dict[str, str]]:
     return report_res.json()["report_id"], auth
 
 
+def test_admin_full_report_preview_does_not_unlock_or_grant_credits() -> None:
+    report_id, _ = _create_completed_report()
+    credit_keys_before = set(service.repo.credit_accounts)
+
+    preview_res = client.post(f"/api/v1/admin/reports/{report_id}/full-report-preview")
+    assert preview_res.status_code == 200
+    preview = preview_res.json()
+    assert preview["is_preview"] is True
+    assert preview["is_unlocked"] is False
+    assert preview["full_report"]["overall_review"]
+
+    locked = client.get(f"/api/v1/reports/{report_id}").json()
+    assert locked["is_unlocked"] is False
+    assert locked["full_report"] is None
+    assert set(service.repo.credit_accounts) == credit_keys_before
+
+
 def test_group_buy_requires_three_paid_members_or_explicit_official_assist() -> None:
     report_1, _ = _create_completed_report()
     order_1_res = client.post("/api/v1/orders", json={"report_id": report_1, "product_type": GROUP_ESSAY_CREDIT_PACK_PRODUCT, "payer_contact": "student1@example.com"})

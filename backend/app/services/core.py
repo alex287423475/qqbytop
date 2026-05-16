@@ -28,6 +28,7 @@ from app.models.schemas import (
     CreateUploadIntentRequest,
     CreateUploadIntentResponse,
     CreditLedgerRecord,
+    FullReportPreviewResponse,
     FunnelResponse,
     GroupBuyRecord,
     GroupMemberRecord,
@@ -269,6 +270,24 @@ class GaokaoEssayService:
         else:
             report.full_report = None
         return report
+
+    def preview_full_report(self, report_id: UUID) -> FullReportPreviewResponse:
+        report = self.repo.reports.get(report_id)
+        if not report:
+            raise ValueError("Report does not exist.")
+        if report.status != "COMPLETED":
+            raise ValueError("Report is not ready for full report preview.")
+
+        self._ensure_full_report(report)
+        full_report = self.repo.full_report_cache.get(str(report.id)) or self.repo.full_report_cache.get(report.confirmed_text_hash)
+        if not full_report:
+            raise ValueError("Full report preview could not be generated.")
+
+        report.updated_at = utcnow()
+        self.repo.upsert_report(report)
+        self.repo.add_support_action("ADMIN_FULL_REPORT_PREVIEW_GENERATED", report_id=report.id)
+        self.repo.persist_all()
+        return FullReportPreviewResponse(report_id=report.id, is_preview=True, is_unlocked=report.is_unlocked, full_report=full_report)
 
     def create_order(self, request: CreateOrderRequest) -> CreateOrderResponse:
         report = self.repo.reports.get(request.report_id)

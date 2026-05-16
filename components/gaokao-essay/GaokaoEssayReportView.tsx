@@ -86,7 +86,8 @@ export function GaokaoEssayReportView({ reportId }: { reportId: string }) {
     );
   }
 
-  const unlockedFullReport = report.is_unlocked ? report.full_report : null;
+  const visibleFullReport = report.is_unlocked ? report.full_report : null;
+  const isPreviewMode = false;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -108,7 +109,7 @@ export function GaokaoEssayReportView({ reportId }: { reportId: string }) {
           <StatusPanel report={report} />
           {report.status === "COMPLETED" && report.free_summary ? <FreeSummaryPanel report={report} /> : null}
           {report.status === "FAILED" ? <FailedPanel report={report} onRetry={setReport} /> : null}
-          {unlockedFullReport ? <FullReportPanel report={report} fullReport={unlockedFullReport} /> : <LockedSections />}
+          {visibleFullReport ? <FullReportPanel report={report} fullReport={visibleFullReport} isPreview={isPreviewMode} /> : <LockedSections />}
         </div>
         <aside className="space-y-5">
           {!report.is_unlocked ? <PaywallCard reportId={reportId} /> : null}
@@ -211,12 +212,14 @@ function LockedSections() {
   );
 }
 
-function FullReportPanel({ report, fullReport }: { report: GaokaoEssayReport; fullReport: FullReport }) {
+function FullReportPanel({ report, fullReport, isPreview = false }: { report: GaokaoEssayReport; fullReport: FullReport; isPreview?: boolean }) {
   return (
     <section className="space-y-6">
-      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-5">
-        <h2 className="text-xl font-bold text-emerald-950">完整报告已解锁</h2>
-        <p className="mt-2 text-sm leading-6 text-emerald-900">{fullReport.disclaimer}</p>
+      <div className={`rounded-3xl border p-5 ${isPreview ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+        <h2 className={`text-xl font-bold ${isPreview ? "text-amber-950" : "text-emerald-950"}`}>{isPreview ? "开发预览：完整报告未解锁" : "完整报告已解锁"}</h2>
+        <p className={`mt-2 text-sm leading-6 ${isPreview ? "text-amber-900" : "text-emerald-900"}`}>
+          {isPreview ? "这是真实模型生成的后台预览结果，仅用于检查报告质量和前端展示；不会发放额度、不会创建订单，也不会把用户报告标记为已解锁。" : fullReport.disclaimer}
+        </p>
       </div>
 
       <DiagnosisDashboard report={report} fullReport={fullReport} />
@@ -441,23 +444,23 @@ function StudyPlanPanel({ fullReport }: { fullReport: FullReport }) {
 function PaywallCard({ reportId }: { reportId: string }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-xl font-bold text-slate-950">开通完整深度诊断</h2>
+      <h2 className="text-xl font-bold text-slate-950">????????</h2>
       <div className="mt-4 space-y-3">
         <Link
           className="block rounded-3xl border border-slate-300 p-4 font-semibold text-slate-900 transition hover:border-blue-600"
           href={`${GAOKAO_ESSAY_TOOL_BASE_PATH}/checkout/${reportId}?product=${GAOKAO_ESSAY_PRODUCT_TYPES.singlePack}`}
         >
-          立即开通 20 篇提分权限 {formatCny(GAOKAO_ESSAY_PRICING.singlePriceCents)}
+          ???? 20 ????? {formatCny(GAOKAO_ESSAY_PRICING.singlePriceCents)}
         </Link>
         <GaokaoEssaySinglePlanFull />
         <Link
           className="block rounded-3xl border-2 border-blue-700 bg-blue-50 p-4 font-semibold text-blue-950 transition hover:bg-blue-100"
           href={`${GAOKAO_ESSAY_TOOL_BASE_PATH}/checkout/${reportId}?product=${GAOKAO_ESSAY_PRODUCT_TYPES.groupPack}`}
         >
-          发起组队开通 20 篇抢分包 {formatCny(GAOKAO_ESSAY_PRICING.groupPriceCents)} / 人
+          ?????? 20 ???? {formatCny(GAOKAO_ESSAY_PRICING.groupPriceCents)} / ?
         </Link>
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-500">3 人成团，每名真实付费成员都获得独立 20 篇额度。作文、报告、订单和个人信息互不共享。</p>
+      <p className="mt-3 text-sm leading-6 text-slate-500">3 ????????????????? 20 ??????????????????????</p>
     </section>
   );
 }

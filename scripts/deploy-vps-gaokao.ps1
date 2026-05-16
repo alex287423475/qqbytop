@@ -35,6 +35,7 @@ tar -czf $archive `
   --exclude ".env" `
   --exclude ".env.production" `
   --exclude "backend/.env" `
+  --exclude "backend/.env.local-deepseek" `
   .
 
 ssh -i $KeyPath "${User}@${HostName}" "sudo mkdir -p $RemoteDir && sudo chown -R ${User}:${User} $RemoteDir"
