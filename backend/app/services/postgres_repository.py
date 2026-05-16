@@ -121,6 +121,14 @@ class PostgresRepository(InMemoryRepository):
     def _connect(self):
         return psycopg.connect(self.database_url, row_factory=dict_row)
 
+    @staticmethod
+    def _existing_marketing_attribution_id(cursor, value: str | None) -> UUID | None:
+        attribution_id = uuid_or_none(value)
+        if not attribution_id:
+            return None
+        cursor.execute("select 1 from marketing_attributions where id=%s", (attribution_id,))
+        return attribution_id if cursor.fetchone() else None
+
     def _ensure_merchants(self, merchant_codes: list[str]) -> None:
         with self._connect() as conn, conn.cursor() as cursor:
             for code in merchant_codes:
@@ -351,7 +359,7 @@ class PostgresRepository(InMemoryRepository):
                 (
                     record.id,
                     record.session_id,
-                    uuid_or_none(record.attribution_id),
+                    self._existing_marketing_attribution_id(cursor, record.attribution_id),
                     record.source_type,
                     record.draft_status,
                     record.raw_input_text,
@@ -447,7 +455,7 @@ class PostgresRepository(InMemoryRepository):
                 (
                     order.id,
                     order.report_id,
-                    uuid_or_none(order.attribution_id),
+                    self._existing_marketing_attribution_id(cursor, order.attribution_id),
                     order.group_buy_id,
                     order.merchant_account_id,
                     order.product_type,
@@ -646,7 +654,7 @@ class PostgresRepository(InMemoryRepository):
                     values (%s,%s,%s,%s,'CNY','PENDING')
                     on conflict (order_id, event_name) do nothing
                     """,
-                    (order.id, uuid_or_none(order.attribution_id), event_name, order.amount_cents),
+                    (order.id, self._existing_marketing_attribution_id(cursor, order.attribution_id), event_name, order.amount_cents),
                 )
             for account in self.credit_accounts.values():
                 cursor.execute(

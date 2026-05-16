@@ -16,7 +16,9 @@ $files = @(
   "backend/app/services/report_quality.py",
   "backend/app/adapters/llm.py",
   "backend/app/models/schemas.py",
-  "backend/app/services/core.py"
+  "backend/app/services/core.py",
+  "backend/app/services/repository.py",
+  "backend/app/services/postgres_repository.py"
 )
 
 foreach ($file in $files) {
