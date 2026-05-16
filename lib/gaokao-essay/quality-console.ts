@@ -738,7 +738,15 @@ async function getLatestBatchSummary(): Promise<QualityBatchSummary | null> {
       const rows = parseSummaryCsv(csv);
       if (rows.length === 0) continue;
       const scores = rows.map((row) => Number(row.rule_score)).filter((value) => Number.isFinite(value));
-      const failed = rows.filter((row) => row.status !== "ok" || String(row.schema_ok).toLowerCase() !== "true" || Number(row.rule_score) < 80).length;
+      const failed = rows.filter((row) => {
+        const status = String(row.status || "");
+        const manifestOk = String(row.manifest_ok || "").toLowerCase();
+        if (manifestOk && manifestOk !== "true" && manifestOk !== "1") return true;
+        if (status === "guardrail_expected") return false;
+        if (status !== "ok") return true;
+        if (String(row.schema_ok).toLowerCase() !== "true") return true;
+        return Number(row.rule_score) < 80;
+      }).length;
       return {
         outputDir: path.join(batchOutputsDir, dir),
         total: rows.length,

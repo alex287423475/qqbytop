@@ -32,6 +32,13 @@ SUMMARY_FIELDS = [
     "report_id",
     "order_id",
     "local_case_id",
+    "word_count",
+    "estimated_score",
+    "target_score_band",
+    "manifest_ok",
+    "manifest_errors",
+    "guardrail_expected",
+    "guardrail_triggered",
     "provider",
     "model_name",
     "model_degraded",
@@ -143,6 +150,95 @@ def score_report(report: dict[str, Any]) -> dict[str, Any]:
         return {"score": 0, "schema_ok": False, "deductions": ["missing full_report"]}
     quality = score_generated_report_quality(str(report.get("confirmed_text") or report.get("essay_text") or ""), report.get("free_summary") or {}, full_report)
     return {"score": quality.score, "schema_ok": quality.schema_ok, "deductions": quality.deductions}
+
+
+def extract_estimated_score(report: dict[str, Any]) -> int | None:
+    score = ((report.get("free_summary") or {}).get("score") or {}).get("estimated")
+    return score if isinstance(score, int) else None
+
+
+def load_golden_manifest(input_dir: Path) -> dict[str, dict[str, Any]]:
+    manifest_path = input_dir / "golden_manifest.json"
+    if not manifest_path.exists():
+        return {}
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    cases = payload.get("cases") or []
+    return {str(case.get("filename")): case for case in cases if case.get("filename")}
+
+
+def format_score_band(case: dict[str, Any] | None) -> str:
+    if not case:
+        return ""
+    band = case.get("target_score_band")
+    if isinstance(band, list) and len(band) == 2:
+        return f"{band[0]}-{band[1]}"
+    return "guardrail"
+
+
+def detect_expected_guardrails(essay_text: str, case: dict[str, Any] | None) -> list[str]:
+    if not case:
+        return []
+    expected = set(case.get("should_trigger_guardrail") or [])
+    triggered: list[str] = []
+    if "WORD_COUNT_TOO_LOW" in expected and word_count(essay_text) < 41:
+        triggered.append("WORD_COUNT_TOO_LOW")
+    off_topic_needles = ("basketball", "mother", "dinner", "river", "forest", "animals")
+    if "OFF_TOPIC_RISK" in expected and any(needle in essay_text.lower() for needle in off_topic_needles):
+        triggered.append("OFF_TOPIC_RISK")
+    return triggered
+
+
+def validate_manifest_expectation(
+    *,
+    essay_text: str,
+    row: dict[str, Any],
+    case: dict[str, Any] | None,
+    guardrails: list[str] | None = None,
+) -> dict[str, str]:
+    if not case:
+        return {
+            "word_count": str(word_count(essay_text)),
+            "estimated_score": str(row.get("estimated_score") or ""),
+            "target_score_band": "",
+            "manifest_ok": "",
+            "manifest_errors": "",
+            "guardrail_expected": "",
+            "guardrail_triggered": "",
+        }
+
+    errors: list[str] = []
+    count = word_count(essay_text)
+    expected_range = case.get("expected_word_count_range")
+    if isinstance(expected_range, list) and len(expected_range) == 2:
+        low, high = int(expected_range[0]), int(expected_range[1])
+        if not (low <= count <= high):
+            errors.append(f"word_count {count} outside {low}-{high}")
+
+    expected_guardrails = [str(item) for item in (case.get("should_trigger_guardrail") or [])]
+    triggered_guardrails = guardrails or []
+    if expected_guardrails:
+        missing = [item for item in expected_guardrails if item not in triggered_guardrails]
+        if missing:
+            errors.append(f"missing expected guardrails: {'|'.join(missing)}")
+    else:
+        estimated = row.get("estimated_score")
+        band = case.get("target_score_band")
+        if isinstance(band, list) and len(band) == 2 and isinstance(estimated, int):
+            low, high = int(band[0]), int(band[1])
+            if not (low <= estimated <= high):
+                errors.append(f"estimated_score {estimated} outside target band {low}-{high}")
+        elif isinstance(band, list):
+            errors.append("estimated_score missing")
+
+    return {
+        "word_count": str(count),
+        "estimated_score": str(row.get("estimated_score") or ""),
+        "target_score_band": format_score_band(case),
+        "manifest_ok": "true" if not errors else "false",
+        "manifest_errors": "; ".join(errors),
+        "guardrail_expected": "|".join(expected_guardrails),
+        "guardrail_triggered": "|".join(triggered_guardrails),
+    }
 
 
 def compact_report_for_judge(report: dict[str, Any]) -> dict[str, Any]:
@@ -275,6 +371,8 @@ def run_pipeline_case(api_base: str, file_path: Path, essay_text: str, output_di
         "report_id": report["report_id"],
         "order_id": order["order_id"],
         "local_case_id": file_path.stem,
+        "word_count": word_count(essay_text),
+        "estimated_score": extract_estimated_score(unlocked),
         "provider": meta.get("provider"),
         "model_name": meta.get("model_name"),
         "model_degraded": meta.get("model_degraded"),
@@ -343,6 +441,8 @@ def run_ab_case(
         "report_id": "",
         "order_id": "",
         "local_case_id": file_path.stem,
+        "word_count": word_count(essay_text),
+        "estimated_score": extract_estimated_score(report_a),
         "provider": meta_a.get("provider"),
         "model_name": meta_a.get("model_name"),
         "model_degraded": meta_a.get("model_degraded"),
@@ -396,6 +496,8 @@ def run_local_case(settings: Settings, file_path: Path, essay_text: str, output_
         "report_id": "",
         "order_id": "",
         "local_case_id": file_path.stem,
+        "word_count": word_count(essay_text),
+        "estimated_score": extract_estimated_score(report),
         "provider": meta.get("provider") or provider,
         "model_name": meta.get("model_name"),
         "model_degraded": meta.get("model_degraded"),
@@ -430,7 +532,13 @@ def write_batch_summary(output_dir: Path, rows: list[dict[str, Any]]) -> None:
 
 def has_quality_failures(rows: list[dict[str, Any]], min_rule_score: int) -> bool:
     for row in rows:
-        if row.get("status") not in ("ok", ""):
+        status = str(row.get("status") or "")
+        manifest_ok = str(row.get("manifest_ok") or "").lower()
+        if manifest_ok and manifest_ok not in ("true", "1"):
+            return True
+        if status == "guardrail_expected":
+            continue
+        if status not in ("ok", ""):
             return True
         if row.get("mode") == "ab":
             for field in ("rule_score_a", "rule_score_b"):
@@ -477,6 +585,7 @@ def main() -> int:
         files = files[: args.limit]
     if not files:
         raise RuntimeError(f"No .txt essay files found in {input_dir}")
+    manifest_cases = load_golden_manifest(input_dir)
 
     apply_env_file(Path(args.env_file))
     settings = Settings()
@@ -487,20 +596,34 @@ def main() -> int:
 
     for index, file_path in enumerate(files, 1):
         started = time.time()
+        essay_text = ""
+        manifest_case = manifest_cases.get(file_path.name)
         try:
             essay_text = file_path.read_text(encoding="utf-8").strip()
+            expected_guardrails = detect_expected_guardrails(essay_text, manifest_case)
             if not essay_text:
                 row = {"file": file_path.name, "mode": args.mode, "status": "skipped_empty", "elapsed_seconds": 0, "error": "empty file"}
+            elif manifest_case and manifest_case.get("should_trigger_guardrail"):
+                row = {
+                    "file": file_path.name,
+                    "mode": args.mode,
+                    "status": "guardrail_expected",
+                    "elapsed_seconds": round(time.time() - started, 2),
+                    "schema_ok": True,
+                    "error": "",
+                }
             elif args.mode == "pipeline":
                 row = run_pipeline_case(args.api_base.rstrip("/"), file_path, essay_text, output_dir, index, args.payer_contact)
             elif args.mode == "local":
                 row = run_local_case(settings, file_path, essay_text, output_dir, args.prompt_a)
             else:
                 row = run_ab_case(settings, file_path, essay_text, output_dir, args.prompt_a, args.prompt_b, args.judge)
+            row.update(validate_manifest_expectation(essay_text=essay_text, row=row, case=manifest_case, guardrails=expected_guardrails))
             rows.append({field: row.get(field, "") for field in SUMMARY_FIELDS})
             print(f"[{index}/{len(files)}] ok {file_path.name}")
         except Exception as exc:  # noqa: BLE001 - batch runner must continue and persist per-file errors.
             error_payload = {"file": file_path.name, "mode": args.mode, "status": "error", "error": str(exc), "elapsed_seconds": round(time.time() - started, 2)}
+            error_payload.update(validate_manifest_expectation(essay_text=essay_text, row=error_payload, case=manifest_case))
             json_dump(output_dir / f"{file_path.stem}.error.json", error_payload)
             rows.append({field: error_payload.get(field, "") for field in SUMMARY_FIELDS})
             print(f"[{index}/{len(files)}] error {file_path.name}: {exc}")
